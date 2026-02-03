@@ -317,4 +317,34 @@ Breaking changes must follow semantic versioning.
 
 ---
 
+## 10. Stage-1 Module Allowlist (Enforced)
+
+During Stage-1 development, only the following Core FHIR modules are permitted:
+
+### Allowed Modules (Stage-1)
+
+- fhir-model
+- fhir-parser
+- fhir-validator (StructureDefinition only)
+- fhir-profile
+- fhir-context
+
+### Conditionally Allowed (Read-only / Test-only)
+
+- terminology-assets (external, read-only)
+
+### Explicitly Forbidden in Stage-1
+
+- fhir-search
+- fhir-reference (runtime resolution)
+- fhir-transaction
+- fhir-history
+- index-engine
+- storage-postgres
+- any Platform / Application / Integration modules
+
+Implementation of forbidden modules during Stage-1 is a violation.
+
+---
+
 **This document is enforceable.**

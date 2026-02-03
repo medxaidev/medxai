@@ -229,7 +229,26 @@ Breaking changes **MUST**:
 
 ---
 
-## 9. Relationship to Other Documents
+## 9. Development Stages (Enforced)
+
+Stages define **time-bounded capability constraints** over this architecture.
+
+A Stage:
+
+- DOES NOT introduce new architectural concepts
+- DOES NOT change layer responsibilities
+- ONLY restricts which modules and dataflows are legally instantiable at a given time
+
+At any given Stage:
+
+- Modules not explicitly allowed MUST NOT exist
+- Dataflows not explicitly allowed MUST NOT be implemented
+
+Stage definitions are binding and enforceable.
+
+---
+
+## 10. Relationship to Other Documents
 
 - MODULES.md defines concrete module inventory
 - DATAFLOW.md defines runtime behavior

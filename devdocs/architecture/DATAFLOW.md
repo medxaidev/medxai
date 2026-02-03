@@ -237,4 +237,27 @@ The following are explicitly forbidden:
 
 ---
 
+## Appendix A: Stage-1 Valid Dataflows (Enforced)
+
+During Stage-1, the only legal dataflows are:
+
+### A.1 Definition Processing Flow
+
+StructureDefinition / ValueSet / CodeSystem
+→ fhir-parser
+→ fhir-profile processing
+→ canonical fhir-model
+→ type generation (d.ts)
+
+### A.2 Profile Validation Test Flow
+
+FHIR Resource (test-only)
+→ fhir-parser
+→ fhir-validator (structure & profile constraints)
+→ validation report
+
+All other flows defined in this document are INVALID during Stage-1.
+
+---
+
 **This document is enforceable.**
