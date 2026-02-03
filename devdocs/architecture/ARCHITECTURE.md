@@ -54,6 +54,102 @@ The system **MUST NOT**:
 The system **MUST** follow this layered model.
 Dependencies are **strictly one-directional**.
 
+### 3.0 System Layering Diagram
+
+```mermaid
+graph TB
+    subgraph Delivery["5. Delivery Interfaces"]
+        REST[REST API]
+        GraphQL[GraphQL API]
+        WebUI[Web UI]
+    end
+
+    subgraph Application["4. Application Layer"]
+        EMR[app-emr]
+        OPD[app-opd]
+        LIS[app-lis]
+        RIS[app-ris]
+        Prescription[app-prescription]
+    end
+
+    subgraph Platform["3. Platform Layer"]
+        Tenant[tenant-service]
+        Auth[auth-service]
+        RBAC[rbac-service]
+        Audit[audit-service]
+        Workflow[workflow-engine]
+    end
+
+    subgraph Infrastructure["2. Infrastructure Layer"]
+        Storage[storage-postgres]
+        Index[index-engine]
+        Cache[cache-redis]
+    end
+
+    subgraph CoreFHIR["1. Core FHIR Engine"]
+        subgraph Semantic["Semantic Layer (Foundation)"]
+            Model[fhir-model]
+            Profile[fhir-profile]
+            Context[fhir-context]
+        end
+
+        subgraph Validation["Validation Layer"]
+            Validator[fhir-validator]
+        end
+
+        subgraph Runtime["Runtime Layer"]
+            Parser[fhir-parser]
+            Search[fhir-search]
+            Reference[fhir-reference]
+            Transaction[fhir-transaction]
+            History[fhir-history]
+        end
+    end
+
+    subgraph Spec["0. Specification Layer (READ-ONLY)"]
+        FHIRR4[FHIR R4 Definitions]
+        Profiles[Custom Profiles]
+        Terminology[Terminology Assets]
+    end
+
+    %% Dependencies (top-down)
+    Delivery --> Application
+    Application --> Platform
+    Application --> CoreFHIR
+    Platform --> CoreFHIR
+    Platform --> Infrastructure
+    Infrastructure --> CoreFHIR
+    CoreFHIR --> Spec
+
+    %% Internal Core FHIR dependencies
+    Runtime -.-> Validation
+    Runtime -.-> Semantic
+    Validation -.-> Semantic
+
+    %% Styling
+    classDef readOnly fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
+    classDef stable fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef medium fill:#fff9c4,stroke:#f57c00,stroke-width:2px
+    classDef evolve fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    class Spec readOnly
+    class CoreFHIR,Semantic,Validation,Runtime stable
+    class Infrastructure,Platform medium
+    class Application,Delivery evolve
+```
+
+**Legend:**
+
+- **Solid arrows (→)**: Layer dependencies (must flow downward only)
+- **Dashed arrows (-.->)**: Internal sublayer dependencies within Core FHIR Engine
+- **Colors**:
+  - 🔵 Blue: Read-only (Specification)
+  - 🟢 Green: Very High Stability (Core FHIR)
+  - 🟡 Yellow: Medium Stability (Infrastructure, Platform)
+  - 🔴 Pink: Low Stability / High Evolvability (Application, Delivery)
+
+**Text Representation:**
+
 ```
 Specification
     ↓
@@ -84,24 +180,156 @@ Delivery Interfaces
 
 ### 3.2 Core FHIR Engine (MOST STABLE)
 
+The Core FHIR Engine is subdivided into three sublayers with strict dependencies:
+
+#### Core FHIR Engine Internal Architecture
+
+```mermaid
+graph TB
+    subgraph Runtime["Runtime Layer"]
+        Parser[fhir-parser<br/>JSON/XML Parsing]
+        Search[fhir-search<br/>Query Plans]
+        Reference[fhir-reference<br/>Reference Resolution]
+        Transaction[fhir-transaction<br/>Bundle Execution]
+        History[fhir-history<br/>Versioning]
+    end
+
+    subgraph Validation["Validation Layer"]
+        Validator[fhir-validator<br/>Structural Validation]
+        CardinalityCheck[Cardinality Enforcement]
+        TypeCheck[Type Validation]
+        BindingCheck[Binding Metadata]
+    end
+
+    subgraph Semantic["Semantic Layer (Foundation)"]
+        Model[fhir-model<br/>Canonical Types]
+        Profile[fhir-profile<br/>Snapshot Generation]
+        Context[fhir-context<br/>Definition Registry]
+
+        SnapshotAlgo[Snapshot Generation<br/>Algorithm]
+        InheritanceResolver[Inheritance Chain<br/>Resolution]
+        ElementMerger[ElementDefinition<br/>Constraint Merging]
+    end
+
+    %% Runtime dependencies
+    Parser --> Validator
+    Parser --> Model
+    Search --> Validator
+    Search --> Context
+    Reference --> Context
+    Transaction --> Validator
+    History --> Model
+
+    %% Validation dependencies
+    Validator --> Profile
+    Validator --> Context
+    CardinalityCheck --> Profile
+    TypeCheck --> Profile
+    BindingCheck --> Context
+
+    %% Semantic internal dependencies
+    Profile --> Model
+    Profile --> Context
+    Context --> Model
+    SnapshotAlgo --> Model
+    SnapshotAlgo --> InheritanceResolver
+    ElementMerger --> Model
+
+    %% Styling
+    classDef semantic fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    classDef validation fill:#fff9c4,stroke:#f57c00,stroke-width:2px
+    classDef runtime fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
+    classDef algorithm fill:#ffccbc,stroke:#d84315,stroke-width:2px
+
+    class Model,Profile,Context,InheritanceResolver,ElementMerger semantic
+    class Validator,CardinalityCheck,TypeCheck,BindingCheck validation
+    class Parser,Search,Reference,Transaction,History runtime
+    class SnapshotAlgo algorithm
+```
+
+**Key Dependency Rules:**
+
+- Runtime Layer → Validation Layer → Semantic Layer (strict downward flow)
+- Semantic Layer MUST NOT depend on Validation or Runtime
+- All layers depend on `fhir-model` for type definitions
+
+#### 3.2.1 Semantic Layer (Foundation)
+
 **Responsibilities:**
 
-- FHIR resource parsing
-- StructureDefinition processing
-- Validation engine
-- Search grammar and execution model
-- Reference resolution
-- Versioning & history
-- Transaction semantics
+- StructureDefinition canonical interpretation
+- **Snapshot generation from differential** (HAPI core algorithm)
+- **Profile inheritance chain resolution**
+- ElementDefinition constraint merging (cardinality, type, binding)
+- Slicing definition processing
+- Type system and cardinality rules
+- Path normalization (base, sliced, choice types)
+
+**Key Modules:** `fhir-model`, `fhir-profile`, `fhir-context`
 
 **Rules:**
 
-- MUST be framework-agnostic
-- MUST NOT reference application concepts (patients, orders, billing)
-- MUST expose only typed interfaces
-- MUST remain backward compatible within a major version
+- MUST be deterministic (same input → same output)
+- MUST NOT depend on Validation or Runtime layers
+- MUST NOT access external resources (database, HTTP)
 
-This layer is conceptually inspired by **HAPI**, but implemented independently.
+---
+
+#### 3.2.2 Validation Layer
+
+**Responsibilities:**
+
+- Structural validation against profiles
+- Cardinality enforcement (min/max)
+- Type constraint checking
+- Required element presence validation
+- Terminology binding hooks (metadata only, no expansion)
+
+**Key Modules:** `fhir-validator`
+
+**Depends on:** Semantic Layer only
+
+**Rules:**
+
+- MUST use resolved snapshots from Semantic Layer
+- MUST NOT evaluate FHIRPath constraints (deferred to Stage-3)
+- MUST NOT perform terminology expansion (deferred to Infrastructure)
+- MUST NOT validate reference targets at runtime (deferred to Stage-3)
+
+---
+
+#### 3.2.3 Runtime Layer
+
+**Responsibilities:**
+
+- FHIR resource parsing (JSON/XML → runtime objects)
+- Reference resolution (logical → literal)
+- Search grammar interpretation
+- Versioning & history semantics
+- Transaction bundle execution
+
+**Key Modules:** `fhir-parser`, `fhir-search`, `fhir-reference`, `fhir-transaction`, `fhir-history`
+
+**Depends on:** Semantic Layer and Validation Layer
+
+**Rules:**
+
+- MUST validate through Validation Layer before persistence
+- MUST use canonical semantics from Semantic Layer
+
+---
+
+**Cross-Layer Rules:**
+
+- Semantic Layer MUST NOT depend on Validation or Runtime layers
+- Validation Layer MUST NOT depend on Runtime layer
+- Runtime Layer MAY depend on both Semantic and Validation layers
+- All layers MUST be framework-agnostic
+- All layers MUST NOT reference application concepts (patients, orders, billing)
+- All layers MUST expose only typed interfaces
+- All layers MUST remain backward compatible within a major version
+
+This layer is conceptually inspired by **HAPI FHIR**, but implemented independently in TypeScript.
 
 ---
 

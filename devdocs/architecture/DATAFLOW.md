@@ -239,24 +239,192 @@ The following are explicitly forbidden:
 
 ## Appendix A: Stage-1 Valid Dataflows (Enforced)
 
-During Stage-1, the only legal dataflows are:
+During Stage-1, the following dataflows are LEGAL and REQUIRED:
 
-### A.1 Definition Processing Flow
+### A.1 StructureDefinition Loading Flow
 
-StructureDefinition / ValueSet / CodeSystem
-→ fhir-parser
-→ fhir-profile processing
-→ canonical fhir-model
-→ type generation (d.ts)
+```
+External StructureDefinition (JSON/XML file or HTTP)
+  ↓
+fhir-parser.parse()
+  ↓
+CanonicalStructureDefinition (fhir-model type)
+  ↓
+fhir-context.register(url, structureDefinition)
+  ↓
+Cached in StructureDefinition Registry
+```
 
-### A.2 Profile Validation Test Flow
+**Purpose:** Load FHIR definitions into the system.
 
-FHIR Resource (test-only)
-→ fhir-parser
-→ fhir-validator (structure & profile constraints)
-→ validation report
+---
 
-All other flows defined in this document are INVALID during Stage-1.
+### A.2 Snapshot Generation Flow ⭐ (HAPI Core Algorithm)
+
+```
+StructureDefinition (with differential only)
+  ↓
+fhir-profile.SnapshotGenerator.generate(sd)
+  ↓
+Step 1: Load base StructureDefinition
+  fhir-context.loadStructureDefinition(sd.baseDefinition)
+  ↓
+Step 2: Ensure base has snapshot (recursive generation if needed)
+  if (!base.snapshot) {
+    generate(base)  // Recursive call
+  }
+  ↓
+Step 3: Initialize snapshot from base.snapshot
+  snapshot = clone(base.snapshot.element)
+  ↓
+Step 4: Apply differential.element (element-by-element merge)
+  For each diffElement in sd.differential.element:
+    a. Find matching baseElement in snapshot by path
+    b. If found:
+       - Merge cardinality: min = max(base.min, diff.min)
+       - Merge cardinality: max = min(base.max, diff.max)
+       - Merge types: intersection(base.type, diff.type)
+       - Merge binding: stricter(base.binding, diff.binding)
+       - Accumulate constraints: base.constraint + diff.constraint
+    c. If not found (new slice):
+       - Insert diffElement into snapshot
+       - Apply slicing rules
+  ↓
+Step 5: Validate merged snapshot
+  - Check min <= max for all elements
+  - Check type compatibility with base
+  - Check required elements exist
+  ↓
+Step 6: Sort elements by path (lexicographic order)
+  ↓
+StructureDefinition (with complete snapshot)
+  ↓
+Cache snapshot in fhir-context
+```
+
+**Purpose:** Generate complete element tree from differential (HAPI's most critical algorithm).
+
+**Reference:** HAPI `org.hl7.fhir.r4.conformance.ProfileUtilities.generateSnapshot()`
+
+---
+
+### A.3 Profile Inheritance Chain Resolution Flow
+
+```
+Profile URL (e.g., "http://example.org/ChinesePatient")
+  ↓
+fhir-context.resolveInheritanceChain(url)
+  ↓
+Step 1: Load StructureDefinition
+  sd = loadStructureDefinition(url)
+  ↓
+Step 2: Extract baseDefinition URL
+  baseUrl = sd.baseDefinition
+  ↓
+Step 3: Recursively load base (until reaching FHIR base resource)
+  chain = [url]
+  while (baseUrl) {
+    chain.push(baseUrl)
+    base = loadStructureDefinition(baseUrl)
+    baseUrl = base.baseDefinition
+  }
+  ↓
+Step 4: Detect circular dependencies
+  if (chain has duplicates) {
+    throw CircularDependencyError
+  }
+  ↓
+Inheritance Chain (ordered list)
+Example: ["ChinesePatient", "Patient", "DomainResource", "Resource"]
+```
+
+**Purpose:** Resolve profile inheritance for snapshot generation and validation.
+
+---
+
+### A.4 Resource Instance Structural Validation Flow
+
+```
+FHIR Resource Instance (JSON)
+  ↓
+fhir-parser.parse()
+  ↓
+Runtime Resource Object
+  ↓
+fhir-validator.validate(resource, profileUrl)
+  ↓
+Step 1: Load profile snapshot
+  snapshot = fhir-context.getSnapshot(profileUrl)
+  ↓
+Step 2: For each ElementDefinition in snapshot:
+  a. Extract values from resource (FHIRPath-like navigation)
+     values = extractValues(resource, elementDef.path)
+  b. Validate cardinality
+     if (values.length < elementDef.min) → ERROR
+     if (values.length > elementDef.max) → ERROR
+  c. Validate type
+     for each value:
+       if (!isTypeCompatible(value, elementDef.type)) → ERROR
+  d. Validate binding (metadata only)
+     if (elementDef.binding) {
+       // Store binding info, do NOT expand ValueSet
+       // Actual code validation deferred to Stage-3
+     }
+  ↓
+ValidationResult {
+  valid: boolean,
+  issues: ValidationIssue[]
+}
+```
+
+**Purpose:** Validate resource instances against profile structure (Stage-1 scope: structure only).
+
+**Limitations:**
+
+- ✅ Cardinality validation
+- ✅ Type validation
+- ✅ Required element presence
+- ❌ FHIRPath constraint evaluation (deferred to Stage-3)
+- ❌ Terminology binding validation (deferred to Stage-3)
+- ❌ Reference target validation (deferred to Stage-3)
+
+---
+
+### A.5 Canonical Profile Registry Query Flow
+
+```
+Query: "Get canonical element definition for Patient.identifier.system"
+  ↓
+fhir-context.getSnapshot("http://hl7.org/fhir/StructureDefinition/Patient")
+  ↓
+snapshot.element.find(e => e.path === "Patient.identifier.system")
+  ↓
+CanonicalElement {
+  path: "Patient.identifier.system",
+  min: 0,
+  max: "1",
+  type: [{ code: "uri" }],
+  // ... other constraints
+}
+```
+
+**Purpose:** Provide semantic metadata for downstream stages.
+
+---
+
+### A.6 Forbidden Flows in Stage-1 ❌
+
+The following flows are EXPLICITLY FORBIDDEN during Stage-1:
+
+❌ **Direct database access** (no `storage-postgres` module)
+❌ **Search parameter processing** (no `fhir-search` module)
+❌ **Reference resolution at runtime** (no `fhir-reference` module)
+❌ **Transaction bundle execution** (no `fhir-transaction` module)
+❌ **Terminology expansion** (no ValueSet `$expand` operation)
+❌ **FHIRPath constraint evaluation** (parse only, do not evaluate)
+❌ **Resource instance CRUD operations** (no persistence)
+
+**Rationale:** Stage-1 focuses exclusively on **canonical semantics**, not runtime behavior.
 
 ---
 

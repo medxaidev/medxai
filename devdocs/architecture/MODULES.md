@@ -49,8 +49,21 @@ This layer is **conceptually inspired by HAPI FHIR**, but implemented independen
 
 **Responsibilities:**
 
-- Define canonical internal representations
-- Own resource identity, typing, and element addressing
+- Define FHIR primitive types (string, uri, code, integer, boolean, decimal, etc.)
+- Define canonical StructureDefinition model (as per FHIR R4 specification)
+- Define canonical ElementDefinition model
+- **Define internal canonical semantic model:**
+  - `CanonicalProfile` (resolved, flattened semantic view)
+  - `CanonicalElement` (merged constraints from inheritance chain)
+  - `TypeConstraint`, `BindingConstraint`, `Invariant`
+- Own element path normalization rules (base path, sliced path, choice types)
+- Own cardinality and type compatibility rules
+
+**Canonical vs Runtime Models:**
+
+- **Canonical Model**: Semantic truth derived from StructureDefinition (e.g., `CanonicalProfile`)
+- **Runtime Model**: Instance data representation (e.g., `Patient` resource instance)
+- This module defines BOTH, but keeps them strictly separated
 
 **Stability:**
 
@@ -58,7 +71,9 @@ This layer is **conceptually inspired by HAPI FHIR**, but implemented independen
 
 **Must NOT:**
 
-- Contain parsing or validation logic
+- Contain parsing logic (belongs to `fhir-parser`)
+- Contain validation logic (belongs to `fhir-validator`)
+- Contain snapshot generation logic (belongs to `fhir-profile`)
 - Depend on infrastructure or platform layers
 
 ---
@@ -67,13 +82,67 @@ This layer is **conceptually inspired by HAPI FHIR**, but implemented independen
 
 **Responsibilities:**
 
-- Parse FHIR JSON/XML into internal canonical structures
-- Normalize element paths and types
+- Parse FHIR JSON/XML into `fhir-model` types
+- Normalize primitive values (trim whitespace, validate format)
+- Handle FHIR-specific JSON conventions (resourceType, meta, etc.)
+- Convert external StructureDefinition JSON into `CanonicalStructureDefinition`
+
+**Depends on:**
+
+- `fhir-model` (for type definitions)
 
 **Must NOT:**
 
+- Interpret StructureDefinition semantics (belongs to `fhir-profile`)
+- Generate snapshots (belongs to `fhir-profile`)
+- Resolve profile inheritance (belongs to `fhir-context`)
 - Access database
 - Contain business logic
+
+---
+
+#### `fhir-profile` ⭐
+
+**Responsibilities:**
+
+- **Snapshot generation from differential** (HAPI core algorithm: `ProfileUtilities.generateSnapshot()`)
+- **Profile inheritance chain resolution**
+- **ElementDefinition constraint merging** (cardinality, type, binding)
+- **Slicing definition processing** (discriminators, slicing rules)
+- Type specialization and constraint intersection
+- Cardinality tightening rules enforcement
+
+**Core Algorithm (HAPI-inspired):**
+
+```
+Input: StructureDefinition with differential
+Output: StructureDefinition with complete snapshot
+
+Steps:
+1. Load base StructureDefinition (recursive if needed)
+2. Initialize snapshot from base.snapshot (clone all elements)
+3. Apply differential.element (merge constraints element by element)
+4. Validate merged snapshot (min <= max, type compatibility)
+5. Sort elements by path
+```
+
+**Depends on:**
+
+- `fhir-model` (for canonical types)
+- `fhir-parser` (to load StructureDefinitions)
+- `fhir-context` (to resolve base profiles)
+
+**Stability:**
+
+- Very High (this is the heart of FHIR semantic understanding)
+
+**Must NOT:**
+
+- Perform runtime validation (belongs to `fhir-validator`)
+- Access database
+- Modify StructureDefinitions after snapshot generation
+
+**Note:** This module implements the most complex algorithm in Stage-1. It is conceptually equivalent to HAPI's `org.hl7.fhir.r4.conformance.ProfileUtilities`.
 
 ---
 
@@ -81,13 +150,24 @@ This layer is **conceptually inspired by HAPI FHIR**, but implemented independen
 
 **Responsibilities:**
 
-- Structural validation
-- Profile-based constraint evaluation
-- Terminology hooks (no storage)
+- Structural validation against profiles
+- Cardinality enforcement (min/max)
+- Type constraint checking
+- Required element presence validation
+- Terminology binding hooks (metadata only, no expansion)
 
 **Depends on:**
 
+- `fhir-model`
 - `fhir-parser`
+- `fhir-profile` (to access resolved snapshots)
+- `fhir-context` (to load profiles)
+
+**Must NOT:**
+
+- Evaluate FHIRPath constraints (deferred to Stage-3)
+- Perform terminology expansion (deferred to Infrastructure Layer)
+- Validate reference targets at runtime (deferred to Stage-3)
 
 ---
 
@@ -129,6 +209,57 @@ This layer is **conceptually inspired by HAPI FHIR**, but implemented independen
 
 - Manage resource versioning
 - Support \_history interactions
+
+---
+
+#### `fhir-context` ⭐
+
+**Responsibilities:**
+
+- **StructureDefinition registry and lifecycle management**
+- **Canonical URL → StructureDefinition resolution** (with version support)
+- **Circular dependency detection** (prevent infinite recursion in inheritance chains)
+- **Snapshot caching and invalidation**
+- **Base definition preloading** (Patient, Observation, DomainResource, Resource, etc.)
+- Profile inheritance chain resolution
+
+**Loading Strategies:**
+
+- **Lazy loading**: Load StructureDefinition on first access
+- **Eager loading**: Preload core FHIR base resources at initialization
+- **Version-aware loading**: Support `url|version` format for versioned profiles
+
+**Core Operations:**
+
+```typescript
+// Load StructureDefinition by canonical URL
+loadStructureDefinition(url: string): Promise<CanonicalStructureDefinition>
+
+// Get or generate snapshot
+getSnapshot(url: string): Promise<StructureDefinitionSnapshot>
+
+// Resolve inheritance chain
+resolveInheritanceChain(url: string): Promise<string[]>
+```
+
+**Depends on:**
+
+- `fhir-model` (for canonical types)
+- `fhir-parser` (to parse loaded definitions)
+- `fhir-profile` (to generate snapshots when needed)
+
+**Stability:**
+
+- High (central coordination point for all FHIR definitions)
+
+**Must NOT:**
+
+- Modify StructureDefinitions after loading and caching
+- Bypass snapshot generation (always use `fhir-profile`)
+- Perform validation (belongs to `fhir-validator`)
+- Access database directly (use loaders/adapters)
+
+**Note:** This module is conceptually equivalent to HAPI's `FhirContext` and `IValidationSupport`.
 
 ---
 
