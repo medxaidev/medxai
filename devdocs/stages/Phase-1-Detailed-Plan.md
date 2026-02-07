@@ -389,11 +389,13 @@ FHIR 的 `[x]` 字段（如 `defaultValue[x]`, `fixed[x]`, `pattern[x]`）在 JS
 
 ### 验收标准
 
-- [ ] ElementDefinition 接口完整定义（~40 字段）
-- [ ] 所有子类型已定义（Slicing, Base, Type, Constraint, Binding, Example, Mapping）
-- [ ] 所有枚举已定义
-- [ ] choice type [x] 字段有清晰的 JSDoc 说明
-- [ ] TypeScript 编译通过
+- [x] ElementDefinition 接口完整定义（37 字段，extends BackboneElement）
+- [x] 所有子类型已定义（8 个：Slicing, SlicingDiscriminator, Base, Type, Constraint, Binding, Example, Mapping）
+- [x] 所有枚举已定义（复用 primitives.ts 中 7 个枚举）
+- [x] choice type [x] 字段有清晰的 JSDoc 说明（5 个 [x] 字段均标注 Stage-1 策略 + 允许类型）
+- [x] TypeScript 编译通过（`tsc --noEmit` exit 0）
+
+**Completed:** 2026-02-07
 
 ---
 
@@ -517,7 +519,7 @@ interface SlicingDiscriminatorDef {
 | -------------------------------------- | ---- |
 | 所有 FHIR R4 原始类型已定义            | ✅   |
 | StructureDefinition 模型完整           | ✅   |
-| ElementDefinition 模型完整（~40 字段） | ⬜   |
+| ElementDefinition 模型完整（~40 字段） | ✅   |
 | Canonical 内部模型已定义               | ⬜   |
 | 所有枚举类型已定义                     | ✅   |
 | JSDoc 注释完整（含 FHIR 规范引用）     | ⬜   |

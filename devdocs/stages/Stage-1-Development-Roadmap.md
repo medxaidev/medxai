@@ -213,56 +213,19 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 
 ---
 
-#### Task 1.3: Define ElementDefinition Model (2 days)
+#### Task 1.3: Define ElementDefinition Model (2 days) ✅ COMPLETED 2026-02-07
 
-**Files to Create:**
+**File:** `packages/fhir-core/src/model/element-definition.ts` (648 lines)
 
-- `packages/fhir-core/src/model/element-definition.ts`
+**Implemented:**
 
-**Key Interfaces:**
+- `ElementDefinition` interface extending `BackboneElement` (37 fields, all FHIR R4 fields covered)
+- 8 sub-types: `ElementDefinitionSlicing`, `SlicingDiscriminator`, `ElementDefinitionBase`, `ElementDefinitionType`, `ElementDefinitionConstraint`, `ElementDefinitionBinding`, `ElementDefinitionExample`, `ElementDefinitionMapping`
+- Reuses 7 enums from `primitives.ts` (PropertyRepresentation, SlicingRules, DiscriminatorType, AggregationMode, ReferenceVersionRules, ConstraintSeverity, BindingStrength)
+- 5 choice type [x] fields (defaultValue, fixed, pattern, minValue, maxValue) typed as `unknown` with JSDoc documenting allowed types and Stage-1 strategy
+- All JSDoc comments include cardinality annotations and FHIR R4 spec `@see` links
 
-```typescript
-interface ElementDefinition {
-  id?: string;
-  path: string;
-  min: number;
-  max: string; // number or "*"
-  type?: ElementDefinitionType[];
-  binding?: ElementDefinitionBinding;
-  constraint?: ElementDefinitionConstraint[];
-  slicing?: ElementDefinitionSlicing;
-  // ... other properties
-}
-
-interface ElementDefinitionType {
-  code: string;
-  profile?: string[];
-  targetProfile?: string[];
-}
-
-interface ElementDefinitionBinding {
-  strength: "required" | "extensible" | "preferred" | "example";
-  valueSet?: string;
-}
-
-interface ElementDefinitionConstraint {
-  key: string;
-  severity: "error" | "warning";
-  human: string;
-  expression?: string; // FHIRPath
-}
-
-interface ElementDefinitionSlicing {
-  discriminator?: SlicingDiscriminator[];
-  rules: "closed" | "open" | "openAtEnd";
-  ordered?: boolean;
-}
-
-interface SlicingDiscriminator {
-  type: "value" | "exists" | "pattern" | "type" | "profile";
-  path: string;
-}
-```
+**Validation:** `tsc --noEmit` exit 0
 
 ---
 
