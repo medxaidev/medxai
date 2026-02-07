@@ -4,17 +4,18 @@
 
 ## Active ADRs
 
-| ID                                                 | Title                                           | Status   | Date       | Impact                                     |
-| -------------------------------------------------- | ----------------------------------------------- | -------- | ---------- | ------------------------------------------ |
-| [ADR-001](./ADR-001-HAPI-Inspired-Architecture.md) | HAPI-Inspired Architecture for Core FHIR Engine | Accepted | 2026-02-04 | High - Defines core architectural approach |
+| ID                                                 | Title                                               | Status   | Date       | Impact                                                   |
+| -------------------------------------------------- | --------------------------------------------------- | -------- | ---------- | -------------------------------------------------------- |
+| [ADR-001](./ADR-001-HAPI-Inspired-Architecture.md) | HAPI-Inspired Architecture for Core FHIR Engine     | Accepted | 2026-02-04 | High - Defines core architectural approach               |
+| [ADR-002](./ADR-002-Single-Package-fhir-core.md)   | Single Package fhir-core with Module Subdirectories | Accepted | 2026-02-07 | Medium - Defines package structure for Core FHIR modules |
 
 ## Planned ADRs
 
 | ID      | Title                                            | Status | Date |
 | ------- | ------------------------------------------------ | ------ | ---- |
-| ADR-002 | FHIR Version Choice (R4 vs R5)                   | Draft  | TBD  |
-| ADR-003 | Database Schema Design for FHIR Resources        | Draft  | TBD  |
-| ADR-004 | Chinese Medical Terminology Integration Strategy | Draft  | TBD  |
+| ADR-003 | FHIR Version Choice (R4 vs R5)                   | Draft  | TBD  |
+| ADR-004 | Database Schema Design for FHIR Resources        | Draft  | TBD  |
+| ADR-005 | Chinese Medical Terminology Integration Strategy | Draft  | TBD  |
 
 ## ADR Template
 

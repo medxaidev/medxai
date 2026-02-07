@@ -26,6 +26,7 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 **Effort:** 40-60 hours
 
 **Why This Matters:**
+
 - Snapshot generation is the **most complex algorithm** in Stage-1
 - HAPI has 10+ years of production validation
 - Misunderstanding semantics leads to subtle bugs that are hard to fix later
@@ -54,6 +55,7 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 **Target File:** `org.hl7.fhir.r4.conformance.ProfileUtilities.java`
 
 **Focus Areas:**
+
 - `generateSnapshot(StructureDefinition base, StructureDefinition derived)` method
 - `processPaths()` - element path processing
 - `updateFromBase()` - constraint merging logic
@@ -63,6 +65,7 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 **Deliverable:** Document with pseudocode for each key method
 
 **Resources:**
+
 - [HAPI GitHub - ProfileUtilities.java](https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/conformance/ProfileUtilities.java)
 - [HAPI Documentation - Validation](https://hapifhir.io/hapi-fhir/docs/validation/profile_validator.html)
 
@@ -71,11 +74,13 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 #### Task 0.2: Study Element Path Normalization (1-2 days)
 
 **Target Concepts:**
+
 - Base path: `Patient.identifier.system`
 - Sliced path: `Patient.identifier:nationalId.system`
 - Choice type path: `Observation.value[x]` → `valueString`, `valueQuantity`
 
 **Key Questions to Answer:**
+
 - How does HAPI handle path matching during differential merge?
 - How are slices inserted into the element tree?
 - How are choice type expansions generated?
@@ -87,12 +92,14 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 #### Task 0.3: Study Constraint Merging Rules (2-3 days)
 
 **Target Logic:**
+
 - **Cardinality merging**: `min = max(base.min, diff.min)`, `max = min(base.max, diff.max)`
 - **Type constraint merging**: Intersection of allowed types
 - **Binding merging**: Stricter binding wins
 - **Invariant accumulation**: Parent constraints + child constraints
 
 **Key HAPI Methods:**
+
 - `updateFromBase()` - how constraints are merged
 - `checkTypeDerivation()` - type compatibility checking
 - `compareBindings()` - binding strength comparison
@@ -104,11 +111,13 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 #### Task 0.4: Study Slicing Semantics (2-3 days)
 
 **Target Concepts:**
+
 - Discriminator types: `value`, `pattern`, `type`, `profile`, `exists`
 - Slicing rules: `closed`, `open`, `openAtEnd`
 - Slice ordering and insertion logic
 
 **Key HAPI Methods:**
+
 - `processSlicing()` - slicing definition processing
 - `matchSlice()` - discriminator evaluation
 
@@ -121,6 +130,7 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 **Objective:** Validate our implementation produces same results as HAPI
 
 **Test Categories:**
+
 1. **Simple Profile** (no slicing, basic constraints)
 2. **Inheritance Chain** (3+ levels deep)
 3. **Slicing** (value discriminator, closed/open rules)
@@ -128,6 +138,7 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 5. **Complex Constraints** (cardinality tightening, type restriction)
 
 **Test Format:**
+
 ```typescript
 {
   name: "Simple Patient Profile",
@@ -171,46 +182,41 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 
 ### Tasks
 
-#### Task 1.1: Define FHIR Primitive Types (1 day)
+#### Task 1.1: Define FHIR Primitive Types (1 day) ✅ COMPLETED 2026-02-07
 
-**Files to Create:**
-- `packages/fhir-core/src/model/primitives.ts`
+**File:** `packages/fhir-core/src/model/primitives.ts` (580 lines)
 
-**Types to Define:**
-```typescript
-type FHIRString = string;
-type FHIRUri = string;
-type FHIRCode = string;
-type FHIRInteger = number;
-type FHIRBoolean = boolean;
-type FHIRDecimal = number;
-type FHIRDate = string; // YYYY-MM-DD
-type FHIRDateTime = string; // YYYY-MM-DDThh:mm:ss+zz:zz
-// ... etc
-```
+**Implemented:**
 
-**Validation:** Type definitions compile without errors
+- 20 FHIR R4 primitive types using branded types (compile-time nominal typing, zero runtime cost)
+- 13 common enum types (PublicationStatus, StructureDefinitionKind, BindingStrength, etc.)
+- 16 base complex types (Element, Extension, Coding, CodeableConcept, Identifier, Period, Reference, ContactDetail, ContactPoint, UsageContext, Quantity, Narrative, Meta, Resource, DomainResource, BackboneElement)
+- All JSDoc comments include FHIR R4 spec `@see` links and cardinality annotations
+
+**Validation:** `tsc --noEmit` exit 0
 
 ---
 
 #### Task 1.2: Define StructureDefinition Model (2 days)
 
 **Files to Create:**
+
 - `packages/fhir-core/src/model/structure-definition.ts`
 
 **Key Interfaces:**
+
 ```typescript
 interface StructureDefinition {
-  resourceType: 'StructureDefinition';
+  resourceType: "StructureDefinition";
   url: string;
   version?: string;
   name: string;
-  status: 'draft' | 'active' | 'retired' | 'unknown';
-  kind: 'primitive-type' | 'complex-type' | 'resource' | 'logical';
+  status: "draft" | "active" | "retired" | "unknown";
+  kind: "primitive-type" | "complex-type" | "resource" | "logical";
   abstract: boolean;
   type: string;
   baseDefinition?: string;
-  derivation?: 'specialization' | 'constraint';
+  derivation?: "specialization" | "constraint";
   snapshot?: StructureDefinitionSnapshot;
   differential?: StructureDefinitionDifferential;
 }
@@ -231,9 +237,11 @@ interface StructureDefinitionDifferential {
 #### Task 1.3: Define ElementDefinition Model (2 days)
 
 **Files to Create:**
+
 - `packages/fhir-core/src/model/element-definition.ts`
 
 **Key Interfaces:**
+
 ```typescript
 interface ElementDefinition {
   id?: string;
@@ -254,25 +262,25 @@ interface ElementDefinitionType {
 }
 
 interface ElementDefinitionBinding {
-  strength: 'required' | 'extensible' | 'preferred' | 'example';
+  strength: "required" | "extensible" | "preferred" | "example";
   valueSet?: string;
 }
 
 interface ElementDefinitionConstraint {
   key: string;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
   human: string;
   expression?: string; // FHIRPath
 }
 
 interface ElementDefinitionSlicing {
   discriminator?: SlicingDiscriminator[];
-  rules: 'closed' | 'open' | 'openAtEnd';
+  rules: "closed" | "open" | "openAtEnd";
   ordered?: boolean;
 }
 
 interface SlicingDiscriminator {
-  type: 'value' | 'exists' | 'pattern' | 'type' | 'profile';
+  type: "value" | "exists" | "pattern" | "type" | "profile";
   path: string;
 }
 ```
@@ -282,26 +290,28 @@ interface SlicingDiscriminator {
 #### Task 1.4: Define Canonical Model (Internal) (1-2 days)
 
 **Files to Create:**
+
 - `packages/fhir-core/src/model/canonical-profile.ts`
 
 **Key Interfaces:**
+
 ```typescript
 interface CanonicalProfile {
   url: string;
   version?: string;
-  kind: 'primitive-type' | 'complex-type' | 'resource' | 'logical';
+  kind: "primitive-type" | "complex-type" | "resource" | "logical";
   type: string;
   baseProfile?: string;
   elements: Map<string, CanonicalElement>; // path → element
   abstract: boolean;
-  derivation?: 'specialization' | 'constraint';
+  derivation?: "specialization" | "constraint";
 }
 
 interface CanonicalElement {
   path: string;
   id: string;
   min: number;
-  max: number | 'unbounded';
+  max: number | "unbounded";
   types: TypeConstraint[];
   binding?: BindingConstraint;
   constraints: Invariant[];
@@ -315,13 +325,13 @@ interface TypeConstraint {
 }
 
 interface BindingConstraint {
-  strength: 'required' | 'extensible' | 'preferred' | 'example';
+  strength: "required" | "extensible" | "preferred" | "example";
   valueSetUrl: string;
 }
 
 interface Invariant {
   key: string;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
   human: string;
   expression?: string;
 }
@@ -364,15 +374,18 @@ interface Invariant {
 #### Task 2.1: JSON Parser Implementation (3 days)
 
 **Files to Create:**
+
 - `packages/fhir-core/src/parser/json-parser.ts`
 
 **Key Functions:**
+
 ```typescript
 function parseStructureDefinition(json: string): StructureDefinition;
 function parseElementDefinition(json: any): ElementDefinition;
 ```
 
 **Edge Cases to Handle:**
+
 - Missing optional fields
 - Invalid JSON structure
 - FHIR-specific conventions (resourceType, meta)
@@ -382,6 +395,7 @@ function parseElementDefinition(json: any): ElementDefinition;
 #### Task 2.2: Primitive Value Normalization (1 day)
 
 **Normalization Rules:**
+
 - Trim whitespace from strings
 - Validate URI format
 - Validate date/datetime format
@@ -391,6 +405,7 @@ function parseElementDefinition(json: any): ElementDefinition;
 #### Task 2.3: Parser Tests (2 days)
 
 **Test Cases:**
+
 - Valid StructureDefinition JSON
 - Invalid JSON (error handling)
 - Edge cases (empty arrays, null values)
@@ -430,9 +445,11 @@ function parseElementDefinition(json: any): ElementDefinition;
 #### Task 3.1: Registry Implementation (2 days)
 
 **Files to Create:**
+
 - `packages/fhir-core/src/context/fhir-context.ts`
 
 **Key Methods:**
+
 ```typescript
 class FhirContext {
   register(url: string, sd: StructureDefinition): void;
@@ -446,6 +463,7 @@ class FhirContext {
 #### Task 3.2: Circular Dependency Detection (1 day)
 
 **Algorithm:**
+
 ```typescript
 function detectCircularDependency(chain: string[]): boolean {
   const seen = new Set<string>();
@@ -462,6 +480,7 @@ function detectCircularDependency(chain: string[]): boolean {
 #### Task 3.3: Loader Abstraction (1 day)
 
 **Support:**
+
 - File system loader (for local definitions)
 - HTTP loader (for remote definitions)
 - Memory loader (for tests)
@@ -471,6 +490,7 @@ function detectCircularDependency(chain: string[]): boolean {
 #### Task 3.4: Context Tests (2 days)
 
 **Test Cases:**
+
 - Register and retrieve definitions
 - Inheritance chain resolution
 - Circular dependency detection
@@ -513,13 +533,15 @@ function detectCircularDependency(chain: string[]): boolean {
 #### Task 4.1: Snapshot Generator Skeleton (2 days)
 
 **Files to Create:**
+
 - `packages/fhir-core/src/profile/snapshot-generator.ts`
 
 **Basic Structure:**
+
 ```typescript
 class SnapshotGenerator {
   constructor(private context: FhirContext) {}
-  
+
   async generate(sd: StructureDefinition): Promise<StructureDefinition> {
     // Step 1: Load base
     // Step 2: Initialize snapshot
@@ -535,19 +557,20 @@ class SnapshotGenerator {
 #### Task 4.2: Base Loading and Initialization (2 days)
 
 **Implementation:**
+
 ```typescript
 private async loadBase(sd: StructureDefinition): Promise<StructureDefinition> {
   if (!sd.baseDefinition) {
     throw new Error('No base definition');
   }
-  
+
   const base = await this.context.load(sd.baseDefinition);
-  
+
   // Ensure base has snapshot (recursive generation)
   if (!base.snapshot) {
     return this.generate(base);
   }
-  
+
   return base;
 }
 
@@ -562,6 +585,7 @@ private initializeSnapshot(base: StructureDefinition): ElementDefinition[] {
 #### Task 4.3: Element Path Matching (3 days)
 
 **Implementation:**
+
 ```typescript
 private findMatchingElement(
   snapshot: ElementDefinition[],
@@ -574,6 +598,7 @@ private findMatchingElement(
 ```
 
 **Edge Cases:**
+
 - Sliced paths with colons
 - Choice type expansions
 - Nested elements
@@ -585,29 +610,30 @@ private findMatchingElement(
 **This is the core algorithm.**
 
 **Implementation:**
+
 ```typescript
 private mergeConstraints(
   base: ElementDefinition,
   diff: ElementDefinition
 ): ElementDefinition {
   const merged = { ...base };
-  
+
   // Merge cardinality
   merged.min = Math.max(base.min, diff.min ?? base.min);
   merged.max = this.mergeMax(base.max, diff.max);
-  
+
   // Merge types
   merged.type = this.mergeTypes(base.type, diff.type);
-  
+
   // Merge binding
   merged.binding = this.mergeBinding(base.binding, diff.binding);
-  
+
   // Accumulate constraints
   merged.constraint = [
     ...(base.constraint ?? []),
     ...(diff.constraint ?? [])
   ];
-  
+
   return merged;
 }
 
@@ -625,7 +651,7 @@ private mergeTypes(
 ): ElementDefinitionType[] | undefined {
   if (!diffTypes) return baseTypes;
   if (!baseTypes) return diffTypes;
-  
+
   // Intersection of types
   return diffTypes.filter(dt =>
     baseTypes.some(bt => this.isTypeCompatible(bt, dt))
@@ -638,12 +664,12 @@ private mergeBinding(
 ): ElementDefinitionBinding | undefined {
   if (!diffBinding) return baseBinding;
   if (!baseBinding) return diffBinding;
-  
+
   // Stricter binding wins
   const strengthOrder = ['example', 'preferred', 'extensible', 'required'];
   const baseStrength = strengthOrder.indexOf(baseBinding.strength);
   const diffStrength = strengthOrder.indexOf(diffBinding.strength);
-  
+
   return diffStrength >= baseStrength ? diffBinding : baseBinding;
 }
 ```
@@ -653,6 +679,7 @@ private mergeBinding(
 #### Task 4.5: Slicing Handling (3-4 days)
 
 **Implementation:**
+
 ```typescript
 private processSlicing(
   snapshot: ElementDefinition[],
@@ -671,6 +698,7 @@ private processSlicing(
 #### Task 4.6: Validation and Sorting (2 days)
 
 **Implementation:**
+
 ```typescript
 private validateSnapshot(snapshot: ElementDefinition[]): void {
   for (const element of snapshot) {
@@ -678,7 +706,7 @@ private validateSnapshot(snapshot: ElementDefinition[]): void {
     if (element.min > Number(element.max) && element.max !== '*') {
       throw new Error(`Invalid cardinality: ${element.path}`);
     }
-    
+
     // Check type compatibility
     // Check required elements exist
   }
@@ -696,12 +724,14 @@ private sortElements(elements: ElementDefinition[]): ElementDefinition[] {
 **Objective:** Validate our implementation matches HAPI
 
 **Test Strategy:**
+
 1. Run HAPI on reference profiles
 2. Capture HAPI's snapshot output
 3. Run our implementation on same profiles
 4. Compare outputs (element by element)
 
 **Success Criteria:**
+
 - 100% match for simple profiles
 - 95%+ match for complex profiles (document differences)
 
@@ -743,29 +773,28 @@ private sortElements(elements: ElementDefinition[]): ElementDefinition[] {
 #### Task 5.1: Validator Implementation (3 days)
 
 **Files to Create:**
+
 - `packages/fhir-core/src/validator/structure-validator.ts`
 
 **Key Methods:**
+
 ```typescript
 class StructureValidator {
-  async validate(
-    resource: any,
-    profileUrl: string
-  ): Promise<ValidationResult> {
+  async validate(resource: any, profileUrl: string): Promise<ValidationResult> {
     const snapshot = await this.context.getSnapshot(profileUrl);
     const issues: ValidationIssue[] = [];
-    
+
     for (const element of snapshot.element) {
       // Extract values from resource
       const values = this.extractValues(resource, element.path);
-      
+
       // Validate cardinality
       this.validateCardinality(element, values, issues);
-      
+
       // Validate types
       this.validateTypes(element, values, issues);
     }
-    
+
     return { valid: issues.length === 0, issues };
   }
 }
@@ -776,6 +805,7 @@ class StructureValidator {
 #### Task 5.2: Value Extraction (2 days)
 
 **Implementation:**
+
 ```typescript
 private extractValues(resource: any, path: string): any[] {
   // Navigate resource using path (FHIRPath-like)
@@ -789,6 +819,7 @@ private extractValues(resource: any, path: string): any[] {
 #### Task 5.3: Validator Tests (2 days)
 
 **Test Cases:**
+
 - Valid resources pass validation
 - Invalid cardinality fails
 - Invalid types fail
@@ -829,6 +860,7 @@ private extractValues(resource: any, path: string): any[] {
 #### Task 6.1: End-to-End Tests (2 days)
 
 **Test Flow:**
+
 ```
 Load StructureDefinition
   ↓
@@ -844,11 +876,13 @@ Assert Results
 #### Task 6.2: Performance Benchmarks (1 day)
 
 **Metrics:**
+
 - Snapshot generation time (per profile)
 - Validation time (per resource)
 - Memory usage
 
 **Targets:**
+
 - Snapshot generation: < 5 seconds per profile
 - Validation: < 100ms per resource
 
@@ -857,6 +891,7 @@ Assert Results
 #### Task 6.3: Documentation (2 days)
 
 **Documents to Create:**
+
 - API documentation (TypeDoc)
 - Usage examples
 - Troubleshooting guide
@@ -866,6 +901,7 @@ Assert Results
 #### Task 6.4: Stage-1 Completion Review (1 day)
 
 **Checklist:**
+
 - [ ] All modules implemented
 - [ ] All tests passing
 - [ ] Documentation complete
