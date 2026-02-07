@@ -484,7 +484,7 @@ export interface UsageContext extends Element {
 export interface Quantity extends Element {
   /** Numerical value (with implicit precision) (0..1) */
   value?: FhirDecimal;
-  /** < | <= | >= | > — how to understand the value (0..1) */
+  /** `<` | `<=` | `>=` | `>` — how to understand the value (0..1) */
   comparator?: FhirCode;
   /** Unit representation (0..1) */
   unit?: FhirString;

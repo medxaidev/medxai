@@ -508,10 +508,12 @@ interface SlicingDiscriminatorDef {
 
 ### 验收标准
 
-- [ ] `npm run build` 成功
-- [ ] `dist/index.d.ts` 包含所有公共类型
-- [ ] 无 TypeScript 编译错误
-- [ ] 无 api-extractor 警告
+- [x] `npm run build` 成功（clean → tsc → api-extractor → esbuild ESM+CJS）
+- [x] `dist/index.d.ts` 包含所有公共类型（1607 行，70 个导出类型）
+- [x] 无 TypeScript 编译错误（`tsc --noEmit` exit 0）
+- [x] 无 api-extractor 警告（修复了 TSDoc 转义问题）
+
+**Completed:** 2026-02-08
 
 ---
 
@@ -524,10 +526,10 @@ interface SlicingDiscriminatorDef {
 | ElementDefinition 模型完整（~40 字段） | ✅   |
 | Canonical 内部模型已定义               | ✅   |
 | 所有枚举类型已定义                     | ✅   |
-| JSDoc 注释完整（含 FHIR 规范引用）     | ⬜   |
-| TypeScript 编译通过                    | ⬜   |
-| `npm run build` 成功                   | ⬜   |
-| 零逻辑代码（纯类型）                   | ⬜   |
+| JSDoc 注释完整（含 FHIR 规范引用）     | ✅   |
+| TypeScript 编译通过                    | ✅   |
+| `npm run build` 成功                   | ✅   |
+| 零逻辑代码（纯类型）                   | ✅   |
 | 代码审查通过                           | ⬜   |
 
 ---
