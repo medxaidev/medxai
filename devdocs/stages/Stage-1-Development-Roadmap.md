@@ -197,40 +197,19 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 
 ---
 
-#### Task 1.2: Define StructureDefinition Model (2 days)
+#### Task 1.2: Define StructureDefinition Model (2 days) ✅ COMPLETED 2026-02-07
 
-**Files to Create:**
+**File:** `packages/fhir-core/src/model/structure-definition.ts` (359 lines)
 
-- `packages/fhir-core/src/model/structure-definition.ts`
+**Implemented:**
 
-**Key Interfaces:**
+- `StructureDefinition` interface extending `DomainResource` (36 fields, all FHIR R4 fields covered)
+- 4 sub-types: `StructureDefinitionMapping`, `StructureDefinitionContext`, `StructureDefinitionSnapshot`, `StructureDefinitionDifferential`
+- Reuses 5 enums from `primitives.ts` (PublicationStatus, StructureDefinitionKind, TypeDerivationRule, ExtensionContextType, FhirVersionCode)
+- All JSDoc comments include cardinality annotations and FHIR R4 spec `@see` links
+- **Side fix:** `Resource.resourceType` changed from `FhirString` to `string` to allow literal narrowing
 
-```typescript
-interface StructureDefinition {
-  resourceType: "StructureDefinition";
-  url: string;
-  version?: string;
-  name: string;
-  status: "draft" | "active" | "retired" | "unknown";
-  kind: "primitive-type" | "complex-type" | "resource" | "logical";
-  abstract: boolean;
-  type: string;
-  baseDefinition?: string;
-  derivation?: "specialization" | "constraint";
-  snapshot?: StructureDefinitionSnapshot;
-  differential?: StructureDefinitionDifferential;
-}
-
-interface StructureDefinitionSnapshot {
-  element: ElementDefinition[];
-}
-
-interface StructureDefinitionDifferential {
-  element: ElementDefinition[];
-}
-```
-
-**Reference:** FHIR R4 StructureDefinition resource definition
+**Validation:** `tsc --noEmit` exit 0
 
 ---
 

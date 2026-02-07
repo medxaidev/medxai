@@ -206,11 +206,15 @@ type ExtensionContextType = "fhirpath" | "element" | "extension";
 
 ### 验收标准
 
-- [ ] StructureDefinition 接口完整定义
-- [ ] 所有子类型（Mapping, Context, Snapshot, Differential）已定义
-- [ ] 所有相关枚举已定义
-- [ ] TypeScript 编译通过
-- [ ] JSDoc 注释标注每个字段的 cardinality 和 FHIR 规范引用
+- [x] StructureDefinition 接口完整定义 (extends DomainResource, 36 字段全覆盖)
+- [x] 所有子类型（Mapping, Context, Snapshot, Differential）已定义 (4 个 BackboneElement 子类型)
+- [x] 所有相关枚举已定义 (复用 primitives.ts: PublicationStatus, StructureDefinitionKind, TypeDerivationRule, ExtensionContextType, FhirVersionCode)
+- [x] TypeScript 编译通过 (`tsc --noEmit` exit 0)
+- [x] JSDoc 注释标注每个字段的 cardinality 和 FHIR 规范引用 (每个字段均有 `@see` 链接)
+
+**附带修改:** `primitives.ts` 中 `Resource.resourceType` 从 `FhirString` 改为 `string`，允许具体资源接口窄化为字符串字面量。
+
+**Completed:** 2026-02-07
 
 ---
 
@@ -512,7 +516,7 @@ interface SlicingDiscriminatorDef {
 | 标准                                   | 状态 |
 | -------------------------------------- | ---- |
 | 所有 FHIR R4 原始类型已定义            | ✅   |
-| StructureDefinition 模型完整           | ⬜   |
+| StructureDefinition 模型完整           | ✅   |
 | ElementDefinition 模型完整（~40 字段） | ⬜   |
 | Canonical 内部模型已定义               | ⬜   |
 | 所有枚举类型已定义                     | ✅   |

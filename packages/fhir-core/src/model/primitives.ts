@@ -537,8 +537,15 @@ export interface Meta extends Element {
  * @see https://hl7.org/fhir/R4/resource.html
  */
 export interface Resource {
-  /** The type of the resource (1..1) */
-  resourceType: FhirString;
+  /**
+   * The type of the resource (1..1)
+   *
+   * This is typed as `string` rather than `FhirString` because it serves
+   * as a discriminator field that concrete resource interfaces narrow to
+   * a string literal (e.g., `'StructureDefinition'`, `'Patient'`).
+   * Branded types would prevent this narrowing.
+   */
+  resourceType: string;
   /** Logical id of this artifact (0..1) */
   id?: FhirId;
   /** Metadata about the resource (0..1) */
