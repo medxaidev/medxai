@@ -229,55 +229,19 @@ This document provides a **detailed, step-by-step development plan** for Stage-1
 
 ---
 
-#### Task 1.4: Define Canonical Model (Internal) (1-2 days)
+#### Task 1.4: Define Canonical Model (Internal) (1-2 days) ✅ COMPLETED 2026-02-08
 
-**Files to Create:**
+**File:** `packages/fhir-core/src/model/canonical-profile.ts`
 
-- `packages/fhir-core/src/model/canonical-profile.ts`
+**Implemented:**
 
-**Key Interfaces:**
+- `CanonicalProfile` interface (9 fields, `elements` as `Map<string, CanonicalElement>`)
+- `CanonicalElement` interface (11 fields, all flags non-optional)
+- 5 auxiliary types: `TypeConstraint`, `BindingConstraint`, `Invariant`, `SlicingDefinition`, `SlicingDiscriminatorDef`
+- 4 design decisions documented in JSDoc: `max` as `number | 'unbounded'`, Map for O(1) lookup with insertion-order preservation, non-optional `constraints` array, non-optional boolean flags
+- Reuses enums from `primitives.ts` (BindingStrength, ConstraintSeverity, DiscriminatorType, SlicingRules, StructureDefinitionKind, TypeDerivationRule)
 
-```typescript
-interface CanonicalProfile {
-  url: string;
-  version?: string;
-  kind: "primitive-type" | "complex-type" | "resource" | "logical";
-  type: string;
-  baseProfile?: string;
-  elements: Map<string, CanonicalElement>; // path → element
-  abstract: boolean;
-  derivation?: "specialization" | "constraint";
-}
-
-interface CanonicalElement {
-  path: string;
-  id: string;
-  min: number;
-  max: number | "unbounded";
-  types: TypeConstraint[];
-  binding?: BindingConstraint;
-  constraints: Invariant[];
-  slicing?: SlicingDefinition;
-}
-
-interface TypeConstraint {
-  code: string;
-  profiles?: string[];
-  targetProfiles?: string[];
-}
-
-interface BindingConstraint {
-  strength: "required" | "extensible" | "preferred" | "example";
-  valueSetUrl: string;
-}
-
-interface Invariant {
-  key: string;
-  severity: "error" | "warning";
-  human: string;
-  expression?: string;
-}
-```
+**Validation:** `tsc --noEmit` exit 0
 
 ---
 

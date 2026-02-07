@@ -486,11 +486,13 @@ interface SlicingDiscriminatorDef {
 
 ### 验收标准
 
-- [ ] CanonicalProfile 接口定义完整
-- [ ] CanonicalElement 接口定义完整
-- [ ] 所有辅助类型（TypeConstraint, BindingConstraint, Invariant, SlicingDefinition）已定义
-- [ ] 设计决策在 JSDoc 中有说明
-- [ ] TypeScript 编译通过
+- [x] CanonicalProfile 接口定义完整（9 字段，含 elements Map）
+- [x] CanonicalElement 接口定义完整（11 字段，所有 flag 非可选）
+- [x] 所有辅助类型已定义（TypeConstraint, BindingConstraint, Invariant, SlicingDefinition, SlicingDiscriminatorDef）
+- [x] 设计决策在 JSDoc 中有说明（4 项决策均标注）
+- [x] TypeScript 编译通过（`tsc --noEmit` exit 0）
+
+**Completed:** 2026-02-08
 
 ---
 
@@ -520,7 +522,7 @@ interface SlicingDiscriminatorDef {
 | 所有 FHIR R4 原始类型已定义            | ✅   |
 | StructureDefinition 模型完整           | ✅   |
 | ElementDefinition 模型完整（~40 字段） | ✅   |
-| Canonical 内部模型已定义               | ⬜   |
+| Canonical 内部模型已定义               | ✅   |
 | 所有枚举类型已定义                     | ✅   |
 | JSDoc 注释完整（含 FHIR 规范引用）     | ⬜   |
 | TypeScript 编译通过                    | ⬜   |
