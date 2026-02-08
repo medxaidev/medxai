@@ -510,12 +510,20 @@ Parser 需要同时消费 `valueString` 和 `_valueString`。
 
 ### 验收标准
 
-- [ ] 正确从 JSON 对象中提取 choice type 值
-- [ ] 保留原始属性名（`propertyName`）用于 round-trip
-- [ ] 检测并报告多值冲突
-- [ ] 处理 choice type 的 `_element` 扩展
-- [ ] 未知类型后缀报告 `INVALID_CHOICE_TYPE` 错误
-- [ ] Choice type 注册表覆盖所有 8 个 choice 字段
+- [x] 正确从 JSON 对象中提取 choice type 值 ✅ (2026-02-08)
+- [x] 保留原始属性名（`propertyName`）用于 round-trip ✅ (2026-02-08)
+- [x] 检测并报告多值冲突 ✅ (2026-02-08)
+- [x] 处理 choice type 的 `_element` 扩展 ✅ (2026-02-08)
+- [x] 未知类型后缀报告 `INVALID_CHOICE_TYPE` 错误 ✅ (2026-02-08)
+- [x] Choice type 注册表覆盖所有 8 个 choice 字段 ✅ (2026-02-08)
+
+### Implementation Notes (2026-02-08)
+
+- **File**: `src/parser/choice-type-parser.ts` (~340 lines)
+- **Exports**: `ChoiceTypeField`, `ChoiceValue`, `extractChoiceValue`, `extractAllChoiceValues`, `getChoiceFieldBases`, `getChoiceFields`, `matchChoiceTypeProperty`, `CHOICE_TYPE_FIELDS`, `ALL_FHIR_TYPE_SUFFIXES` (~50 types), `MIN_MAX_VALUE_TYPE_SUFFIXES` (9 types), `USAGE_CONTEXT_VALUE_TYPE_SUFFIXES` (4 types)
+- **Tests**: `__tests__/choice-type-parser.test.ts` — 43 tests covering extraction, multi-value conflicts, unknown suffixes, \_element companions, registry coverage, type suffix constants, and utility functions
+- **Registry**: 4 host types (Extension, UsageContext, ElementDefinition, ElementDefinitionExample) × 8 total choice fields
+- **No bugs found by tests** — all 43 tests passed on first run
 
 ---
 
