@@ -57,7 +57,10 @@ FHIR 原始类型在 JSON 中拆分为两个属性：
 ```json
 {
   "code": ["au", "nz"],
-  "_code": [null, { "extension": [{ "url": "...", "valueString": "Kiwiland" }] }]
+  "_code": [
+    null,
+    { "extension": [{ "url": "...", "valueString": "Kiwiland" }] }
+  ]
 }
 ```
 
@@ -89,7 +92,7 @@ FHIR 原始类型在 JSON 中拆分为两个属性：
 ### 5. 十进制精度丢失
 
 ```json
-{ "value": 2.00 }
+{ "value": 2.0 }
 ```
 
 - JavaScript `JSON.parse()` 会将 `2.00` 转为 `2`
@@ -147,7 +150,7 @@ packages/fhir-core/src/parser/__tests__/
 /**
  * 解析错误的严重级别
  */
-export type ParseSeverity = 'error' | 'warning';
+export type ParseSeverity = "error" | "warning";
 
 /**
  * 单个解析问题
@@ -167,16 +170,16 @@ export interface ParseIssue {
  * 解析错误代码枚举
  */
 export type ParseErrorCode =
-  | 'INVALID_JSON'           // JSON 语法错误
-  | 'MISSING_RESOURCE_TYPE'  // 缺少 resourceType
-  | 'UNKNOWN_RESOURCE_TYPE'  // 未知的 resourceType
-  | 'INVALID_PRIMITIVE'      // 原始类型值无效
-  | 'INVALID_STRUCTURE'      // 结构不符合预期
-  | 'INVALID_CHOICE_TYPE'    // Choice type 属性名无效
-  | 'MULTIPLE_CHOICE_VALUES' // 同一 choice 字段有多个值
-  | 'ARRAY_MISMATCH'         // _element 数组长度不匹配
-  | 'UNEXPECTED_NULL'        // 非预期的 null 值
-  | 'UNEXPECTED_PROPERTY';   // 未知属性（warning）
+  | "INVALID_JSON" // JSON 语法错误
+  | "MISSING_RESOURCE_TYPE" // 缺少 resourceType
+  | "UNKNOWN_RESOURCE_TYPE" // 未知的 resourceType
+  | "INVALID_PRIMITIVE" // 原始类型值无效
+  | "INVALID_STRUCTURE" // 结构不符合预期
+  | "INVALID_CHOICE_TYPE" // Choice type 属性名无效
+  | "MULTIPLE_CHOICE_VALUES" // 同一 choice 字段有多个值
+  | "ARRAY_MISMATCH" // _element 数组长度不匹配
+  | "UNEXPECTED_NULL" // 非预期的 null 值
+  | "UNEXPECTED_PROPERTY"; // 未知属性（warning）
 
 /**
  * 解析结果：成功时携带数据 + 可能的 warnings，失败时携带 errors
@@ -194,10 +197,16 @@ export type ParseResult<T> =
 
 ### 验收标准
 
-- [ ] `ParseResult<T>` 类型定义完整
-- [ ] `ParseErrorCode` 覆盖所有已知错误场景
-- [ ] `ParseIssue` 包含 severity、code、message、path
-- [ ] 编译通过
+- [x] `ParseResult<T>` 类型定义完整 ✅ (2026-02-08)
+- [x] `ParseErrorCode` 覆盖所有已知错误场景 ✅ (2026-02-08)
+- [x] `ParseIssue` 包含 severity、code、message、path ✅ (2026-02-08)
+- [x] 编译通过 ✅ (2026-02-08)
+
+### Implementation Notes (2026-02-08)
+
+- **File**: `src/parser/parse-error.ts` (~180 lines)
+- **Exports**: `ParseSeverity`, `ParseErrorCode` (10 codes), `ParseIssue`, `ParseResult<T>`, `parseSuccess`, `parseFailure`, `createIssue`, `hasErrors`
+- **Tests**: `__tests__/parse-error.test.ts` — 21 tests
 
 ---
 
@@ -278,23 +287,31 @@ function parseComplexType(
 
 2. **递归解析**: 复合类型属性递归调用 `parseComplexType`
 
-3. **数组处理**: 
+3. **数组处理**:
    - 检查 FHIR 规范中该属性是否为数组类型
    - 数组元素逐个解析
    - 空数组视为不存在（FHIR 规范：JSON 对象和数组不能为空）
 
 ### 验收标准
 
-- [ ] `parseFhirJson()` 能解析有效的 FHIR JSON 字符串
-- [ ] `parseFhirObject()` 能解析已解析的 JSON 对象
-- [ ] 无效 JSON 返回 `INVALID_JSON` 错误
-- [ ] 缺少 `resourceType` 返回 `MISSING_RESOURCE_TYPE` 错误
-- [ ] 未知属性产生 warning 而非 error
-- [ ] 路径追踪正确（嵌套对象、数组索引）
+- [x] `parseFhirJson()` 能解析有效的 FHIR JSON 字符串 ✅ (2026-02-08)
+- [x] `parseFhirObject()` 能解析已解析的 JSON 对象 ✅ (2026-02-08)
+- [x] 无效 JSON 返回 `INVALID_JSON` 错误 ✅ (2026-02-08)
+- [x] 缺少 `resourceType` 返回 `MISSING_RESOURCE_TYPE` 错误 ✅ (2026-02-08)
+- [x] 未知属性产生 warning 而非 error ✅ (2026-02-08)
+- [x] 路径追踪正确（嵌套对象、数组索引） ✅ (2026-02-08)
+
+### Implementation Notes (2026-02-08)
+
+- **File**: `src/parser/json-parser.ts` (~450 lines)
+- **Exports**: `parseFhirJson`, `parseFhirObject`, `parseComplexObject`, `isPlainObject`, `pathAppend`, `pathIndex`, `JsonObject`, `PropertyDescriptor`, `PropertySchema`, `ComplexParseResult`
+- **Tests**: `__tests__/json-parser.test.ts` — 48 tests (11 fixtures in `fixtures/` and `fixtures/invalid/`)
+- **Bug found by tests**: Pass 4 `_element` filtering used `consumedKeys.has(key.slice(1))` which incorrectly suppressed warnings for `_element` companions of non-primitive properties — fixed to `consumedKeys.has(key)`
+- **Architecture**: 4-pass strategy (known props → \_element companions → choice type [x] → unexpected warnings), schema-driven via `PropertySchema`
 
 ---
 
-## Task 2.3: 原始类型解析 + _element 合并 (Day 3-4, ~1.5 days)
+## Task 2.3: 原始类型解析 + \_element 合并 (Day 3-4, ~1.5 days)
 
 ### 文件: `primitive-parser.ts`
 
@@ -360,15 +377,15 @@ export function validatePrimitiveValue(
 ): ParseIssue | null;
 ```
 
-### _element 处理规则
+### \_element 处理规则
 
-| 场景 | 值属性 | _属性 | 结果 |
-|------|--------|-------|------|
-| 正常 | `"1970-03-30"` | 无 | `{ value: "1970-03-30" }` |
-| 有扩展 | `"1970-03-30"` | `{ "id": "x", "extension": [...] }` | `{ value: "1970-03-30", id: "x", extension: [...] }` |
-| 仅扩展 | 无 | `{ "extension": [...] }` | `{ extension: [...] }` |
-| 数组对齐 | `["a", "b"]` | `[null, { "ext": [...] }]` | `[{ value: "a" }, { value: "b", ext: [...] }]` |
-| 数组长度不匹配 | `["a"]` | `[null, { ... }]` | error: `ARRAY_MISMATCH` |
+| 场景           | 值属性         | \_属性                              | 结果                                                 |
+| -------------- | -------------- | ----------------------------------- | ---------------------------------------------------- |
+| 正常           | `"1970-03-30"` | 无                                  | `{ value: "1970-03-30" }`                            |
+| 有扩展         | `"1970-03-30"` | `{ "id": "x", "extension": [...] }` | `{ value: "1970-03-30", id: "x", extension: [...] }` |
+| 仅扩展         | 无             | `{ "extension": [...] }`            | `{ extension: [...] }`                               |
+| 数组对齐       | `["a", "b"]`   | `[null, { "ext": [...] }]`          | `[{ value: "a" }, { value: "b", ext: [...] }]`       |
+| 数组长度不匹配 | `["a"]`        | `[null, { ... }]`                   | error: `ARRAY_MISMATCH`                              |
 
 ### Stage-1 简化策略
 
@@ -382,11 +399,19 @@ export function validatePrimitiveValue(
 
 ### 验收标准
 
-- [ ] 正确合并值属性和 `_element` 属性
-- [ ] 正确处理仅有 `_element` 无值的情况
-- [ ] 正确处理重复原始元素的 null 对齐
-- [ ] 数组长度不匹配时报告 `ARRAY_MISMATCH` 错误
-- [ ] 验证原始值的 JavaScript 类型（boolean/number/string）
+- [x] 正确合并值属性和 `_element` 属性 ✅ (2026-02-08)
+- [x] 正确处理仅有 `_element` 无值的情况 ✅ (2026-02-08)
+- [x] 正确处理重复原始元素的 null 对齐 ✅ (2026-02-08)
+- [x] 数组长度不匹配时报告 `ARRAY_MISMATCH` 错误 ✅ (2026-02-08)
+- [x] 验证原始值的 JavaScript 类型（boolean/number/string） ✅ (2026-02-08)
+
+### Implementation Notes (2026-02-08)
+
+- **File**: `src/parser/primitive-parser.ts` (~435 lines)
+- **Exports**: `validatePrimitiveValue`, `getExpectedJsType`, `mergePrimitiveElement`, `mergePrimitiveArray`, `PrimitiveWithMetadata`, `ElementMetadata`, `PrimitiveJsType`
+- **Tests**: `__tests__/primitive-parser.test.ts` — 58 tests covering all 20 FHIR primitive types, \_element merging, null alignment, array mismatch, and edge cases
+- **Bug found by tests**: `mergePrimitiveArray` lost `INVALID_STRUCTURE` issue when falling back to values-only on non-array `_element` input — fixed by merging issues from recursive call
+- **Stage-1 simplification**: No regex validation of primitive values (deferred to fhir-validator Phase 5). Parser only checks JS type correctness (boolean/number/string) and integer wholeness.
 
 ---
 
@@ -455,22 +480,22 @@ export const CHOICE_TYPE_FIELDS: ReadonlyMap<string, ChoiceTypeField[]>;
 
 **包含的 choice type 字段（来自 Phase 1 模型）:**
 
-| 宿主类型 | 基础名 | 允许的类型数量 |
-|----------|--------|---------------|
-| `Extension` | `value` | ~50 (所有 FHIR 类型) |
-| `UsageContext` | `value` | 4 (CodeableConcept, Quantity, Range, Reference) |
-| `ElementDefinition` | `defaultValue` | ~50 |
-| `ElementDefinition` | `fixed` | ~50 |
-| `ElementDefinition` | `pattern` | ~50 |
-| `ElementDefinition` | `minValue` | 9 (date, dateTime, instant, time, decimal, integer, positiveInt, unsignedInt, Quantity) |
-| `ElementDefinition` | `maxValue` | 9 |
-| `ElementDefinitionExample` | `value` | ~50 |
+| 宿主类型                   | 基础名         | 允许的类型数量                                                                          |
+| -------------------------- | -------------- | --------------------------------------------------------------------------------------- |
+| `Extension`                | `value`        | ~50 (所有 FHIR 类型)                                                                    |
+| `UsageContext`             | `value`        | 4 (CodeableConcept, Quantity, Range, Reference)                                         |
+| `ElementDefinition`        | `defaultValue` | ~50                                                                                     |
+| `ElementDefinition`        | `fixed`        | ~50                                                                                     |
+| `ElementDefinition`        | `pattern`      | ~50                                                                                     |
+| `ElementDefinition`        | `minValue`     | 9 (date, dateTime, instant, time, decimal, integer, positiveInt, unsignedInt, Quantity) |
+| `ElementDefinition`        | `maxValue`     | 9                                                                                       |
+| `ElementDefinitionExample` | `value`        | ~50                                                                                     |
 
 ### 多值检测
 
 如果同一个 choice 字段出现多个变体（如同时有 `valueString` 和 `valueBoolean`），报告 `MULTIPLE_CHOICE_VALUES` 错误。
 
-### 与 _element 的交互
+### 与 \_element 的交互
 
 Choice type 的原始类型变体也可能有 `_element`：
 
@@ -565,24 +590,77 @@ parseElementDefinition(obj)
 
 ```typescript
 const STRUCTURE_DEFINITION_PROPERTIES = new Set([
-  'resourceType', 'id', 'meta', 'implicitRules', 'language',
-  'text', 'contained', 'extension', 'modifierExtension',
-  'url', 'identifier', 'version', 'name', 'title', 'status',
-  'experimental', 'date', 'publisher', 'contact', 'description',
-  'useContext', 'jurisdiction', 'purpose', 'copyright', 'keyword',
-  'fhirVersion', 'mapping', 'kind', 'abstract', 'context',
-  'contextInvariant', 'type', 'baseDefinition', 'derivation',
-  'snapshot', 'differential',
+  "resourceType",
+  "id",
+  "meta",
+  "implicitRules",
+  "language",
+  "text",
+  "contained",
+  "extension",
+  "modifierExtension",
+  "url",
+  "identifier",
+  "version",
+  "name",
+  "title",
+  "status",
+  "experimental",
+  "date",
+  "publisher",
+  "contact",
+  "description",
+  "useContext",
+  "jurisdiction",
+  "purpose",
+  "copyright",
+  "keyword",
+  "fhirVersion",
+  "mapping",
+  "kind",
+  "abstract",
+  "context",
+  "contextInvariant",
+  "type",
+  "baseDefinition",
+  "derivation",
+  "snapshot",
+  "differential",
 ]);
 
 const ELEMENT_DEFINITION_PROPERTIES = new Set([
-  'id', 'extension', 'modifierExtension',
-  'path', 'representation', 'sliceName', 'sliceIsConstraining',
-  'label', 'code', 'slicing', 'short', 'definition', 'comment',
-  'requirements', 'alias', 'min', 'max', 'base', 'contentReference',
-  'type', 'meaningWhenMissing', 'orderMeaning', 'example',
-  'maxLength', 'condition', 'constraint', 'mustSupport',
-  'isModifier', 'isModifierReason', 'isSummary', 'binding', 'mapping',
+  "id",
+  "extension",
+  "modifierExtension",
+  "path",
+  "representation",
+  "sliceName",
+  "sliceIsConstraining",
+  "label",
+  "code",
+  "slicing",
+  "short",
+  "definition",
+  "comment",
+  "requirements",
+  "alias",
+  "min",
+  "max",
+  "base",
+  "contentReference",
+  "type",
+  "meaningWhenMissing",
+  "orderMeaning",
+  "example",
+  "maxLength",
+  "condition",
+  "constraint",
+  "mustSupport",
+  "isModifier",
+  "isModifierReason",
+  "isSummary",
+  "binding",
+  "mapping",
   // choice type 前缀由 choice-type-parser 处理
 ]);
 ```
@@ -622,7 +700,9 @@ export function serializeToFhirJson(resource: Resource): string;
 /**
  * 将 Resource 对象序列化为 JavaScript 对象（不做 JSON.stringify）
  */
-export function serializeToFhirObject(resource: Resource): Record<string, unknown>;
+export function serializeToFhirObject(
+  resource: Resource,
+): Record<string, unknown>;
 ```
 
 ### 序列化规则
@@ -652,75 +732,75 @@ export function serializeToFhirObject(resource: Resource): Record<string, unknow
 #### 层次 1: 单元测试 — 原始类型解析
 
 ```typescript
-describe('primitive-parser', () => {
+describe("primitive-parser", () => {
   // 基础值解析
-  it('parses string primitive');
-  it('parses boolean primitive');
-  it('parses integer primitive');
-  it('parses decimal primitive');
+  it("parses string primitive");
+  it("parses boolean primitive");
+  it("parses integer primitive");
+  it("parses decimal primitive");
 
   // _element 合并
-  it('merges value with _element extension');
-  it('handles _element without value');
-  it('handles value without _element');
+  it("merges value with _element extension");
+  it("handles _element without value");
+  it("handles value without _element");
 
   // 数组对齐
-  it('merges primitive array with _element array');
-  it('handles null alignment in arrays');
-  it('reports ARRAY_MISMATCH for mismatched lengths');
+  it("merges primitive array with _element array");
+  it("handles null alignment in arrays");
+  it("reports ARRAY_MISMATCH for mismatched lengths");
 
   // 类型验证
-  it('reports error for string where number expected');
-  it('reports error for number where boolean expected');
+  it("reports error for string where number expected");
+  it("reports error for number where boolean expected");
 });
 ```
 
 #### 层次 2: 单元测试 — Choice Type 解析
 
 ```typescript
-describe('choice-type-parser', () => {
-  it('extracts valueString from Extension');
-  it('extracts valueQuantity from Extension');
-  it('extracts defaultValueBoolean from ElementDefinition');
-  it('reports MULTIPLE_CHOICE_VALUES for conflicting values');
-  it('reports INVALID_CHOICE_TYPE for unknown suffix');
-  it('handles _valueString extension');
-  it('returns null when no choice value present');
+describe("choice-type-parser", () => {
+  it("extracts valueString from Extension");
+  it("extracts valueQuantity from Extension");
+  it("extracts defaultValueBoolean from ElementDefinition");
+  it("reports MULTIPLE_CHOICE_VALUES for conflicting values");
+  it("reports INVALID_CHOICE_TYPE for unknown suffix");
+  it("handles _valueString extension");
+  it("returns null when no choice value present");
 });
 ```
 
 #### 层次 3: 集成测试 — StructureDefinition 解析
 
 ```typescript
-describe('structure-definition-parser', () => {
+describe("structure-definition-parser", () => {
   // 真实 FHIR R4 StructureDefinition JSON
-  it('parses Patient base StructureDefinition');
-  it('parses Observation base StructureDefinition');
-  it('parses US Core Patient profile');
+  it("parses Patient base StructureDefinition");
+  it("parses Observation base StructureDefinition");
+  it("parses US Core Patient profile");
 
   // 字段完整性
-  it('preserves all StructureDefinition top-level fields');
-  it('preserves all ElementDefinition fields');
-  it('preserves ElementDefinition.slicing');
-  it('preserves ElementDefinition.type with profiles');
-  it('preserves ElementDefinition.binding');
-  it('preserves ElementDefinition.constraint');
+  it("preserves all StructureDefinition top-level fields");
+  it("preserves all ElementDefinition fields");
+  it("preserves ElementDefinition.slicing");
+  it("preserves ElementDefinition.type with profiles");
+  it("preserves ElementDefinition.binding");
+  it("preserves ElementDefinition.constraint");
 
   // 错误处理
-  it('reports error for missing resourceType');
-  it('reports error for wrong resourceType');
-  it('reports warning for unknown properties');
+  it("reports error for missing resourceType");
+  it("reports error for wrong resourceType");
+  it("reports warning for unknown properties");
 });
 ```
 
 #### 层次 4: Round-trip 测试
 
 ```typescript
-describe('round-trip', () => {
-  it('parse → serialize → parse produces equivalent StructureDefinition');
-  it('parse → serialize preserves all ElementDefinition fields');
-  it('parse → serialize preserves choice type property names');
-  it('parse → serialize preserves _element extensions');
+describe("round-trip", () => {
+  it("parse → serialize → parse produces equivalent StructureDefinition");
+  it("parse → serialize preserves all ElementDefinition fields");
+  it("parse → serialize preserves choice type property names");
+  it("parse → serialize preserves _element extensions");
 });
 ```
 
@@ -734,14 +814,14 @@ describe('round-trip', () => {
 
 ### 测试数量目标
 
-| 类别 | 预计测试数 |
-|------|-----------|
-| 原始类型解析 | 12-15 |
-| Choice type 解析 | 8-10 |
-| StructureDefinition 解析 | 10-12 |
-| 序列化 | 8-10 |
-| Round-trip | 5-8 |
-| **总计** | **43-55** |
+| 类别                     | 预计测试数 |
+| ------------------------ | ---------- |
+| 原始类型解析             | 12-15      |
+| Choice type 解析         | 8-10       |
+| StructureDefinition 解析 | 10-12      |
+| 序列化                   | 8-10       |
+| Round-trip               | 5-8        |
+| **总计**                 | **43-55**  |
 
 ### 验收标准
 
@@ -768,11 +848,16 @@ describe('round-trip', () => {
 
 ```typescript
 // src/parser/index.ts
-export { parseFhirJson, parseFhirObject } from './json-parser.js';
-export { parseStructureDefinition } from './structure-definition-parser.js';
-export { serializeToFhirJson, serializeToFhirObject } from './serializer.js';
-export type { ParseResult, ParseIssue, ParseErrorCode, ParseSeverity } from './parse-error.js';
-export type { ChoiceValue } from './choice-type-parser.js';
+export { parseFhirJson, parseFhirObject } from "./json-parser.js";
+export { parseStructureDefinition } from "./structure-definition-parser.js";
+export { serializeToFhirJson, serializeToFhirObject } from "./serializer.js";
+export type {
+  ParseResult,
+  ParseIssue,
+  ParseErrorCode,
+  ParseSeverity,
+} from "./parse-error.js";
+export type { ChoiceValue } from "./choice-type-parser.js";
 
 // 内部函数不导出:
 // - mergePrimitiveElement (internal)
@@ -794,20 +879,20 @@ export type { ChoiceValue } from './choice-type-parser.js';
 
 ## Phase 2 总体验收标准
 
-| 标准 | 状态 |
-|------|------|
-| `parseFhirJson()` 能解析有效 FHIR JSON | ⬜ |
-| 正确处理原始类型双属性表示 | ⬜ |
-| 正确处理 choice type [x] 分发 | ⬜ |
-| 正确处理重复元素 null 对齐 | ⬜ |
-| 解析 FHIR R4 Patient StructureDefinition | ⬜ |
-| 解析 FHIR R4 Observation StructureDefinition | ⬜ |
-| Round-trip 保真 (parse → serialize → parse) | ⬜ |
-| 错误信息包含精确路径 | ⬜ |
-| 测试数量 ≥ 40 | ⬜ |
-| `npm run build` 成功 | ⬜ |
-| 零 TypeScript 编译错误 | ⬜ |
-| 代码审查通过 | ⬜ |
+| 标准                                         | 状态 |
+| -------------------------------------------- | ---- |
+| `parseFhirJson()` 能解析有效 FHIR JSON       | ⬜   |
+| 正确处理原始类型双属性表示                   | ⬜   |
+| 正确处理 choice type [x] 分发                | ⬜   |
+| 正确处理重复元素 null 对齐                   | ⬜   |
+| 解析 FHIR R4 Patient StructureDefinition     | ⬜   |
+| 解析 FHIR R4 Observation StructureDefinition | ⬜   |
+| Round-trip 保真 (parse → serialize → parse)  | ⬜   |
+| 错误信息包含精确路径                         | ⬜   |
+| 测试数量 ≥ 40                                | ⬜   |
+| `npm run build` 成功                         | ⬜   |
+| 零 TypeScript 编译错误                       | ⬜   |
+| 代码审查通过                                 | ⬜   |
 
 ---
 
@@ -832,13 +917,13 @@ Task 2.8 (exports & build)
 
 ## 风险评估
 
-| 风险 | 概率 | 影响 | 缓解措施 |
-|------|------|------|----------|
-| FHIR JSON 边界情况遗漏 | 中 | 中 | 使用官方 edge-cases.json 测试 |
-| Choice type 注册表不完整 | 低 | 高 | 从 FHIR R4 规范自动生成 |
-| 十进制精度丢失 | 高 | 低 | Stage-1 接受限制，文档记录 |
-| 真实 SD JSON 解析失败 | 中 | 高 | 优先用真实数据测试，逐步修复 |
-| Round-trip 不完全保真 | 中 | 中 | 接受语义等价而非字节等价 |
+| 风险                     | 概率 | 影响 | 缓解措施                      |
+| ------------------------ | ---- | ---- | ----------------------------- |
+| FHIR JSON 边界情况遗漏   | 中   | 中   | 使用官方 edge-cases.json 测试 |
+| Choice type 注册表不完整 | 低   | 高   | 从 FHIR R4 规范自动生成       |
+| 十进制精度丢失           | 高   | 低   | Stage-1 接受限制，文档记录    |
+| 真实 SD JSON 解析失败    | 中   | 高   | 优先用真实数据测试，逐步修复  |
+| Round-trip 不完全保真    | 中   | 中   | 接受语义等价而非字节等价      |
 
 ---
 
@@ -847,7 +932,7 @@ Task 2.8 (exports & build)
 原始 Roadmap 中 Phase 2 的描述较为简略（3 个 task），本详细计划扩展为 8 个 task，主要增加了：
 
 1. **结构化错误类型** (Task 2.1) — 原计划未明确
-2. **原始类型 _element 合并** (Task 2.3) — 原计划仅提到 "normalization"
+2. **原始类型 \_element 合并** (Task 2.3) — 原计划仅提到 "normalization"
 3. **Choice type 解析** (Task 2.4) — 原计划未提及，但 ADR-003 明确要求
 4. **序列化** (Task 2.6) — 原计划未提及，但 round-trip 保真需要
 5. **更详细的测试分层** (Task 2.7) — 原计划 20+ 测试扩展到 40+
