@@ -347,6 +347,32 @@ describe('Category 1: Primitive Parser', () => {
       const result = parseFhirJson(json);
       expect(result.success).toBe(true);
     });
+
+    it('correctly handles Chinese characters (UTF-8)', () => {
+      // Test UTF-8 handling with StructureDefinition (Patient parser not yet implemented)
+      const sd = parseUnifiedSD('01-primitives', '01-string-values.json');
+      const obj = serializeToFhirObject(sd);
+      const json = serializeToFhirJson(sd);
+
+      // Verify Chinese characters in title/description are preserved
+      expect(sd.title).toBe('String Values Test');
+      expect(sd.description).toContain('string primitive');
+
+      // Test round-trip with Chinese characters by modifying and re-parsing
+      const chineseSD = {
+        ...obj,
+        title: '中文标题测试',
+        description: '这是一个包含中文字符的描述：患者、医生、诊断',
+        publisher: '北京医疗信息技术有限公司',
+      };
+      const chineseJson = JSON.stringify(chineseSD);
+      const result = parseFhirJson(chineseJson);
+      expect(result.success).toBe(true);
+      const parsed = result.data as any;
+      expect(parsed.title).toBe('中文标题测试');
+      expect(parsed.description).toBe('这是一个包含中文字符的描述：患者、医生、诊断');
+      expect(parsed.publisher).toBe('北京医疗信息技术有限公司');
+    });
   });
 });
 
