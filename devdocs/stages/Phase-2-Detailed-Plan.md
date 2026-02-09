@@ -675,13 +675,40 @@ const ELEMENT_DEFINITION_PROPERTIES = new Set([
 
 ### 验收标准
 
-- [ ] 正确解析完整的 StructureDefinition JSON
-- [ ] 正确解析 ElementDefinition 的所有 37 个字段
-- [ ] 正确解析所有 8 个 ElementDefinition 子类型
-- [ ] 正确处理 snapshot.element[] 和 differential.element[]
-- [ ] 正确处理 ElementDefinition 中的 5 个 choice type 字段
-- [ ] 解析 FHIR R4 Patient base StructureDefinition 无错误
-- [ ] 解析 FHIR R4 Observation base StructureDefinition 无错误
+- [x] 正确解析完整的 StructureDefinition JSON ✅ (2026-02-09)
+- [x] 正确解析 ElementDefinition 的所有 37 个字段 ✅ (2026-02-09)
+- [x] 正确解析所有 8 个 ElementDefinition 子类型 ✅ (2026-02-09)
+- [x] 正确处理 snapshot.element[] 和 differential.element[] ✅ (2026-02-09)
+- [x] 正确处理 ElementDefinition 中的 5 个 choice type 字段 ✅ (2026-02-09)
+- [x] 解析 FHIR R4 Patient base StructureDefinition 无错误 ✅ (2026-02-09)
+- [x] 解析 FHIR R4 Observation base StructureDefinition 无错误 ✅ (2026-02-09)
+
+### Implementation Notes (2026-02-09)
+
+- **File**: `src/parser/structure-definition-parser.ts` (~765 lines)
+- **Exports**: `parseStructureDefinition`, `parseElementDefinition`
+- **Internal parsers**: 10 sub-type parsers (parseSlicing, parseDiscriminator, parseBase, parseEDType, parseConstraint, parseBinding, parseExample, parseEDMapping, parseSDMapping, parseSDContext) + parseElementContainer + parseObjectArray helper
+- **Known property sets**: `STRUCTURE_DEFINITION_PROPERTIES` (36 keys), `ELEMENT_DEFINITION_PROPERTIES` (31 keys + choice type prefixes)
+- **Choice type integration**: Uses `extractAllChoiceValues()` from choice-type-parser for 5 ED choice fields (defaultValue, fixed, pattern, minValue, maxValue) + example value[x]
+- **Dispatch**: `json-parser.ts` → `parseFhirObject()` dispatches `resourceType=StructureDefinition` to dedicated parser
+
+#### Test Files
+
+- `__tests__/structure-definition-parser.test.ts` — 63 unit tests (required fields, optional metadata, sub-types, choice types, unknown properties, integration dispatch, fixture parsing, complex profile)
+- `__tests__/structure-definition-fixtures.test.ts` — 93 fixture-based tests loading 45 JSON files
+
+#### Test Fixtures (`__tests__/fixtures/structure-definition/`)
+
+| Category                    | Files | Description                                                                                                                                                                                                                                                         |
+| --------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01-complete-sd/`           | 5     | Minimal, full metadata, extension-def, logical-model, datatype-def                                                                                                                                                                                                  |
+| `02-element-fields/`        | 5     | Identity fields, cardinality+docs, flags+conditions, contentReference+maxLength, all-37-fields                                                                                                                                                                      |
+| `03-element-subtypes/`      | 5     | Slicing+discriminator, base+type, constraints, binding+example, mapping                                                                                                                                                                                             |
+| `04-snapshot-differential/` | 5     | Snapshot-only, differential-only, both, deep-nesting, large-element-array (19 elements)                                                                                                                                                                             |
+| `05-choice-types/`          | 5     | fixed[x], pattern[x], defaultValue[x], minValue+maxValue[x], multiple-choice-fields                                                                                                                                                                                 |
+| `06-base-resources/`        | 20    | Patient, Observation, Condition, Encounter, MedicationRequest, Procedure, DiagnosticReport, AllergyIntolerance, Immunization, Practitioner, Organization, CarePlan, Medication, Location, Claim, Bundle, Questionnaire, ServiceRequest, DocumentReference, ValueSet |
+
+**Total**: 45 JSON fixture files, 156 tests (63 + 93), **326 total tests across 6 test files — all passing**
 
 ---
 

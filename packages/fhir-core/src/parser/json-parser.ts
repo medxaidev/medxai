@@ -31,6 +31,7 @@ import {
   parseFailure,
   hasErrors,
 } from './parse-error.js';
+import { parseStructureDefinition } from './structure-definition-parser.js';
 
 // =============================================================================
 // Section 1: Type Guards & Utilities
@@ -435,11 +436,19 @@ export function parseFhirObject(obj: unknown): ParseResult<Resource> {
   const path = resourceType;
 
   // Step 3: Dispatch by resourceType
-  // StructureDefinition has a dedicated parser (Task 2.5).
-  // For now, all types use the generic parser. The SD parser will be
-  // wired in when structure-definition-parser.ts is implemented.
-  const { result, issues: parseIssues } = parseGenericResource(obj, resourceType, path);
-  issues.push(...parseIssues);
+  let result: Resource;
+  if (resourceType === 'StructureDefinition') {
+    const sdResult = parseStructureDefinition(obj, path);
+    issues.push(...sdResult.issues);
+    if (!sdResult.success) {
+      return parseFailure<Resource>(issues);
+    }
+    result = sdResult.data;
+  } else {
+    const generic = parseGenericResource(obj, resourceType, path);
+    issues.push(...generic.issues);
+    result = generic.result;
+  }
 
   if (hasErrors(issues)) {
     return parseFailure<Resource>(issues);
