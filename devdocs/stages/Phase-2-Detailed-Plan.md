@@ -750,11 +750,48 @@ export function serializeToFhirObject(
 
 ### 验收标准
 
-- [ ] 正确序列化 Resource 为 FHIR JSON 字符串
-- [ ] 原始类型正确拆分为值和 `_element`
-- [ ] Choice type 使用正确的属性名
-- [ ] 空值被正确省略
-- [ ] `resourceType` 作为第一个属性输出
+- [x] 正确序列化 Resource 为 FHIR JSON 字符串
+- [x] 原始类型正确拆分为值和 `_element`
+- [x] Choice type 使用正确的属性名
+- [x] 空值被正确省略
+- [x] `resourceType` 作为第一个属性输出
+
+### Implementation Notes (Completed 2026-02-10)
+
+**Implementation file:** `packages/fhir-core/src/parser/serializer.ts` (~560 lines)
+
+**Public API:**
+
+- `serializeToFhirJson(resource: Resource): string` — pretty-printed JSON string
+- `serializeToFhirObject(resource: Resource): Record<string, unknown>` — plain object
+
+**Internal architecture (7 sections):**
+
+1. Public API — dispatch by resourceType
+2. StructureDefinition serializer — all top-level fields, alphabetical property ordering
+3. Sub-type serializers — StructureDefinitionMapping, StructureDefinitionContext, element containers
+4. ElementDefinition serializer — all 37+ fields, sub-types, choice type restoration
+5. ElementDefinition sub-type serializers — Slicing, Discriminator, Base, Type, Constraint, Binding, Example, Mapping
+6. Choice type serialization — `ChoiceValue` duck-typing detection, `propertyName` restoration, `_element` companion restoration
+7. Utility helpers — `assignIfDefined`, `assignIfNotEmptyArray`
+
+**Test file:** `__tests__/serializer.test.ts` — **53 tests** across 10 describe blocks:
+
+- Public API (5 tests)
+- Minimal SD serialization (2 tests)
+- Full metadata serialization (5 tests)
+- Slicing/discriminator serialization (3 tests)
+- Base/type serialization (3 tests)
+- Constraint serialization (2 tests)
+- Binding/example serialization (3 tests)
+- Choice type serialization (3 tests)
+- Property ordering (2 tests)
+- Round-trip parse→serialize→parse (15 tests)
+- Edge cases (6 tests)
+- Mapping serialization (1 test)
+- Base resource round-trip (3 tests)
+
+**Total test count after Task 2.6: 379 tests across 7 test files — all passing**
 
 ---
 
