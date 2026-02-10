@@ -50,7 +50,6 @@ Validation Layer
 - `fhir-context` **MAY** depend on:
   - ✅ `fhir-model` (for type definitions)
   - ✅ `fhir-parser` (to parse loaded JSON)
-  
 - `fhir-context` **MUST NOT** depend on:
   - ❌ `fhir-profile` (snapshot generation)
   - ❌ `fhir-validator`
@@ -58,13 +57,13 @@ Validation Layer
 
 ### HAPI FHIR Conceptual Mapping
 
-| HAPI Component | MedXAI Equivalent | Phase |
-|----------------|-------------------|-------|
-| `FhirContext` | `FhirContext` class | Phase 3 |
-| `IValidationSupport` | `StructureDefinitionLoader` interface | Phase 3 |
-| `ValidationSupportChain` | `CompositeLoader` | Phase 3 |
-| `PrePopulatedValidationSupport` | `MemoryLoader` | Phase 3 |
-| `ProfileUtilities` | `SnapshotGenerator` | Phase 4 |
+| HAPI Component                  | MedXAI Equivalent                     | Phase   |
+| ------------------------------- | ------------------------------------- | ------- |
+| `FhirContext`                   | `FhirContext` class                   | Phase 3 |
+| `IValidationSupport`            | `StructureDefinitionLoader` interface | Phase 3 |
+| `ValidationSupportChain`        | `CompositeLoader`                     | Phase 3 |
+| `PrePopulatedValidationSupport` | `MemoryLoader`                        | Phase 3 |
+| `ProfileUtilities`              | `SnapshotGenerator`                   | Phase 4 |
 
 ---
 
@@ -84,6 +83,7 @@ Define the foundational interfaces and error types for the context module.
 #### Work Items
 
 1. **Define `FhirContext` interface**
+
    ```typescript
    interface FhirContext {
      loadStructureDefinition(url: string): Promise<StructureDefinition>;
@@ -97,6 +97,7 @@ Define the foundational interfaces and error types for the context module.
    ```
 
 2. **Define `StructureDefinitionLoader` interface**
+
    ```typescript
    interface StructureDefinitionLoader {
      load(url: string): Promise<StructureDefinition | null>;
@@ -106,6 +107,7 @@ Define the foundational interfaces and error types for the context module.
    ```
 
 3. **Define `LoaderOptions` configuration**
+
    ```typescript
    interface LoaderOptions {
      baseUrl?: string;
@@ -135,10 +137,32 @@ Define the foundational interfaces and error types for the context module.
 
 #### Acceptance Criteria
 
-- [ ] All interfaces compile without errors
-- [ ] Error types have proper inheritance chain
-- [ ] TSDoc comments for all public interfaces
-- [ ] No dependencies on fhir-profile or fhir-validator
+- [x] All interfaces compile without errors
+- [x] Error types have proper inheritance chain
+- [x] TSDoc comments for all public interfaces
+- [x] No dependencies on fhir-profile or fhir-validator
+
+#### Implementation Notes (Completed 2026-02-10)
+
+**Created:** `src/context/types.ts`
+
+- `FhirContext` interface (8 methods: load, get, has, resolveInheritanceChain, register, preloadCoreDefinitions, getStatistics, dispose)
+- `StructureDefinitionLoader` interface (3 methods: load, canLoad, getSourceType)
+- `FhirContextOptions` — context configuration (loaders, preloadCore, specDirectory)
+- `LoaderOptions` — per-loader configuration (basePath, timeout, retryCount)
+- `ContextStatistics` — runtime metrics (totalLoaded, cacheHits, cacheMisses, loaderCalls, chainsResolved, registrations)
+- `createEmptyStatistics()` — factory function
+
+**Created:** `src/context/errors.ts`
+
+- `ContextError` (base, `name: string` to allow subclass override)
+- `ResourceNotFoundError` (url, triedSources)
+- `CircularDependencyError` (chain with `→` display)
+- `LoaderError` (url, sourceType, cause preservation)
+- `InvalidStructureDefinitionError` (reason, url)
+- All errors use `Object.setPrototypeOf` for correct `instanceof` after transpilation
+
+**Verification:** `tsc --noEmit` — zero errors
 
 ---
 
@@ -181,11 +205,38 @@ Implement the in-memory registry for storing and querying StructureDefinitions.
 
 #### Acceptance Criteria
 
-- [ ] Registry stores and retrieves StructureDefinitions correctly
-- [ ] Version resolution works for both exact and latest version queries
-- [ ] Statistics are tracked accurately
-- [ ] Unit tests cover all operations (≥20 tests)
-- [ ] Edge cases tested: duplicate registration, non-existent URL, version conflicts
+- [x] Registry stores and retrieves StructureDefinitions correctly
+- [x] Version resolution works for both exact and latest version queries
+- [x] Statistics are tracked accurately
+- [x] Unit tests cover all operations (≥20 tests) — **45 tests**
+- [x] Edge cases tested: duplicate registration, non-existent URL, version conflicts
+
+#### Implementation Notes (Completed 2026-02-10)
+
+**Created:** `src/context/registry.ts`
+
+- `parseVersionedUrl(url)` — splits `url|version` format
+- `buildVersionedKey(url, version)` — constructs registry key
+- `StructureDefinitionRegistry` class:
+  - Dual-Map storage: primary (`url|version` → SD) + latest index (`url` → key)
+  - Core operations: `register`, `get`, `has`, `delete`, `clear`, `size`, `getAllKeys`, `getAllUrls`
+  - Version resolution: exact match for `url|version`, latest-registered for bare URL
+  - Statistics: `queryCount`, `hitCount`, `missCount`, `hitRate`
+  - Validation: throws `InvalidStructureDefinitionError` if `sd.url` is missing
+
+**Created:** `src/context/__tests__/registry.test.ts` — 45 tests across 9 describe blocks
+
+- URL utilities: 8 tests (parseVersionedUrl, buildVersionedKey)
+- Register & get: 6 tests
+- Version support: 6 tests
+- has(): 4 tests
+- delete(): 5 tests
+- clear(): 2 tests
+- getAllKeys/getAllUrls: 4 tests
+- Statistics: 5 tests
+- Edge cases: 5 tests (long URLs, special chars, 100 entries, object identity)
+
+**Verification:** 572 tests across 9 files — all passing, zero regressions
 
 ---
 
@@ -231,12 +282,45 @@ Implement concrete loader classes for different sources.
 
 #### Acceptance Criteria
 
-- [ ] MemoryLoader works with in-memory map
-- [ ] FileSystemLoader reads and parses JSON files correctly
-- [ ] CompositeLoader tries loaders in order and stops at first success
-- [ ] Error handling is robust (file not found, parse errors, etc.)
-- [ ] Unit tests for each loader (≥15 tests total)
-- [ ] Integration test: CompositeLoader with memory + file loaders
+- [x] MemoryLoader works with in-memory map
+- [x] FileSystemLoader reads and parses JSON files correctly
+- [x] CompositeLoader tries loaders in order and stops at first success
+- [x] Error handling is robust (file not found, parse errors, etc.)
+- [x] Unit tests for each loader (≥15 tests total) — **32 tests**
+- [x] Integration test: CompositeLoader with memory + file loaders
+
+#### Implementation Notes (Completed 2026-02-11)
+
+**Created:** `src/context/loaders/memory-loader.ts`
+
+- `MemoryLoader` — wraps `Map<string, StructureDefinition>`, shares reference (mutations visible)
+- Exposes `size` getter for diagnostics
+
+**Created:** `src/context/loaders/file-loader.ts`
+
+- `FileSystemLoader` — reads `{basePath}/{ResourceName}.json` files
+- `extractResourceName(url)` — extracts last path segment from canonical URL
+- Uses `parseFhirJson()` from fhir-parser for type-safe parsing
+- Returns `null` for missing files, throws `LoaderError` for invalid JSON / parse failures
+
+**Created:** `src/context/loaders/composite-loader.ts`
+
+- `CompositeLoader` — chain-of-responsibility pattern (HAPI `ValidationSupportChain` equivalent)
+- Tries loaders in order, stops at first non-null result
+- Propagates `LoaderError` directly; wraps unexpected errors
+- Requires ≥1 child loader (constructor validation)
+- `getSourceType()` returns `"composite(memory, filesystem)"` style label
+
+**Created:** `src/context/loaders/index.ts` — barrel exports
+
+**Created:** `src/context/__tests__/loaders.test.ts` — 32 tests across 4 describe blocks
+
+- extractResourceName: 4 tests
+- MemoryLoader: 8 tests (load, canLoad, mutations, empty map)
+- FileSystemLoader: 9 tests (load, canLoad, errors, custom URL mapping)
+- CompositeLoader: 11 tests (fallback, error propagation, integration with memory+file)
+
+**Verification:** 604 tests across 10 files — all passing, zero regressions
 
 ---
 
@@ -258,10 +342,11 @@ Implement recursive resolution of profile inheritance chains with circular depen
    - Main method: `resolve(url: string): Promise<string[]>`
 
 2. **Resolution algorithm**
+
    ```
    Input: Profile URL (e.g., "http://example.org/ChinesePatient")
    Output: Inheritance chain (e.g., ["ChinesePatient", "Patient", "DomainResource", "Resource"])
-   
+
    Steps:
    1. Load StructureDefinition for given URL
    2. Extract baseDefinition URL
@@ -559,13 +644,28 @@ Create barrel exports and validate the complete build pipeline.
 #### Work Items
 
 1. **Create `src/context/index.ts`**
+
    ```typescript
    // Public API exports
-   export type { FhirContext, StructureDefinitionLoader, LoaderOptions, ContextStatistics } from './types.js';
-   export { FhirContextImpl } from './fhir-context.js';
-   export { MemoryLoader, FileSystemLoader, CompositeLoader } from './loaders/index.js';
-   export { ContextError, CircularDependencyError, ResourceNotFoundError, LoaderError } from './errors.js';
-   
+   export type {
+     FhirContext,
+     StructureDefinitionLoader,
+     LoaderOptions,
+     ContextStatistics,
+   } from "./types.js";
+   export { FhirContextImpl } from "./fhir-context.js";
+   export {
+     MemoryLoader,
+     FileSystemLoader,
+     CompositeLoader,
+   } from "./loaders/index.js";
+   export {
+     ContextError,
+     CircularDependencyError,
+     ResourceNotFoundError,
+     LoaderError,
+   } from "./errors.js";
+
    // Internal exports (not re-exported from src/index.ts)
    // - StructureDefinitionRegistry
    // - InheritanceChainResolver
@@ -601,20 +701,20 @@ Create barrel exports and validate the complete build pipeline.
 
 ## Phase 3 Overall Acceptance Criteria
 
-| Criterion | Verification Method | Status |
-|-----------|---------------------|--------|
-| Load FHIR R4 Patient StructureDefinition | `context.loadStructureDefinition('http://hl7.org/fhir/StructureDefinition/Patient')` succeeds | ⬜ |
-| Resolve Patient inheritance chain | Returns `['Patient', 'DomainResource', 'Resource']` | ⬜ |
-| Detect circular dependencies | Crafted circular profile throws `CircularDependencyError` | ⬜ |
-| Support versioned URLs | `context.loadStructureDefinition('http://example.org/Profile\|1.0.0')` works | ⬜ |
-| Preload core resources | After `preloadCoreDefinitions()`, registry contains ≥20 resources | ⬜ |
-| Composite loader fallback | CompositeLoader tries loaders in order | ⬜ |
-| Cache hit rate | After warmup, cache hit rate ≥80% for repeated queries | ⬜ |
-| Test coverage | ≥80% line coverage, ≥75% branch coverage | ⬜ |
-| Zero TypeScript errors | `tsc --noEmit` passes | ⬜ |
-| Build success | `npm run build` succeeds | ⬜ |
-| All tests pass | `vitest run` shows 100% pass rate | ⬜ |
-| No regressions | Phase 1 and Phase 2 tests still pass | ⬜ |
+| Criterion                                | Verification Method                                                                           | Status |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------- | ------ |
+| Load FHIR R4 Patient StructureDefinition | `context.loadStructureDefinition('http://hl7.org/fhir/StructureDefinition/Patient')` succeeds | ⬜     |
+| Resolve Patient inheritance chain        | Returns `['Patient', 'DomainResource', 'Resource']`                                           | ⬜     |
+| Detect circular dependencies             | Crafted circular profile throws `CircularDependencyError`                                     | ⬜     |
+| Support versioned URLs                   | `context.loadStructureDefinition('http://example.org/Profile\|1.0.0')` works                  | ⬜     |
+| Preload core resources                   | After `preloadCoreDefinitions()`, registry contains ≥20 resources                             | ⬜     |
+| Composite loader fallback                | CompositeLoader tries loaders in order                                                        | ⬜     |
+| Cache hit rate                           | After warmup, cache hit rate ≥80% for repeated queries                                        | ⬜     |
+| Test coverage                            | ≥80% line coverage, ≥75% branch coverage                                                      | ⬜     |
+| Zero TypeScript errors                   | `tsc --noEmit` passes                                                                         | ⬜     |
+| Build success                            | `npm run build` succeeds                                                                      | ⬜     |
+| All tests pass                           | `vitest run` shows 100% pass rate                                                             | ⬜     |
+| No regressions                           | Phase 1 and Phase 2 tests still pass                                                          | ⬜     |
 
 ---
 
@@ -622,21 +722,21 @@ Create barrel exports and validate the complete build pipeline.
 
 ### Dependencies
 
-| Dependency | Status | Impact if Delayed |
-|------------|--------|-------------------|
-| Phase 1 (fhir-model) | ✅ Complete | N/A |
-| Phase 2 (fhir-parser) | ✅ Complete | N/A |
+| Dependency               | Status              | Impact if Delayed        |
+| ------------------------ | ------------------- | ------------------------ |
+| Phase 1 (fhir-model)     | ✅ Complete         | N/A                      |
+| Phase 2 (fhir-parser)    | ✅ Complete         | N/A                      |
 | FHIR R4 core definitions | ⬜ Need to download | Can use subset initially |
 
 ### Risks
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| FHIR R4 definitions incomplete | Low | Medium | Download official definitions.json.zip from HL7 |
-| Inheritance chain complexity | Low | Medium | Start with simple chains, add complexity incrementally |
-| Cache invalidation bugs | Medium | Low | Comprehensive cache invalidation tests |
-| Loader error handling gaps | Medium | Medium | Test all error scenarios explicitly |
-| Performance issues with large registries | Low | Low | Defer optimization to later phase if needed |
+| Risk                                     | Probability | Impact | Mitigation                                             |
+| ---------------------------------------- | ----------- | ------ | ------------------------------------------------------ |
+| FHIR R4 definitions incomplete           | Low         | Medium | Download official definitions.json.zip from HL7        |
+| Inheritance chain complexity             | Low         | Medium | Start with simple chains, add complexity incrementally |
+| Cache invalidation bugs                  | Medium      | Low    | Comprehensive cache invalidation tests                 |
+| Loader error handling gaps               | Medium      | Medium | Test all error scenarios explicitly                    |
+| Performance issues with large registries | Low         | Low    | Defer optimization to later phase if needed            |
 
 ---
 
@@ -687,13 +787,13 @@ Phase 4 (fhir-profile) will depend on Phase 3 providing this interface:
 interface FhirContext {
   // Load StructureDefinition (with caching)
   loadStructureDefinition(url: string): Promise<StructureDefinition>;
-  
+
   // Resolve inheritance chain (from child to parent)
   resolveInheritanceChain(url: string): Promise<string[]>;
-  
+
   // Register generated snapshot back to context
   registerStructureDefinition(sd: StructureDefinition): void;
-  
+
   // Check if definition is already loaded
   hasStructureDefinition(url: string): boolean;
 }
@@ -703,19 +803,21 @@ Phase 4 usage example:
 
 ```typescript
 // Phase 4: SnapshotGenerator will use Phase 3 like this
-async function generateSnapshot(sd: StructureDefinition): Promise<StructureDefinition> {
+async function generateSnapshot(
+  sd: StructureDefinition,
+): Promise<StructureDefinition> {
   // 1. Get inheritance chain using Phase 3
   const chain = await context.resolveInheritanceChain(sd.url);
-  
+
   // 2. Load base definition using Phase 3
   const base = await context.loadStructureDefinition(sd.baseDefinition);
-  
+
   // 3. Generate snapshot (Phase 4 algorithm)
   const snapshot = mergeElements(base.snapshot, sd.differential);
-  
+
   // 4. Register back to context (optional, for caching)
   context.registerStructureDefinition({ ...sd, snapshot });
-  
+
   return sd;
 }
 ```
@@ -745,17 +847,17 @@ After Phase 3 completion, update:
 
 ## Estimated Timeline
 
-| Task | Duration | Dependencies |
-|------|----------|--------------|
-| 3.1 Core Interfaces | 0.5 day | None |
-| 3.2 Registry | 1 day | 3.1 |
-| 3.3 Loaders | 1.5 days | 3.1 |
-| 3.4 Inheritance Resolver | 1.5 days | 3.1, 3.2 |
-| 3.5 Core Resources Prep | 1 day | None (parallel) |
-| 3.6 FhirContext Main | 1.5 days | 3.2, 3.3, 3.4 |
-| 3.7 Caching | 0.5 day | 3.6 |
-| 3.8 Test Suite | 2 days | All above |
-| 3.9 Exports & Build | 0.5 day | All above |
+| Task                     | Duration | Dependencies    |
+| ------------------------ | -------- | --------------- |
+| 3.1 Core Interfaces      | 0.5 day  | None            |
+| 3.2 Registry             | 1 day    | 3.1             |
+| 3.3 Loaders              | 1.5 days | 3.1             |
+| 3.4 Inheritance Resolver | 1.5 days | 3.1, 3.2        |
+| 3.5 Core Resources Prep  | 1 day    | None (parallel) |
+| 3.6 FhirContext Main     | 1.5 days | 3.2, 3.3, 3.4   |
+| 3.7 Caching              | 0.5 day  | 3.6             |
+| 3.8 Test Suite           | 2 days   | All above       |
+| 3.9 Exports & Build      | 0.5 day  | All above       |
 
 **Total: 8-10 days** (with some parallelization)
 
@@ -763,18 +865,18 @@ After Phase 3 completion, update:
 
 ## Success Metrics
 
-| Metric | Target | Actual |
-|--------|--------|--------|
-| Implementation files | 8-10 | ⬜ |
-| Test files | 6-8 | ⬜ |
-| Total tests | 100-120 | ⬜ |
-| Line coverage | ≥80% | ⬜ |
-| Branch coverage | ≥75% | ⬜ |
-| Build time | <30s | ⬜ |
-| Test execution time | <5s | ⬜ |
-| Core resources preloaded | ≥20 | ⬜ |
-| Public API functions | 8-10 | ⬜ |
-| Public API types | 6-8 | ⬜ |
+| Metric                   | Target  | Actual |
+| ------------------------ | ------- | ------ |
+| Implementation files     | 8-10    | ⬜     |
+| Test files               | 6-8     | ⬜     |
+| Total tests              | 100-120 | ⬜     |
+| Line coverage            | ≥80%    | ⬜     |
+| Branch coverage          | ≥75%    | ⬜     |
+| Build time               | <30s    | ⬜     |
+| Test execution time      | <5s     | ⬜     |
+| Core resources preloaded | ≥20     | ⬜     |
+| Public API functions     | 8-10    | ⬜     |
+| Public API types         | 6-8     | ⬜     |
 
 ---
 

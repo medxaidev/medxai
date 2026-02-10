@@ -92,6 +92,18 @@ type FhirString = string & { readonly __brand: "FhirString" };
 
 **Completed:** 2026-02-07
 
+### 二次复盘记录（2026-02-11）
+
+- **总体结论**: `primitives.ts` 满足 Stage-1 目标（纯类型、零运行时逻辑），Primitive/Enum/Base Complex Types 覆盖与文档验收标准一致；未发现会阻塞后续 Phase 的结构性问题。
+- **Choice type `[x]`（unknown）**: `Extension.value` 与 `UsageContext.value` 采用 `unknown` + JSDoc（“Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.”）是合理的 Stage-1 策略。
+  - 该策略在本文档 Task 1.3 已有总述（用于 ElementDefinition 的 `[x]` 字段）。为便于后续回顾，建议在 Task 1.1 也明确注明：基础复合类型中同样存在 `[x]` 字段，Stage-1 统一用 `unknown`，Phase 2（`fhir-parser`）再做具体类型分派/解析。
+- **`Resource.resourceType: string`**: 没有问题。
+  - FHIR JSON 里 `resourceType` 是资源级必需字段（用于区分资源类型）。
+  - 将其定义在抽象 `Resource` 基类中符合 FHIR 语义；并且用 `string`（而不是 `FhirString` branded）可让具体资源接口把它窄化为字符串字面量（例如 `"StructureDefinition"`），这对解析/序列化的分派很关键。
+- **可选改进项（不属于 Stage-1 阻塞）**:
+  - `ContactPoint.system/use`、`Identifier.use` 当前使用 `FhirCode`（较宽）；未来如要更贴近规范，可引入更精确的值集类型（例如 `ContactPointSystem`, `ContactPointUse`, `IdentifierUse`）。
+  - `FhirBoolean` 未做 branded（与其他 primitive 的 nominal typing 不一致）；但 boolean 本身语义明确、且不会参与字面量窄化，当前实现可接受。
+
 ---
 
 ## Task 1.2: StructureDefinition Model (Day 2-3)
