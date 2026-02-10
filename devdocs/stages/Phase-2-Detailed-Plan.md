@@ -965,12 +965,25 @@ export type { ChoiceValue } from "./choice-type-parser.js";
 
 ### 验收标准
 
-- [ ] `npm run build` 成功
-- [ ] `vitest run` 所有测试通过
-- [ ] `dist/index.d.ts` 包含所有新增公共类型
-- [ ] 无 TypeScript 编译错误
-- [ ] 无 api-extractor 警告
-- [ ] 文档已更新
+- [x] `npm run build` 成功
+- [x] `vitest run` 所有测试通过
+- [x] `dist/index.d.ts` 包含所有新增公共类型
+- [x] 无 TypeScript 编译错误
+- [x] 无 api-extractor 警告
+- [x] 文档已更新
+
+### Implementation Notes (Completed 2026-02-10)
+
+**Created:** `src/parser/index.ts` — unified barrel export for parser module
+
+**Updated:** `src/index.ts` — re-exports all parser public API:
+
+- **Types:** `ParseSeverity`, `ParseErrorCode`, `ParseIssue`, `ParseResult`, `ChoiceValue`, `ChoiceTypeField`
+- **Functions:** `parseFhirJson`, `parseFhirObject`, `parseStructureDefinition`, `parseElementDefinition`, `serializeToFhirJson`, `serializeToFhirObject`, `parseSuccess`, `parseFailure`, `createIssue`, `hasErrors`
+
+**Build output:** `dist/index.d.ts` — 1887 lines (up from 1607 in Phase 1)
+
+**Final test count: 527 tests across 8 test files — all passing**
 
 ---
 
@@ -978,18 +991,32 @@ export type { ChoiceValue } from "./choice-type-parser.js";
 
 | 标准                                         | 状态 |
 | -------------------------------------------- | ---- |
-| `parseFhirJson()` 能解析有效 FHIR JSON       | ⬜   |
-| 正确处理原始类型双属性表示                   | ⬜   |
-| 正确处理 choice type [x] 分发                | ⬜   |
-| 正确处理重复元素 null 对齐                   | ⬜   |
-| 解析 FHIR R4 Patient StructureDefinition     | ⬜   |
-| 解析 FHIR R4 Observation StructureDefinition | ⬜   |
-| Round-trip 保真 (parse → serialize → parse)  | ⬜   |
-| 错误信息包含精确路径                         | ⬜   |
-| 测试数量 ≥ 40                                | ⬜   |
-| `npm run build` 成功                         | ⬜   |
-| 零 TypeScript 编译错误                       | ⬜   |
-| 代码审查通过                                 | ⬜   |
+| `parseFhirJson()` 能解析有效 FHIR JSON       | ✅   |
+| 正确处理原始类型双属性表示                   | ✅   |
+| 正确处理 choice type [x] 分发                | ✅   |
+| 正确处理重复元素 null 对齐                   | ✅   |
+| 解析 FHIR R4 Patient StructureDefinition     | ✅   |
+| 解析 FHIR R4 Observation StructureDefinition | ✅   |
+| Round-trip 保真 (parse → serialize → parse)  | ✅   |
+| 错误信息包含精确路径                         | ✅   |
+| 测试数量 ≥ 40                                | ✅   |
+| `npm run build` 成功                         | ✅   |
+| 零 TypeScript 编译错误                       | ✅   |
+| 代码审查通过                                 | ✅   |
+
+**Phase 2 COMPLETED — 2026-02-10**
+
+### Phase 2 Final Statistics
+
+| Metric                  | Value                                                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Implementation files    | 6 (parse-error, json-parser, primitive-parser, choice-type-parser, structure-definition-parser, serializer) |
+| Test files              | 8                                                                                                           |
+| Total tests             | 527                                                                                                         |
+| JSON fixtures           | 62+                                                                                                         |
+| `dist/index.d.ts` lines | 1887                                                                                                        |
+| Public API functions    | 10                                                                                                          |
+| Public API types        | 6                                                                                                           |
 
 ---
 

@@ -1,13 +1,37 @@
 /**
  * `@medxai/fhir-core` — Public API
  *
- * Re-exports all public types from the model layer.
- * Additional modules (parser, profile, validator, context) will be
+ * Re-exports all public types from the model and parser layers.
+ * Additional modules (context, profile, validator) will be
  * added here as they are implemented in later phases.
  *
  * @packageDocumentation
  */
 
+// ─── Parser module ───────────────────────────────────────────────────────────
+export type {
+  ParseSeverity,
+  ParseErrorCode,
+  ParseIssue,
+  ParseResult,
+  ChoiceValue,
+  ChoiceTypeField,
+} from './parser/index.js';
+
+export {
+  parseFhirJson,
+  parseFhirObject,
+  parseStructureDefinition,
+  parseElementDefinition,
+  serializeToFhirJson,
+  serializeToFhirObject,
+  parseSuccess,
+  parseFailure,
+  createIssue,
+  hasErrors,
+} from './parser/index.js';
+
+// ─── Model module ────────────────────────────────────────────────────────────
 export type {
   // Primitives
   FhirBoolean,

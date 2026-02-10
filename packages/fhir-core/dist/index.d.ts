@@ -1,8 +1,8 @@
 /**
  * `@medxai/fhir-core` — Public API
  *
- * Re-exports all public types from the model layer.
- * Additional modules (parser, profile, validator, context) will be
+ * Re-exports all public types from the model and parser layers.
+ * Additional modules (context, profile, validator) will be
  * added here as they are implemented in later phases.
  *
  * @packageDocumentation
@@ -252,6 +252,44 @@ export declare interface CanonicalProfile {
 }
 
 /**
+ * Definition of a choice type [x] field.
+ *
+ * Each choice type field has a base name and a set of allowed type suffixes.
+ * The actual JSON property name is `baseName` + one of `allowedTypes`.
+ *
+ * @example
+ * ```typescript
+ * const field: ChoiceTypeField = {
+ *   baseName: 'value',
+ *   allowedTypes: ['String', 'Boolean', 'Integer', 'Quantity', ...],
+ * };
+ * // Matches: valueString, valueBoolean, valueInteger, valueQuantity, ...
+ * ```
+ */
+export declare interface ChoiceTypeField {
+    /** Base property name (e.g., "value", "defaultValue", "fixed") */
+    readonly baseName: string;
+    /** Allowed type suffixes (e.g., ["String", "Boolean", "Quantity"]) */
+    readonly allowedTypes: readonly string[];
+}
+
+/**
+ * Parsed choice type value.
+ *
+ * Preserves the original JSON property name for round-trip serialization.
+ */
+export declare interface ChoiceValue {
+    /** Type suffix (e.g., "String", "Quantity") */
+    readonly typeName: string;
+    /** The actual value from JSON */
+    readonly value: unknown;
+    /** Original JSON property name (e.g., "valueString") — for serialization */
+    readonly propertyName: string;
+    /** _element companion data, if present */
+    readonly elementExtension?: unknown;
+}
+
+/**
  * A concept that may be defined by a formal reference to a terminology
  * or ontology, or may be provided by text.
  * @see https://hl7.org/fhir/R4/datatypes.html#CodeableConcept
@@ -313,6 +351,18 @@ export declare interface ContactPoint extends Element {
     /** Time period when the contact point was/is in use (0..1) */
     period?: Period;
 }
+
+/**
+ * Create a single parse issue.
+ *
+ * Convenience factory to reduce boilerplate when constructing issues.
+ *
+ * @param severity - Error or warning
+ * @param code - Machine-readable error code
+ * @param message - Human-readable description
+ * @param path - JSON path where the issue was detected
+ */
+export declare function createIssue(severity: ParseSeverity, code: ParseErrorCode, message: string, path: string): ParseIssue;
 
 /**
  * How an element value is interpreted when discrimination is evaluated.
@@ -1033,6 +1083,14 @@ export declare type FhirVersionCode = '0.01' | '0.05' | '0.06' | '0.11' | '0.0.8
 export declare type FhirXhtml = Branded<string, 'FhirXhtml'>;
 
 /**
+ * Check whether an issues array contains at least one error (not just warnings).
+ *
+ * Useful for determining whether to return success or failure after
+ * collecting issues from sub-parsers.
+ */
+export declare function hasErrors(issues: readonly ParseIssue[]): boolean;
+
+/**
  * An identifier intended for computation (e.g., MRN, NPI).
  * @see https://hl7.org/fhir/R4/datatypes.html#Identifier
  */
@@ -1112,6 +1170,196 @@ export declare interface Narrative extends Element {
  * @see https://hl7.org/fhir/R4/valueset-narrative-status.html
  */
 export declare type NarrativeStatus = 'generated' | 'extensions' | 'additional' | 'empty';
+
+/**
+ * Parse an ElementDefinition JSON object.
+ *
+ * ElementDefinition is the most complex data type in FHIR,
+ * with ~37 fields and 8 sub-types.
+ */
+export declare function parseElementDefinition(obj: Record<string, unknown>, path: string): {
+    result: ElementDefinition;
+    issues: ParseIssue[];
+};
+
+/**
+ * Machine-readable error codes for parse issues.
+ *
+ * Each code corresponds to a specific category of parsing problem.
+ * Consumers can switch on these codes for programmatic error handling.
+ */
+export declare type ParseErrorCode = 
+/** JSON syntax error (e.g., malformed JSON string) */
+'INVALID_JSON'
+/** Missing required `resourceType` property */
+| 'MISSING_RESOURCE_TYPE'
+/** `resourceType` value is not a recognized FHIR resource type */
+| 'UNKNOWN_RESOURCE_TYPE'
+/** Primitive value has wrong JavaScript type (e.g., string where number expected) */
+| 'INVALID_PRIMITIVE'
+/** Object structure does not match expected shape (e.g., array where object expected) */
+| 'INVALID_STRUCTURE'
+/** Choice type `[x]` property name has an unrecognized type suffix */
+| 'INVALID_CHOICE_TYPE'
+/** Multiple variants of the same choice type field are present */
+| 'MULTIPLE_CHOICE_VALUES'
+/** `_element` array length does not match the corresponding value array */
+| 'ARRAY_MISMATCH'
+/** Unexpected `null` value in a non-nullable position */
+| 'UNEXPECTED_NULL'
+/** Property name not recognized for this type (severity: warning) */
+| 'UNEXPECTED_PROPERTY';
+
+/**
+ * Create a failed parse result.
+ *
+ * @param issues - The error(s) that caused the failure (must contain at least one error)
+ */
+export declare function parseFailure<T>(issues: ParseIssue[]): ParseResult<T>;
+
+/**
+ * Parse a FHIR JSON string into a Resource object.
+ *
+ * This is the main entry point for the parser. It:
+ * 1. Calls `JSON.parse()` with error capture
+ * 2. Delegates to {@link parseFhirObject} for structural parsing
+ *
+ * Stage-1 supports dedicated parsing for `StructureDefinition` (Task 2.5).
+ * All other resource types are parsed generically.
+ *
+ * @param json - A FHIR JSON string
+ * @returns A `ParseResult` containing the parsed `Resource` or error details
+ *
+ * @example
+ * ```typescript
+ * const result = parseFhirJson('{"resourceType":"Patient","id":"123"}');
+ * if (result.success) {
+ *   console.log(result.data.resourceType); // "Patient"
+ * }
+ * ```
+ */
+export declare function parseFhirJson(json: string): ParseResult<Resource>;
+
+/**
+ * Parse an already-parsed JSON value into a Resource object.
+ *
+ * Use this when you already have a JavaScript object (e.g., from a database
+ * or from `JSON.parse()` called externally).
+ *
+ * @param obj - An unknown value (expected to be a plain JSON object with `resourceType`)
+ * @returns A `ParseResult` containing the parsed `Resource` or error details
+ */
+export declare function parseFhirObject(obj: unknown): ParseResult<Resource>;
+
+/**
+ * A single issue encountered during parsing.
+ *
+ * Issues are collected throughout the parse process and returned in the
+ * {@link ParseResult}. Both errors and warnings use this same structure.
+ *
+ * @example
+ * ```typescript
+ * const issue: ParseIssue = {
+ *   severity: 'error',
+ *   code: 'MISSING_RESOURCE_TYPE',
+ *   message: 'Object is missing the required "resourceType" property',
+ *   path: '$',
+ * };
+ * ```
+ */
+export declare interface ParseIssue {
+    /** Severity level — `error` blocks successful parsing, `warning` does not */
+    readonly severity: ParseSeverity;
+    /** Machine-readable error code for programmatic handling */
+    readonly code: ParseErrorCode;
+    /** Human-readable description of the issue */
+    readonly message: string;
+    /**
+     * JSON path where the issue was detected.
+     *
+     * Uses dot notation with array indices:
+     * - `"StructureDefinition"` — root level
+     * - `"StructureDefinition.snapshot.element[0].type[1].code"` — nested
+     * - `"$"` — before resourceType is known
+     */
+    readonly path: string;
+}
+
+/**
+ * Result of a parse operation.
+ *
+ * Uses a discriminated union on `success`:
+ * - `success: true` — parsing succeeded; `data` contains the parsed value,
+ *   `issues` may contain warnings
+ * - `success: false` — parsing failed; `data` is `undefined`,
+ *   `issues` contains at least one error
+ *
+ * @typeParam T - The expected output type (e.g., `StructureDefinition`)
+ *
+ * @example
+ * ```typescript
+ * const result = parseFhirJson(jsonString);
+ * if (result.success) {
+ *   console.log(result.data.url); // T is available
+ * } else {
+ *   for (const issue of result.issues) {
+ *     console.error(`[${issue.path}] ${issue.message}`);
+ *   }
+ * }
+ * ```
+ */
+export declare type ParseResult<T> = {
+    readonly success: true;
+    readonly data: T;
+    readonly issues: readonly ParseIssue[];
+} | {
+    readonly success: false;
+    readonly data: undefined;
+    readonly issues: readonly ParseIssue[];
+};
+
+/**
+ * FHIR JSON Parse Error Types
+ *
+ * Structured error types for the fhir-parser module. Provides precise
+ * error localization via JSON path tracking and supports collecting
+ * multiple issues (errors + warnings) in a single parse pass.
+ *
+ * Design decisions:
+ * - Result type over exceptions: allows multi-error collection
+ * - Path tracking: every issue carries the JSON path for precise localization
+ * - Warning support: non-fatal issues (e.g., unknown properties) reported
+ *   as warnings without blocking the parse
+ *
+ * @module fhir-parser
+ */
+/**
+ * Severity level of a parse issue.
+ *
+ * - `error` — the issue prevents correct interpretation of the data
+ * - `warning` — the data can still be used, but something unexpected was found
+ */
+export declare type ParseSeverity = 'error' | 'warning';
+
+/**
+ * Parse a StructureDefinition JSON object.
+ *
+ * This is the most important parse function in Stage-1. All downstream
+ * modules (fhir-context, fhir-profile, fhir-validator) depend on
+ * correctly parsed StructureDefinitions.
+ *
+ * @param obj - A parsed JSON object (already validated as having resourceType = "StructureDefinition")
+ * @param path - Current JSON path (for error reporting)
+ */
+export declare function parseStructureDefinition(obj: Record<string, unknown>, path: string): ParseResult<StructureDefinition>;
+
+/**
+ * Create a successful parse result.
+ *
+ * @param data - The parsed value
+ * @param issues - Any warnings collected during parsing (default: none)
+ */
+export declare function parseSuccess<T>(data: T, issues?: ParseIssue[]): ParseResult<T>;
 
 /**
  * A time period defined by a start and end date/time.
@@ -1197,6 +1445,39 @@ export declare interface Resource {
     /** Language of the resource content (0..1) */
     language?: FhirCode;
 }
+
+/**
+ * Serialize a Resource object to a FHIR JSON string.
+ *
+ * Output conforms to FHIR R4 JSON conventions:
+ * - `resourceType` is the first property
+ * - Remaining properties are in alphabetical order
+ * - Choice type fields use their original JSON property names
+ * - Empty values (`undefined`, `[]`, `{}`) are omitted
+ *
+ * @param resource - The Resource to serialize
+ * @returns A FHIR JSON string (pretty-printed with 2-space indent)
+ *
+ * @example
+ * ```typescript
+ * const sd: StructureDefinition = { resourceType: 'StructureDefinition', ... };
+ * const json = serializeToFhirJson(sd);
+ * // '{\n  "resourceType": "StructureDefinition",\n  ...\n}'
+ * ```
+ */
+export declare function serializeToFhirJson(resource: Resource): string;
+
+/**
+ * Serialize a Resource object to a plain JavaScript object suitable
+ * for FHIR JSON (without calling `JSON.stringify`).
+ *
+ * Use this when you need the object form (e.g., for storage or
+ * further manipulation) rather than a string.
+ *
+ * @param resource - The Resource to serialize
+ * @returns A plain object conforming to FHIR JSON conventions
+ */
+export declare function serializeToFhirObject(resource: Resource): Record<string, unknown>;
 
 /**
  * A resolved slicing definition on a canonical element.
