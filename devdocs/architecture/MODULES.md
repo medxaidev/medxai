@@ -233,20 +233,25 @@ Steps:
 
 ```typescript
 // Load StructureDefinition by canonical URL
-loadStructureDefinition(url: string): Promise<CanonicalStructureDefinition>
+loadStructureDefinition(url: string): Promise<StructureDefinition>
 
-// Get or generate snapshot
-getSnapshot(url: string): Promise<StructureDefinitionSnapshot>
+// Get StructureDefinition from registry (synchronous, no loading)
+getStructureDefinition(url: string): StructureDefinition | undefined
+
+// Check if StructureDefinition is loaded
+hasStructureDefinition(url: string): boolean
 
 // Resolve inheritance chain
 resolveInheritanceChain(url: string): Promise<string[]>
+
+// Register StructureDefinition (for Phase 4 to cache snapshots)
+registerStructureDefinition(sd: StructureDefinition): void
 ```
 
 **Depends on:**
 
 - `fhir-model` (for canonical types)
 - `fhir-parser` (to parse loaded definitions)
-- `fhir-profile` (to generate snapshots when needed)
 
 **Stability:**
 
@@ -255,7 +260,7 @@ resolveInheritanceChain(url: string): Promise<string[]>
 **Must NOT:**
 
 - Modify StructureDefinitions after loading and caching
-- Bypass snapshot generation (always use `fhir-profile`)
+- Generate snapshots (belongs to `fhir-profile`)
 - Perform validation (belongs to `fhir-validator`)
 - Access database directly (use loaders/adapters)
 
