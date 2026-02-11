@@ -228,6 +228,15 @@ type ExtensionContextType = "fhirpath" | "element" | "extension";
 
 **Completed:** 2026-02-07
 
+### 二次复盘记录（2026-02-11）
+
+- **总体结论**: `structure-definition.ts` 与 FHIR R4 `StructureDefinition` 规范字段清单一致（`url/name/status/kind/abstract/type/snapshot/differential` 等核心字段齐全），并正确复用了 `primitives.ts` 的基础类型与枚举；未发现会阻塞 Phase 2/3 的结构性问题。
+- **`resourceType` 窄化**: `StructureDefinition.resourceType: 'StructureDefinition'` 与 `Resource.resourceType: string` 的组合是正确的 discriminator 设计，便于解析/序列化分派。
+- **子类型建模**: `Mapping/Context/Snapshot/Differential` 作为独立接口并显式展开 `id/extension/modifierExtension` 字段符合 FHIR BackboneElement 的结构；不会影响类型使用。
+- **可选改进项（不属于 Stage-1 阻塞）**:
+  - `StructureDefinitionMapping.comment` 在规范中为 `string`（Markdown 语义不强）；当前使用 `FhirString` 可接受。
+  - 如后续希望减少重复字段，可让 `StructureDefinitionMapping/Context/Snapshot/Differential` 直接 `extends BackboneElement`（目前是字段展开），属于代码风格优化，不影响正确性。
+
 ---
 
 ## Task 1.3: ElementDefinition Model (Day 3-4)
