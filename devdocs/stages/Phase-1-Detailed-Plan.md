@@ -418,6 +418,17 @@ FHIR 的 `[x]` 字段（如 `defaultValue[x]`, `fixed[x]`, `pattern[x]`）在 JS
 
 **Completed:** 2026-02-07
 
+### 二次复盘记录（2026-02-11）
+
+- **总体结论**: `element-definition.ts` 字段覆盖与 Task 1.3 文档验收标准一致（ElementDefinition 本体 + 8 个子类型 + 相关枚举复用），未发现会阻塞后续 Phase 的结构性问题。
+- **Choice type `[x]`（重点）**: Stage-1 统一用 `unknown` 表达 `[x]` 字段，并通过 JSDoc 说明 JSON 展开形式与适用类型范围；实现与文档描述一致。
+  - 已覆盖的 `[x]` 字段: `defaultValue`, `fixed`, `pattern`, `minValue`, `maxValue`（以及 `ElementDefinitionExample.value`）。
+  - JSDoc 中明确指出“实际 JSON 字段名会展开为 `xxxString` / `xxxBoolean` / ...”，并标注 Phase 2 由 `fhir-parser` 做 concrete dispatch，这对后续解析与序列化对齐很关键。
+- **类型与枚举复用**: `PropertyRepresentation/SlicingRules/DiscriminatorType/.../BindingStrength` 等均复用自 `primitives.ts`，避免重复定义，方向正确。
+- **可选改进项（不属于 Stage-1 阻塞）**:
+  - 多个子类型（如 `ElementDefinitionSlicing` 等）当前手动展开 `id/extension` 字段；如后续希望更统一，可让这些子类型改为 `extends Element` 或 `BackboneElement`（视规范层级而定），属于风格优化。
+  - `ElementDefinitionType.code` 使用 `FhirUri` 可表达规范允许的 URI/名称两类取值；如未来要更贴近“可为简写名”的语义，可考虑在 parser 层做更严格的校验/归一化（不建议在纯类型层强行收紧）。
+
 ---
 
 ## Task 1.4: Canonical Profile Model (Day 5-6)
@@ -514,6 +525,18 @@ interface SlicingDiscriminatorDef {
 - [x] TypeScript 编译通过（`tsc --noEmit` exit 0）
 
 **Completed:** 2026-02-08
+
+### 二次复盘记录（2026-02-11）
+
+- **边界确认（你关注的两点）**:
+  - `StructureDefinition` / `ElementDefinition` 属于 **FHIR R4 规范模型**，用于表达/承载与 FHIR JSON 原始对象同构的结构（配合 Phase 2 的 `fhir-parser` 可实现 JSON ↔ TypeScript 的解析与序列化）。
+  - `CanonicalProfile` / `CanonicalElement` 属于 **内部语义模型**：由 snapshot generation（`fhir-profile`）在解析并展开继承链后生成，用于下游验证/运行时快速查询与语义计算；它不追求与 FHIR JSON 字段一一对应。
+- **总体结论**: `canonical-profile.ts` 的定位清晰、字段自洽，且与 Task 1.4 文档描述一致；未发现会阻塞后续 Phase 的结构性问题。
+- **设计决策核查**:
+  - `max: number | 'unbounded'`、flags 永远有值（`mustSupport/isModifier/isSummary`）、`constraints/types` 永远为数组，均能显著减少下游 `undefined`/`"*"` 解析负担；合理。
+  - `elements: Map<string, CanonicalElement>` 用于 O(1) path 查找，同时依赖插入顺序保持定义顺序；该假设已在类型注释中明确，合理。
+- **可选改进项（不属于 Stage-1 阻塞）**:
+  - `CanonicalProfile.elements` 使用原生 `Map` 会导致直接 `JSON.stringify` 不可用；但这是内部语义模型，通常不会直接序列化。如未来确实需要持久化/传输，可在 profile 层提供显式转换（例如 `Array<[path, element]>`）。
 
 ---
 

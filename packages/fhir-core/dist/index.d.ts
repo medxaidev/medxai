@@ -1,9 +1,9 @@
 /**
  * `@medxai/fhir-core` — Public API
  *
- * Re-exports all public types from the model and parser layers.
- * Additional modules (context, profile, validator) will be
- * added here as they are implemented in later phases.
+ * Re-exports all public types from the model, parser, and context layers.
+ * Additional modules (profile, validator) will be added here as they
+ * are implemented in later phases.
  *
  * @packageDocumentation
  */
@@ -23,6 +23,12 @@ declare const __brand: unique symbol;
 export declare type AggregationMode = 'contained' | 'referenced' | 'bundled';
 
 /**
+ * All core definition filenames in dependency order:
+ * base → primitives → complex types → resources.
+ */
+export declare const ALL_CORE_DEFINITIONS: readonly string[];
+
+/**
  * Base definition for all elements that are defined inside a resource,
  * but not those in a data type.
  * @see https://hl7.org/fhir/R4/backboneelement.html
@@ -31,6 +37,12 @@ export declare interface BackboneElement extends Element {
     /** Extensions that cannot be ignored even if unrecognized (0..*) */
     modifierExtension?: Extension[];
 }
+
+/**
+ * Base resource types — the foundation of the FHIR type hierarchy.
+ * These MUST be loaded first as other definitions depend on them.
+ */
+export declare const BASE_RESOURCES: readonly ["Resource", "DomainResource", "Element", "BackboneElement", "Extension"];
 
 /**
  * A resolved value set binding on a canonical element.
@@ -290,6 +302,26 @@ export declare interface ChoiceValue {
 }
 
 /**
+ * Thrown when a circular `baseDefinition` chain is detected during
+ * inheritance resolution.
+ *
+ * @example
+ * ```typescript
+ * throw new CircularDependencyError([
+ *   'http://example.org/A',
+ *   'http://example.org/B',
+ *   'http://example.org/A',  // cycle back to A
+ * ]);
+ * ```
+ */
+export declare class CircularDependencyError extends ContextError {
+    readonly name = "CircularDependencyError";
+    /** The full chain of URLs that forms the cycle */
+    readonly chain: readonly string[];
+    constructor(chain: string[]);
+}
+
+/**
  * A concept that may be defined by a formal reference to a terminology
  * or ontology, or may be provided by text.
  * @see https://hl7.org/fhir/R4/datatypes.html#CodeableConcept
@@ -316,6 +348,41 @@ export declare interface Coding extends Element {
     display?: FhirString;
     /** If this coding was chosen directly by the user (0..1) */
     userSelected?: FhirBoolean;
+}
+
+/**
+ * Complex types — FHIR complex data types (non-resource).
+ */
+export declare const COMPLEX_TYPES: readonly ["Address", "Age", "Annotation", "Attachment", "CodeableConcept", "Coding", "ContactDetail", "ContactPoint", "Count", "Distance", "Dosage", "Duration", "HumanName", "Identifier", "Meta", "Money", "Narrative", "Period", "Quantity", "Range", "Ratio", "Reference", "SampledData", "Signature", "Timing"];
+
+/**
+ * A loader that delegates to an ordered list of child loaders.
+ *
+ * Resolution stops at the first loader that returns a non-null result.
+ * If a loader throws a {@link LoaderError}, the error is propagated
+ * immediately (no fallback for hard failures).
+ *
+ * @example
+ * ```typescript
+ * const composite = new CompositeLoader([memoryLoader, fileLoader]);
+ * const sd = await composite.load(url);
+ * // Tries memoryLoader first, then fileLoader
+ * ```
+ */
+export declare class CompositeLoader implements StructureDefinitionLoader {
+    private readonly _loaders;
+    /**
+     * @param loaders - Ordered list of loaders to try. First match wins.
+     * @throws Error if loaders array is empty
+     */
+    constructor(loaders: StructureDefinitionLoader[]);
+    load(url: string): Promise<StructureDefinition | null>;
+    canLoad(url: string): boolean;
+    getSourceType(): string;
+    /**
+     * Number of child loaders in the chain.
+     */
+    get loaderCount(): number;
 }
 
 /**
@@ -353,6 +420,66 @@ export declare interface ContactPoint extends Element {
 }
 
 /**
+ * fhir-context — Error Types
+ *
+ * Structured error hierarchy for the FHIR context module.
+ * All errors extend {@link ContextError} so consumers can catch
+ * context-related failures with a single `catch` clause.
+ *
+ * Error hierarchy:
+ * ```
+ * ContextError (base)
+ * ├── ResourceNotFoundError
+ * ├── CircularDependencyError
+ * ├── LoaderError
+ * └── InvalidStructureDefinitionError
+ * ```
+ *
+ * @module fhir-context
+ */
+/**
+ * Base error class for all fhir-context failures.
+ *
+ * Provides a stable `name` property and preserves the original `cause`
+ * when wrapping lower-level errors.
+ */
+export declare class ContextError extends Error {
+    readonly name: string;
+    constructor(message: string, options?: ErrorOptions);
+}
+
+/**
+ * Runtime metrics for the {@link FhirContext}.
+ *
+ * Useful for monitoring cache effectiveness and diagnosing
+ * performance issues.
+ */
+export declare interface ContextStatistics {
+    /** Total number of StructureDefinitions in the registry */
+    totalLoaded: number;
+    /** Number of `loadStructureDefinition` calls resolved from cache */
+    cacheHits: number;
+    /** Number of `loadStructureDefinition` calls that required loader delegation */
+    cacheMisses: number;
+    /** Total number of loader invocations across all loaders */
+    loaderCalls: number;
+    /** Number of inheritance chains resolved */
+    chainsResolved: number;
+    /** Number of `registerStructureDefinition` calls */
+    registrations: number;
+}
+
+/**
+ * Core clinical resources — commonly used FHIR resource types.
+ */
+export declare const CORE_RESOURCES: readonly ["AllergyIntolerance", "Binary", "Bundle", "CarePlan", "Claim", "CodeSystem", "Condition", "DiagnosticReport", "DocumentReference", "Encounter", "Immunization", "Location", "Medication", "MedicationRequest", "Observation", "Organization", "Patient", "Practitioner", "Procedure", "Questionnaire", "ServiceRequest", "StructureDefinition", "ValueSet"];
+
+/**
+ * Create a fresh statistics object with all counters at zero.
+ */
+export declare function createEmptyStatistics(): ContextStatistics;
+
+/**
  * Create a single parse issue.
  *
  * Convenience factory to reduce boilerplate when constructing issues.
@@ -363,6 +490,22 @@ export declare interface ContactPoint extends Element {
  * @param path - JSON path where the issue was detected
  */
 export declare function createIssue(severity: ParseSeverity, code: ParseErrorCode, message: string, path: string): ParseIssue;
+
+/**
+ * Minimal interface for loading a StructureDefinition by canonical URL.
+ *
+ * This decouples the resolver from the full {@link FhirContext} interface,
+ * making it independently testable. The `FhirContextImpl` class (Task 3.6)
+ * will satisfy this interface.
+ */
+declare interface DefinitionProvider {
+    /**
+     * Load a StructureDefinition by canonical URL.
+     *
+     * Must throw {@link ResourceNotFoundError} if the URL cannot be resolved.
+     */
+    loadStructureDefinition(url: string): Promise<StructureDefinition>;
+}
 
 /**
  * How an element value is interpreted when discrimination is evaluated.
@@ -955,933 +1098,1512 @@ export declare type FhirCanonical = Branded<string, 'FhirCanonical'>;
 export declare type FhirCode = Branded<string, 'FhirCode'>;
 
 /**
- * FHIR date: a date or partial date (year, year-month, or year-month-day).
- * No timezone. No time.
- * Format: `YYYY(-MM(-DD)?)?`
- * Regex: `([0-9]([0-9]([0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)(-(0[1-9]|1[0-2])(-(0[1-9]|[1-2][0-9]|3[0-1]))?)?`
- * @see https://hl7.org/fhir/R4/datatypes.html#date
- */
-export declare type FhirDate = Branded<string, 'FhirDate'>;
-
-/**
- * FHIR dateTime: a date, date-time, or partial date with optional time and timezone.
- * Format: `YYYY(-MM(-DD(Thh:mm:ss(.sss)?(Z|(+|-)hh:mm))?)?)?`
- * @see https://hl7.org/fhir/R4/datatypes.html#dateTime
- */
-export declare type FhirDateTime = Branded<string, 'FhirDateTime'>;
-
-/**
- * FHIR decimal: rational numbers with implicit precision.
- * Regex: `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`
- * Note: precision of the decimal value has significance
- * (e.g., 0.010 is regarded as different to 0.01).
- * @see https://hl7.org/fhir/R4/datatypes.html#decimal
- */
-export declare type FhirDecimal = Branded<number, 'FhirDecimal'>;
-
-/**
- * FHIR id: any combination of upper- or lower-case ASCII letters,
- * numerals, '-', and '.', with a length limit of 64 characters.
- * Regex: `[A-Za-z0-9\-\.]{1,64}`
- * @see https://hl7.org/fhir/R4/datatypes.html#id
- */
-export declare type FhirId = Branded<string, 'FhirId'>;
-
-/**
- * FHIR instant: an instant in time with at least second precision
- * and always includes a timezone.
- * Format: `YYYY-MM-DDThh:mm:ss.sss+zz:zz`
- * Regex: `([0-9]([0-9]([0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))`
- * @see https://hl7.org/fhir/R4/datatypes.html#instant
- */
-export declare type FhirInstant = Branded<string, 'FhirInstant'>;
-
-/**
- * FHIR integer: whole numbers in the range -2,147,483,648..2,147,483,647
- * Regex: `[0]|[-+]?[1-9][0-9]*`
- * @see https://hl7.org/fhir/R4/datatypes.html#integer
- */
-export declare type FhirInteger = Branded<number, 'FhirInteger'>;
-
-/**
- * FHIR markdown: a FHIR string that may contain markdown syntax.
- * Systems are not required to have markdown support.
- * @see https://hl7.org/fhir/R4/datatypes.html#markdown
- */
-export declare type FhirMarkdown = Branded<string, 'FhirMarkdown'>;
-
-/**
- * FHIR oid: an OID represented as a URI (RFC 3001).
- * Format: `urn:oid:[0-2](\.(0|[1-9][0-9]*))+`
- * @see https://hl7.org/fhir/R4/datatypes.html#oid
- */
-export declare type FhirOid = Branded<string, 'FhirOid'>;
-
-/**
- * FHIR positiveInt: positive integer in the range 1..2,147,483,647.
- * Regex: `+?[1-9][0-9]*`
- * @see https://hl7.org/fhir/R4/datatypes.html#positiveInt
- */
-export declare type FhirPositiveInt = Branded<number, 'FhirPositiveInt'>;
-
-/**
- * FHIR string: a sequence of Unicode characters.
- * Regex: `[ \r\n\t\S]+`
- * Note: strings SHOULD not contain Unicode character points below 32,
- * except for horizontal tab, carriage return, and line feed.
- * @see https://hl7.org/fhir/R4/datatypes.html#string
- */
-export declare type FhirString = Branded<string, 'FhirString'>;
-
-/**
- * FHIR time: a time of day with no date and no timezone.
- * Format: `hh:mm:ss(.sss)?`
- * Regex: `([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?`
- * @see https://hl7.org/fhir/R4/datatypes.html#time
- */
-export declare type FhirTime = Branded<string, 'FhirTime'>;
-
-/**
- * FHIR unsignedInt: non-negative integer in the range 0..2,147,483,647.
- * Regex: `[0]|([1-9][0-9]*)`
- * @see https://hl7.org/fhir/R4/datatypes.html#unsignedInt
- */
-export declare type FhirUnsignedInt = Branded<number, 'FhirUnsignedInt'>;
-
-/**
- * FHIR uri: a Uniform Resource Identifier.
- * Regex: `\S*`
- * @see https://hl7.org/fhir/R4/datatypes.html#uri
- */
-export declare type FhirUri = Branded<string, 'FhirUri'>;
-
-/**
- * FHIR url: a Uniform Resource Locator (a subset of uri).
- * Must start with http:, https:, ftp:, mailto:, or mllp:.
- * @see https://hl7.org/fhir/R4/datatypes.html#url
- */
-export declare type FhirUrl = Branded<string, 'FhirUrl'>;
-
-/**
- * FHIR uuid: a UUID expressed as a URI (RFC 4122).
- * Format: `urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
- * @see https://hl7.org/fhir/R4/datatypes.html#uuid
- */
-export declare type FhirUuid = Branded<string, 'FhirUuid'>;
-
-/**
- * FHIR version identifier.
- * @see https://hl7.org/fhir/R4/valueset-FHIR-version.html
- */
-export declare type FhirVersionCode = '0.01' | '0.05' | '0.06' | '0.11' | '0.0.80' | '0.0.81' | '0.0.82' | '0.4.0' | '0.5.0' | '1.0.0' | '1.0.1' | '1.0.2' | '1.1.0' | '1.4.0' | '1.6.0' | '1.8.0' | '3.0.0' | '3.0.1' | '3.0.2' | '3.3.0' | '3.5.0' | '4.0.0' | '4.0.1';
-
-/**
- * FHIR xhtml: limited XHTML content as defined in the Narrative datatype.
- * @see https://hl7.org/fhir/R4/datatypes.html#xhtml
- * @see https://hl7.org/fhir/R4/narrative.html
- */
-export declare type FhirXhtml = Branded<string, 'FhirXhtml'>;
-
-/**
- * Check whether an issues array contains at least one error (not just warnings).
+ * Central registry and lifecycle manager for FHIR StructureDefinitions.
  *
- * Useful for determining whether to return success or failure after
- * collecting issues from sub-parsers.
- */
-export declare function hasErrors(issues: readonly ParseIssue[]): boolean;
-
-/**
- * An identifier intended for computation (e.g., MRN, NPI).
- * @see https://hl7.org/fhir/R4/datatypes.html#Identifier
- */
-export declare interface Identifier extends Element {
-    /** usual | official | temp | secondary | old (0..1) */
-    use?: FhirCode;
-    /** Description of identifier (0..1) */
-    type?: CodeableConcept;
-    /** The namespace for the identifier value (0..1) */
-    system?: FhirUri;
-    /** The value that is unique (0..1) */
-    value?: FhirString;
-    /** Time period when id is/was valid for use (0..1) */
-    period?: Period;
-    /** Organization that issued id (0..1) */
-    assigner?: Reference;
-}
-
-/**
- * A resolved constraint (invariant) on a canonical element.
+ * `FhirContext` is the primary entry point for accessing FHIR definitions
+ * at runtime. It manages loading, caching, and resolution of
+ * StructureDefinitions from one or more sources.
  *
- * Corresponds to a simplified version of `ElementDefinition.constraint`.
- */
-export declare interface Invariant {
-    /** Unique key identifying this constraint. */
-    key: string;
-    /**
-     * error | warning
-     * @see https://hl7.org/fhir/R4/valueset-constraint-severity.html
-     */
-    severity: ConstraintSeverity;
-    /** Human-readable description of the constraint. */
-    human: string;
-    /** FHIRPath expression that must evaluate to `true`. */
-    expression?: string;
-    /**
-     * Canonical URL of the StructureDefinition where this constraint
-     * was originally defined.
-     */
-    source?: string;
-}
-
-/**
- * The metadata about a resource. This is content in the resource that is
- * maintained by the infrastructure.
- * @see https://hl7.org/fhir/R4/resource.html#Meta
- */
-export declare interface Meta extends Element {
-    /** Version specific identifier (0..1) */
-    versionId?: FhirId;
-    /** When the resource version last changed (0..1) */
-    lastUpdated?: FhirInstant;
-    /** Identifies where the resource comes from (0..1) */
-    source?: FhirUri;
-    /** Profiles this resource claims to conform to (0..*) */
-    profile?: FhirCanonical[];
-    /** Security Labels applied to this resource (0..*) */
-    security?: Coding[];
-    /** Tags applied to this resource (0..*) */
-    tag?: Coding[];
-}
-
-/**
- * A human-readable summary of the resource conveying the essential
- * clinical and business information.
- * @see https://hl7.org/fhir/R4/narrative.html#Narrative
- */
-export declare interface Narrative extends Element {
-    /** generated | extensions | additional | empty (1..1) */
-    status: NarrativeStatus;
-    /** Limited xhtml content (1..1) */
-    div: FhirXhtml;
-}
-
-/**
- * The status of a narrative.
- * @see https://hl7.org/fhir/R4/valueset-narrative-status.html
- */
-export declare type NarrativeStatus = 'generated' | 'extensions' | 'additional' | 'empty';
-
-/**
- * Parse an ElementDefinition JSON object.
+ * Conceptual mapping:
+ * - HAPI `FhirContext` → registry + lifecycle
+ * - HAPI `IValidationSupport` → loader delegation
  *
- * ElementDefinition is the most complex data type in FHIR,
- * with ~37 fields and 8 sub-types.
- */
-export declare function parseElementDefinition(obj: Record<string, unknown>, path: string): {
-    result: ElementDefinition;
-    issues: ParseIssue[];
-};
-
-/**
- * Machine-readable error codes for parse issues.
- *
- * Each code corresponds to a specific category of parsing problem.
- * Consumers can switch on these codes for programmatic error handling.
- */
-export declare type ParseErrorCode = 
-/** JSON syntax error (e.g., malformed JSON string) */
-'INVALID_JSON'
-/** Missing required `resourceType` property */
-| 'MISSING_RESOURCE_TYPE'
-/** `resourceType` value is not a recognized FHIR resource type */
-| 'UNKNOWN_RESOURCE_TYPE'
-/** Primitive value has wrong JavaScript type (e.g., string where number expected) */
-| 'INVALID_PRIMITIVE'
-/** Object structure does not match expected shape (e.g., array where object expected) */
-| 'INVALID_STRUCTURE'
-/** Choice type `[x]` property name has an unrecognized type suffix */
-| 'INVALID_CHOICE_TYPE'
-/** Multiple variants of the same choice type field are present */
-| 'MULTIPLE_CHOICE_VALUES'
-/** `_element` array length does not match the corresponding value array */
-| 'ARRAY_MISMATCH'
-/** Unexpected `null` value in a non-nullable position */
-| 'UNEXPECTED_NULL'
-/** Property name not recognized for this type (severity: warning) */
-| 'UNEXPECTED_PROPERTY';
-
-/**
- * Create a failed parse result.
- *
- * @param issues - The error(s) that caused the failure (must contain at least one error)
- */
-export declare function parseFailure<T>(issues: ParseIssue[]): ParseResult<T>;
-
-/**
- * Parse a FHIR JSON string into a Resource object.
- *
- * This is the main entry point for the parser. It:
- * 1. Calls `JSON.parse()` with error capture
- * 2. Delegates to {@link parseFhirObject} for structural parsing
- *
- * Stage-1 supports dedicated parsing for `StructureDefinition` (Task 2.5).
- * All other resource types are parsed generically.
- *
- * @param json - A FHIR JSON string
- * @returns A `ParseResult` containing the parsed `Resource` or error details
+ * Phase 4 (`fhir-profile`) will use this interface to load base definitions
+ * during snapshot generation.
  *
  * @example
  * ```typescript
- * const result = parseFhirJson('{"resourceType":"Patient","id":"123"}');
- * if (result.success) {
- *   console.log(result.data.resourceType); // "Patient"
- * }
+ * const context = new FhirContextImpl({ loaders: [memoryLoader, fileLoader] });
+ * await context.preloadCoreDefinitions();
+ *
+ * const patient = await context.loadStructureDefinition(
+ *   'http://hl7.org/fhir/StructureDefinition/Patient'
+ * );
+ * const chain = await context.resolveInheritanceChain(patient.url!);
+ * // → ['http://hl7.org/fhir/StructureDefinition/Patient',
+ * //    'http://hl7.org/fhir/StructureDefinition/DomainResource',
+ * //    'http://hl7.org/fhir/StructureDefinition/Resource']
  * ```
  */
-export declare function parseFhirJson(json: string): ParseResult<Resource>;
-
-/**
- * Parse an already-parsed JSON value into a Resource object.
- *
- * Use this when you already have a JavaScript object (e.g., from a database
- * or from `JSON.parse()` called externally).
- *
- * @param obj - An unknown value (expected to be a plain JSON object with `resourceType`)
- * @returns A `ParseResult` containing the parsed `Resource` or error details
- */
-export declare function parseFhirObject(obj: unknown): ParseResult<Resource>;
-
-/**
- * A single issue encountered during parsing.
- *
- * Issues are collected throughout the parse process and returned in the
- * {@link ParseResult}. Both errors and warnings use this same structure.
- *
- * @example
- * ```typescript
- * const issue: ParseIssue = {
- *   severity: 'error',
- *   code: 'MISSING_RESOURCE_TYPE',
- *   message: 'Object is missing the required "resourceType" property',
- *   path: '$',
- * };
- * ```
- */
-export declare interface ParseIssue {
-    /** Severity level — `error` blocks successful parsing, `warning` does not */
-    readonly severity: ParseSeverity;
-    /** Machine-readable error code for programmatic handling */
-    readonly code: ParseErrorCode;
-    /** Human-readable description of the issue */
-    readonly message: string;
+export declare interface FhirContext {
     /**
-     * JSON path where the issue was detected.
+     * Load a StructureDefinition by canonical URL.
      *
-     * Uses dot notation with array indices:
-     * - `"StructureDefinition"` — root level
-     * - `"StructureDefinition.snapshot.element[0].type[1].code"` — nested
-     * - `"$"` — before resourceType is known
-     */
-    readonly path: string;
-}
-
-/**
- * Result of a parse operation.
- *
- * Uses a discriminated union on `success`:
- * - `success: true` — parsing succeeded; `data` contains the parsed value,
- *   `issues` may contain warnings
- * - `success: false` — parsing failed; `data` is `undefined`,
- *   `issues` contains at least one error
- *
- * @typeParam T - The expected output type (e.g., `StructureDefinition`)
- *
- * @example
- * ```typescript
- * const result = parseFhirJson(jsonString);
- * if (result.success) {
- *   console.log(result.data.url); // T is available
- * } else {
- *   for (const issue of result.issues) {
- *     console.error(`[${issue.path}] ${issue.message}`);
- *   }
- * }
- * ```
- */
-export declare type ParseResult<T> = {
-    readonly success: true;
-    readonly data: T;
-    readonly issues: readonly ParseIssue[];
-} | {
-    readonly success: false;
-    readonly data: undefined;
-    readonly issues: readonly ParseIssue[];
-};
-
-/**
- * FHIR JSON Parse Error Types
- *
- * Structured error types for the fhir-parser module. Provides precise
- * error localization via JSON path tracking and supports collecting
- * multiple issues (errors + warnings) in a single parse pass.
- *
- * Design decisions:
- * - Result type over exceptions: allows multi-error collection
- * - Path tracking: every issue carries the JSON path for precise localization
- * - Warning support: non-fatal issues (e.g., unknown properties) reported
- *   as warnings without blocking the parse
- *
- * @module fhir-parser
- */
-/**
- * Severity level of a parse issue.
- *
- * - `error` — the issue prevents correct interpretation of the data
- * - `warning` — the data can still be used, but something unexpected was found
- */
-export declare type ParseSeverity = 'error' | 'warning';
-
-/**
- * Parse a StructureDefinition JSON object.
- *
- * This is the most important parse function in Stage-1. All downstream
- * modules (fhir-context, fhir-profile, fhir-validator) depend on
- * correctly parsed StructureDefinitions.
- *
- * @param obj - A parsed JSON object (already validated as having resourceType = "StructureDefinition")
- * @param path - Current JSON path (for error reporting)
- */
-export declare function parseStructureDefinition(obj: Record<string, unknown>, path: string): ParseResult<StructureDefinition>;
-
-/**
- * Create a successful parse result.
- *
- * @param data - The parsed value
- * @param issues - Any warnings collected during parsing (default: none)
- */
-export declare function parseSuccess<T>(data: T, issues?: ParseIssue[]): ParseResult<T>;
-
-/**
- * A time period defined by a start and end date/time.
- * @see https://hl7.org/fhir/R4/datatypes.html#Period
- */
-export declare interface Period extends Element {
-    /** Starting time with inclusive boundary (0..1) */
-    start?: FhirDateTime;
-    /** End time with inclusive boundary, if not ongoing (0..1) */
-    end?: FhirDateTime;
-}
-
-/**
- * How a property is represented when serialized.
- * @see https://hl7.org/fhir/R4/valueset-property-representation.html
- */
-export declare type PropertyRepresentation = 'xmlAttr' | 'xmlText' | 'typeAttr' | 'cdaText' | 'xhtml';
-
-/**
- * Publication status of a FHIR conformance resource.
- * @see https://hl7.org/fhir/R4/valueset-publication-status.html
- */
-export declare type PublicationStatus = 'draft' | 'active' | 'retired' | 'unknown';
-
-/**
- * A measured amount (or an amount that can potentially be measured).
- * @see https://hl7.org/fhir/R4/datatypes.html#Quantity
- */
-export declare interface Quantity extends Element {
-    /** Numerical value (with implicit precision) (0..1) */
-    value?: FhirDecimal;
-    /** `<` | `<=` | `>=` | `>` — how to understand the value (0..1) */
-    comparator?: FhirCode;
-    /** Unit representation (0..1) */
-    unit?: FhirString;
-    /** System that defines coded unit form (0..1) */
-    system?: FhirUri;
-    /** Coded form of the unit (0..1) */
-    code?: FhirCode;
-}
-
-/**
- * A reference from one resource to another.
- * @see https://hl7.org/fhir/R4/references.html#Reference
- */
-export declare interface Reference extends Element {
-    /** Literal reference, Relative, internal or absolute URL (0..1) */
-    reference?: FhirString;
-    /** Type the reference refers to (e.g., "Patient") (0..1) */
-    type?: FhirUri;
-    /** Logical reference, when literal reference is not known (0..1) */
-    identifier?: Identifier;
-    /** Text alternative for the resource (0..1) */
-    display?: FhirString;
-}
-
-/**
- * Whether all resource references need to be version-specific.
- * @see https://hl7.org/fhir/R4/valueset-reference-version-rules.html
- */
-export declare type ReferenceVersionRules = 'either' | 'independent' | 'specific';
-
-/**
- * Abstract base for all FHIR resources.
- * @see https://hl7.org/fhir/R4/resource.html
- */
-export declare interface Resource {
-    /**
-     * The type of the resource (1..1)
+     * Resolution order:
+     * 1. Check internal registry (cache hit)
+     * 2. Delegate to configured loaders (cache miss)
+     * 3. Parse, validate, and register the result
      *
-     * This is typed as `string` rather than `FhirString` because it serves
-     * as a discriminator field that concrete resource interfaces narrow to
-     * a string literal (e.g., `'StructureDefinition'`, `'Patient'`).
-     * Branded types would prevent this narrowing.
-     */
-    resourceType: string;
-    /** Logical id of this artifact (0..1) */
-    id?: FhirId;
-    /** Metadata about the resource (0..1) */
-    meta?: Meta;
-    /** A set of rules under which this content was created (0..1) */
-    implicitRules?: FhirUri;
-    /** Language of the resource content (0..1) */
-    language?: FhirCode;
-}
+     * Supports versioned URLs in `url|version` format
+     * (e.g., `"http://example.org/Profile|1.0.0"`).
+     *
+     * @param url - Canonical URL, optionally with `|version` suffix
+     * @returns Resolved StructureDefinition
+     * @throws {@link ResourceNotFoundError} if no loader can resolve the URL
+         * @throws {@link LoaderError} if a loader fails during loading
+             * @throws {@link InvalidStructureDefinitionError} if the loaded resource is malformed
+                 */
+             loadStructureDefinition(url: string): Promise<StructureDefinition>;
+             /**
+              * Synchronously retrieve a StructureDefinition from the registry.
+              *
+              * Does **not** trigger any loader — only checks the in-memory registry.
+              * Use {@link loadStructureDefinition} if you need on-demand loading.
+              *
+              * @param url - Canonical URL (with optional `|version`)
+              * @returns The cached StructureDefinition, or `undefined` if not loaded
+              */
+             getStructureDefinition(url: string): StructureDefinition | undefined;
+             /**
+              * Check whether a StructureDefinition is present in the registry.
+              *
+              * @param url - Canonical URL (with optional `|version`)
+              */
+             hasStructureDefinition(url: string): boolean;
+             /**
+              * Resolve the full inheritance chain for a profile.
+              *
+              * Walks the `baseDefinition` links from the given URL up to the root
+              * resource type (e.g., `Resource`). Each base is loaded on demand if
+              * not already in the registry.
+              *
+              * @param url - Canonical URL of the starting profile
+              * @returns Array of canonical URLs from child to root
+              *          (e.g., `[ChinesePatient, Patient, DomainResource, Resource]`)
+              * @throws {@link CircularDependencyError} if a cycle is detected
+                  * @throws {@link ResourceNotFoundError} if a base definition cannot be found
+                      */
+                  resolveInheritanceChain(url: string): Promise<string[]>;
+                  /**
+                   * Register a StructureDefinition in the registry.
+                   *
+                   * This is used for:
+                   * - Manually adding definitions (e.g., custom profiles)
+                   * - Phase 4: caching generated snapshots back into the context
+                   *
+                   * If a definition with the same URL (and version) already exists,
+                   * it will be replaced and any cached inheritance chains invalidated.
+                   *
+                   * @param sd - The StructureDefinition to register
+                   * @throws {@link InvalidStructureDefinitionError} if `sd.url` is missing
+                       */
+                   registerStructureDefinition(sd: StructureDefinition): void;
+                   /**
+                    * Preload FHIR R4 core StructureDefinitions.
+                    *
+                    * Loads base resource types (Resource, DomainResource, Patient,
+                    * Observation, etc.) into the registry so they are available
+                    * synchronously via {@link getStructureDefinition}.
+                    *
+                    * Should be called once during application initialization.
+                    */
+                   preloadCoreDefinitions(): Promise<void>;
+                   /**
+                    * Return runtime statistics for monitoring and diagnostics.
+                    */
+                   getStatistics(): ContextStatistics;
+                   /**
+                    * Release all cached data and reset internal state.
+                    *
+                    * After calling `dispose()`, the context must be re-initialized
+                    * (e.g., by calling {@link preloadCoreDefinitions} again).
+                    */
+                   dispose(): void;
+                  }
 
-/**
- * Serialize a Resource object to a FHIR JSON string.
- *
- * Output conforms to FHIR R4 JSON conventions:
- * - `resourceType` is the first property
- * - Remaining properties are in alphabetical order
- * - Choice type fields use their original JSON property names
- * - Empty values (`undefined`, `[]`, `{}`) are omitted
- *
- * @param resource - The Resource to serialize
- * @returns A FHIR JSON string (pretty-printed with 2-space indent)
- *
- * @example
- * ```typescript
- * const sd: StructureDefinition = { resourceType: 'StructureDefinition', ... };
- * const json = serializeToFhirJson(sd);
- * // '{\n  "resourceType": "StructureDefinition",\n  ...\n}'
- * ```
- */
-export declare function serializeToFhirJson(resource: Resource): string;
+                  /**
+                   * Concrete implementation of {@link FhirContext}.
+                   *
+                   * @example
+                   * ```typescript
+                   * const ctx = new FhirContextImpl({
+                   *   loaders: [memoryLoader, fileLoader],
+                   * });
+                   * await ctx.preloadCoreDefinitions();
+                   *
+                   * const patient = await ctx.loadStructureDefinition(
+                   *   'http://hl7.org/fhir/StructureDefinition/Patient'
+                   * );
+                   * ```
+                   */
+                  export declare class FhirContextImpl implements FhirContext {
+                      private readonly _registry;
+                      private readonly _resolver;
+                      private readonly _loader;
+                      private readonly _options;
+                      private readonly _stats;
+                      private _disposed;
+                      constructor(options: FhirContextOptions);
+                      loadStructureDefinition(url: string): Promise<StructureDefinition>;
+                      getStructureDefinition(url: string): StructureDefinition | undefined;
+                      hasStructureDefinition(url: string): boolean;
+                      resolveInheritanceChain(url: string): Promise<string[]>;
+                      registerStructureDefinition(sd: StructureDefinition): void;
+                      preloadCoreDefinitions(): Promise<void>;
+                      getStatistics(): ContextStatistics;
+                      dispose(): void;
+                      /**
+                       * Validate that a StructureDefinition has the minimum required fields.
+                       */
+                      private _validateStructureDefinition;
+                      /**
+                       * Guard against use after dispose.
+                       */
+                      private _ensureNotDisposed;
+                      /**
+                       * Direct access to the internal registry (for diagnostics).
+                       */
+                      get registry(): StructureDefinitionRegistry;
+                      /**
+                       * Direct access to the internal resolver (for diagnostics).
+                       */
+                      get resolver(): InheritanceChainResolver;
+                  }
 
-/**
- * Serialize a Resource object to a plain JavaScript object suitable
- * for FHIR JSON (without calling `JSON.stringify`).
- *
- * Use this when you need the object form (e.g., for storage or
- * further manipulation) rather than a string.
- *
- * @param resource - The Resource to serialize
- * @returns A plain object conforming to FHIR JSON conventions
- */
-export declare function serializeToFhirObject(resource: Resource): Record<string, unknown>;
+                  /**
+                   * Configuration options for creating a {@link FhirContext}.
+                   */
+                  export declare interface FhirContextOptions {
+                      /**
+                       * One or more loaders to use for resolving StructureDefinitions.
+                       *
+                       * When multiple loaders are provided, they are tried in order
+                       * (first match wins — chain of responsibility pattern).
+                       */
+                      loaders: StructureDefinitionLoader[];
+                      /**
+                       * Whether to automatically call {@link FhirContext.preloadCoreDefinitions}
+                       * during initialization.
+                       *
+                       * @defaultValue `true`
+                       */
+                      preloadCore?: boolean;
+                      /**
+                       * Path to the FHIR R4 specification directory.
+                       *
+                       * Used by the core definition preloader to locate `profiles-resources.json`
+                       * and `profiles-types.json`.
+                       *
+                       * @defaultValue `undefined` (uses bundled definitions)
+                       */
+                      specDirectory?: string;
+                  }
 
-/**
- * A resolved slicing definition on a canonical element.
- *
- * Corresponds to a simplified version of `ElementDefinition.slicing`.
- * Unlike the FHIR version, `ordered` is always a boolean (default `false`).
- */
-export declare interface SlicingDefinition {
-    /** Discriminators used to match slices. */
-    discriminators: SlicingDiscriminatorDef[];
-    /**
-     * closed | open | openAtEnd
-     * @see https://hl7.org/fhir/R4/valueset-resource-slicing-rules.html
-     */
-    rules: SlicingRules;
-    /**
-     * Whether elements must appear in the same order as slices.
-     *
-     * Always has a value (default `false`), unlike the FHIR spec where
-     * this is optional.
-     */
-    ordered: boolean;
-    /** Human-readable description of the slicing. */
-    description?: string;
-}
+                  /**
+                   * FHIR date: a date or partial date (year, year-month, or year-month-day).
+                   * No timezone. No time.
+                   * Format: `YYYY(-MM(-DD)?)?`
+                   * Regex: `([0-9]([0-9]([0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)(-(0[1-9]|1[0-2])(-(0[1-9]|[1-2][0-9]|3[0-1]))?)?`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#date
+                   */
+                  export declare type FhirDate = Branded<string, 'FhirDate'>;
 
-/**
- * Designates a discriminator to differentiate between slices.
- * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.slicing.discriminator
- */
-export declare interface SlicingDiscriminator {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
-    /**
-     * value | exists | pattern | type | profile (1..1)
-     * @see https://hl7.org/fhir/R4/valueset-discriminator-type.html
-     */
-    type: DiscriminatorType;
-    /**
-     * Path to element value (1..1)
-     *
-     * A FHIRPath expression that identifies the element within the
-     * resource/type to be used as the discriminator.
-     */
-    path: FhirString;
-}
+                  /**
+                   * FHIR dateTime: a date, date-time, or partial date with optional time and timezone.
+                   * Format: `YYYY(-MM(-DD(Thh:mm:ss(.sss)?(Z|(+|-)hh:mm))?)?)?`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#dateTime
+                   */
+                  export declare type FhirDateTime = Branded<string, 'FhirDateTime'>;
 
-/**
- * A single discriminator within a slicing definition.
- *
- * Corresponds to `ElementDefinition.slicing.discriminator`.
- */
-export declare interface SlicingDiscriminatorDef {
-    /**
-     * value | exists | pattern | type | profile
-     * @see https://hl7.org/fhir/R4/valueset-discriminator-type.html
-     */
-    type: DiscriminatorType;
-    /**
-     * FHIRPath expression identifying the discriminating element.
-     */
-    path: string;
-}
+                  /**
+                   * FHIR decimal: rational numbers with implicit precision.
+                   * Regex: `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`
+                   * Note: precision of the decimal value has significance
+                   * (e.g., 0.010 is regarded as different to 0.01).
+                   * @see https://hl7.org/fhir/R4/datatypes.html#decimal
+                   */
+                  export declare type FhirDecimal = Branded<number, 'FhirDecimal'>;
 
-/**
- * How slices are interpreted when evaluating an instance.
- * @see https://hl7.org/fhir/R4/valueset-resource-slicing-rules.html
- */
-export declare type SlicingRules = 'closed' | 'open' | 'openAtEnd';
+                  /**
+                   * FHIR id: any combination of upper- or lower-case ASCII letters,
+                   * numerals, '-', and '.', with a length limit of 64 characters.
+                   * Regex: `[A-Za-z0-9\-\.]{1,64}`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#id
+                   */
+                  export declare type FhirId = Branded<string, 'FhirId'>;
 
-/**
- * A definition of a FHIR structure — a resource, data type, or extension.
- *
- * StructureDefinition is the central metadata resource in FHIR. It defines:
- * - The shape of resources and data types (via snapshot/differential)
- * - Profile constraints (via derivation = 'constraint')
- * - Extension definitions (via kind = 'resource', type = 'Extension')
- *
- * This interface extends DomainResource and includes all fields defined
- * in the FHIR R4 specification.
- *
- * @see https://hl7.org/fhir/R4/structuredefinition.html
- */
-export declare interface StructureDefinition extends DomainResource {
-    /** Resource type discriminator (1..1) */
-    resourceType: 'StructureDefinition';
-    /**
-     * Canonical identifier for this structure definition, represented as a URI
-     * (globally unique) (1..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.url
-     */
-    url: FhirUri;
-    /**
-     * Additional identifier for the structure definition (0..*)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.identifier
-     */
-    identifier?: Identifier[];
-    /**
-     * Business version of the structure definition (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.version
-     */
-    version?: FhirString;
-    /**
-     * Computer-readable name of the structure definition (1..1)
-     *
-     * Name should be usable as an identifier for the module by machine
-     * processing applications such as code generation.
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.name
-     */
-    name: FhirString;
-    /**
-     * Human-readable name for the structure definition (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.title
-     */
-    title?: FhirString;
-    /**
-     * Publication status: draft | active | retired | unknown (1..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.status
-     */
-    status: PublicationStatus;
-    /**
-     * For testing purposes, not real usage (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.experimental
-     */
-    experimental?: FhirBoolean;
-    /**
-     * Date last changed (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.date
-     */
-    date?: FhirDateTime;
-    /**
-     * Name of the publisher (organization or individual) (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.publisher
-     */
-    publisher?: FhirString;
-    /**
-     * Contact details for the publisher (0..*)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.contact
-     */
-    contact?: ContactDetail[];
-    /**
-     * Natural language description of the structure definition (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.description
-     */
-    description?: FhirMarkdown;
-    /**
-     * The context that the content is intended to support (0..*)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.useContext
-     */
-    useContext?: UsageContext[];
-    /**
-     * Intended jurisdiction for structure definition (0..*)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.jurisdiction
-     */
-    jurisdiction?: CodeableConcept[];
-    /**
-     * Why this structure definition is defined (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.purpose
-     */
-    purpose?: FhirMarkdown;
-    /**
-     * Use and/or publishing restrictions (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.copyright
-     */
-    copyright?: FhirMarkdown;
-    /**
-     * Assist with indexing and finding (0..*)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.keyword
-     */
-    keyword?: Coding[];
-    /**
-     * FHIR Version this StructureDefinition targets (0..1)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.fhirVersion
-     */
-    fhirVersion?: FhirVersionCode;
-    /**
-     * External specification that the content is mapped to (0..*)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.mapping
-     */
-    mapping?: StructureDefinitionMapping[];
-    /**
-     * The kind of structure: primitive-type | complex-type | resource | logical (1..1)
-     *
-     * Determines the fundamental nature of the structure being defined.
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.kind
-     */
-    kind: StructureDefinitionKind;
-    /**
-     * Whether the structure is abstract (1..1)
-     *
-     * Abstract types cannot be instantiated directly. For example,
-     * `DomainResource` is abstract — you cannot create a resource
-     * with `resourceType: "DomainResource"`.
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.abstract
-     */
-    abstract: FhirBoolean;
-    /**
-     * If an extension, where it can be used in instances (0..*)
-     *
-     * Only meaningful when kind = 'resource' and type = 'Extension'.
-     * Defines the contexts in which the extension can appear.
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.context
-     */
-    context?: StructureDefinitionContext[];
-    /**
-     * FHIRPath invariants — conditions that must be true for the
-     * extension to be valid in a given context (0..*)
-     *
-     * Only meaningful when kind = 'resource' and type = 'Extension'.
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.contextInvariant
-     */
-    contextInvariant?: FhirString[];
-    /**
-     * Type defined or constrained by this structure (1..1)
-     *
-     * For base definitions (derivation = 'specialization'), this is the
-     * type being defined (e.g., 'Patient', 'Observation').
-     * For profiles (derivation = 'constraint'), this is the type being
-     * constrained (must match the type of the base definition).
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.type
-     */
-    type: FhirUri;
-    /**
-     * Definition that this type is constrained/specialized from (0..1)
-     *
-     * The canonical URL of the base StructureDefinition. This forms the
-     * inheritance chain used in snapshot generation.
-     * - For specializations: points to the parent type
-     * - For constraints: points to the profile being constrained
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.baseDefinition
-     */
-    baseDefinition?: FhirCanonical;
-    /**
-     * specialization | constraint (0..1)
-     *
-     * - `specialization`: defines a new type (e.g., Patient specializes DomainResource)
-     * - `constraint`: constrains an existing type (e.g., USCorePatient constrains Patient)
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.derivation
-     */
-    derivation?: TypeDerivationRule;
-    /**
-     * Snapshot view of the structure (0..1)
-     *
-     * Contains the complete, flattened element tree with all constraints
-     * from the inheritance chain resolved. Generated by the snapshot
-     * generation algorithm (fhir-profile module).
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.snapshot
-     */
-    snapshot?: StructureDefinitionSnapshot;
-    /**
-     * Differential constraints of the structure (0..1)
-     *
-     * Contains only the constraints that differ from the base definition.
-     * This is the authoring format — profiles are typically written as
-     * differentials to avoid repeating base constraints.
-     * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.differential
-     */
-    differential?: StructureDefinitionDifferential;
-}
+                  /**
+                   * FHIR instant: an instant in time with at least second precision
+                   * and always includes a timezone.
+                   * Format: `YYYY-MM-DDThh:mm:ss.sss+zz:zz`
+                   * Regex: `([0-9]([0-9]([0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#instant
+                   */
+                  export declare type FhirInstant = Branded<string, 'FhirInstant'>;
 
-/**
- * Identifies the types of resource or data type elements to which the
- * extension can be applied. Only relevant when kind = 'resource' and
- * type = 'Extension'.
- * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.context
- */
-export declare interface StructureDefinitionContext {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
-    /** Extensions that cannot be ignored even if unrecognized (0..*) */
-    modifierExtension?: Extension[];
-    /** fhirpath | element | extension (1..1) */
-    type: ExtensionContextType;
-    /** Where the extension can be used in instances (1..1) */
-    expression: FhirString;
-}
+                  /**
+                   * FHIR integer: whole numbers in the range -2,147,483,648..2,147,483,647
+                   * Regex: `[0]|[-+]?[1-9][0-9]*`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#integer
+                   */
+                  export declare type FhirInteger = Branded<number, 'FhirInteger'>;
 
-/**
- * A differential view of the structure, containing only the constraints
- * that differ from the base definition. This is the compact authoring
- * format used when creating profiles.
- * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.differential
- */
-export declare interface StructureDefinitionDifferential {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
-    /** Extensions that cannot be ignored even if unrecognized (0..*) */
-    modifierExtension?: Extension[];
-    /**
-     * Definition of elements in the resource (if no StructureDefinition) (1..*)
-     *
-     * The differential contains only the constraints that differ from the base
-     * profile. It MUST NOT be used directly for semantic interpretation — it
-     * must first be expanded into a snapshot via snapshot generation.
-     */
-    element: ElementDefinition[];
-}
+                  /**
+                   * FHIR markdown: a FHIR string that may contain markdown syntax.
+                   * Systems are not required to have markdown support.
+                   * @see https://hl7.org/fhir/R4/datatypes.html#markdown
+                   */
+                  export declare type FhirMarkdown = Branded<string, 'FhirMarkdown'>;
 
-/**
- * The kind of structure being defined by a StructureDefinition.
- * @see https://hl7.org/fhir/R4/valueset-structure-definition-kind.html
- */
-export declare type StructureDefinitionKind = 'primitive-type' | 'complex-type' | 'resource' | 'logical';
+                  /**
+                   * FHIR oid: an OID represented as a URI (RFC 3001).
+                   * Format: `urn:oid:[0-2](\.(0|[1-9][0-9]*))+`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#oid
+                   */
+                  export declare type FhirOid = Branded<string, 'FhirOid'>;
 
-/**
- * A mapping to an external specification that the structure conforms to.
- * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.mapping
- */
-export declare interface StructureDefinitionMapping {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
-    /** Extensions that cannot be ignored even if unrecognized (0..*) */
-    modifierExtension?: Extension[];
-    /** Internal id when this mapping is used (1..1) */
-    identity: FhirId;
-    /** Identifies what this mapping refers to (0..1) */
-    uri?: FhirUri;
-    /** Names what this mapping refers to (0..1) */
-    name?: FhirString;
-    /** Versions, issues, scope limitations, etc. (0..1) */
-    comment?: FhirString;
-}
+                  /**
+                   * FHIR positiveInt: positive integer in the range 1..2,147,483,647.
+                   * Regex: `+?[1-9][0-9]*`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#positiveInt
+                   */
+                  export declare type FhirPositiveInt = Branded<number, 'FhirPositiveInt'>;
 
-/**
- * A snapshot view of the structure, containing all element definitions
- * with their complete constraint information resolved from the
- * inheritance chain.
- * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.snapshot
- */
-export declare interface StructureDefinitionSnapshot {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
-    /** Extensions that cannot be ignored even if unrecognized (0..*) */
-    modifierExtension?: Extension[];
-    /**
-     * Definition of elements in the resource (if no StructureDefinition) (1..*)
-     *
-     * The snapshot contains the complete, flattened list of all ElementDefinition
-     * entries with all constraints from the inheritance chain fully resolved.
-     * This is the "semantic truth" used for validation and interpretation.
-     */
-    element: ElementDefinition[];
-}
+                  /**
+                   * FHIR string: a sequence of Unicode characters.
+                   * Regex: `[ \r\n\t\S]+`
+                   * Note: strings SHOULD not contain Unicode character points below 32,
+                   * except for horizontal tab, carriage return, and line feed.
+                   * @see https://hl7.org/fhir/R4/datatypes.html#string
+                   */
+                  export declare type FhirString = Branded<string, 'FhirString'>;
 
-/**
- * A resolved type constraint on a canonical element.
- *
- * Corresponds to a simplified, pre-validated version of
- * `ElementDefinition.type` from the FHIR spec.
- */
-export declare interface TypeConstraint {
-    /**
-     * The data type or resource name (e.g., `string`, `Reference`, `Patient`).
-     *
-     * Unlike `ElementDefinitionType.code` (which is a URI), this is the
-     * resolved short name used for runtime dispatch.
-     */
-    code: string;
-    /**
-     * Profiles that the type must conform to (resolved canonical URLs).
-     *
-     * Corresponds to `ElementDefinitionType.profile`.
-     */
-    profiles?: string[];
-    /**
-     * For Reference/canonical types, profiles that the target must conform to.
-     *
-     * Corresponds to `ElementDefinitionType.targetProfile`.
-     */
-    targetProfiles?: string[];
-}
+                  /**
+                   * FHIR time: a time of day with no date and no timezone.
+                   * Format: `hh:mm:ss(.sss)?`
+                   * Regex: `([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#time
+                   */
+                  export declare type FhirTime = Branded<string, 'FhirTime'>;
 
-/**
- * Whether a StructureDefinition is a specialization or a constraint.
- * - `specialization`: defines a new type (e.g., Patient specializes DomainResource)
- * - `constraint`: constrains an existing type (e.g., USCorePatient constrains Patient)
- * @see https://hl7.org/fhir/R4/valueset-type-derivation-rule.html
- */
-export declare type TypeDerivationRule = 'specialization' | 'constraint';
+                  /**
+                   * FHIR unsignedInt: non-negative integer in the range 0..2,147,483,647.
+                   * Regex: `[0]|([1-9][0-9]*)`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#unsignedInt
+                   */
+                  export declare type FhirUnsignedInt = Branded<number, 'FhirUnsignedInt'>;
 
-/**
- * Specifies clinical/business/etc. context in which a conformance
- * artifact is applicable.
- * @see https://hl7.org/fhir/R4/metadatatypes.html#UsageContext
- */
-export declare interface UsageContext extends Element {
-    /** Type of context being specified (1..1) */
-    code: Coding;
-    /**
-     * Value that defines the context.
-     * Choice type [x]: valueCodeableConcept | valueQuantity | valueRange | valueReference
-     * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
-     */
-    value?: unknown;
-}
+                  /**
+                   * FHIR uri: a Uniform Resource Identifier.
+                   * Regex: `\S*`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#uri
+                   */
+                  export declare type FhirUri = Branded<string, 'FhirUri'>;
 
-export { }
+                  /**
+                   * FHIR url: a Uniform Resource Locator (a subset of uri).
+                   * Must start with http:, https:, ftp:, mailto:, or mllp:.
+                   * @see https://hl7.org/fhir/R4/datatypes.html#url
+                   */
+                  export declare type FhirUrl = Branded<string, 'FhirUrl'>;
+
+                  /**
+                   * FHIR uuid: a UUID expressed as a URI (RFC 4122).
+                   * Format: `urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+                   * @see https://hl7.org/fhir/R4/datatypes.html#uuid
+                   */
+                  export declare type FhirUuid = Branded<string, 'FhirUuid'>;
+
+                  /**
+                   * FHIR version identifier.
+                   * @see https://hl7.org/fhir/R4/valueset-FHIR-version.html
+                   */
+                  export declare type FhirVersionCode = '0.01' | '0.05' | '0.06' | '0.11' | '0.0.80' | '0.0.81' | '0.0.82' | '0.4.0' | '0.5.0' | '1.0.0' | '1.0.1' | '1.0.2' | '1.1.0' | '1.4.0' | '1.6.0' | '1.8.0' | '3.0.0' | '3.0.1' | '3.0.2' | '3.3.0' | '3.5.0' | '4.0.0' | '4.0.1';
+
+                  /**
+                   * FHIR xhtml: limited XHTML content as defined in the Narrative datatype.
+                   * @see https://hl7.org/fhir/R4/datatypes.html#xhtml
+                   * @see https://hl7.org/fhir/R4/narrative.html
+                   */
+                  export declare type FhirXhtml = Branded<string, 'FhirXhtml'>;
+
+                  /**
+                   * A loader that resolves StructureDefinitions from local JSON files.
+                   *
+                   * @example
+                   * ```typescript
+                   * const loader = new FileSystemLoader('/path/to/definitions');
+                   * const sd = await loader.load('http://hl7.org/fhir/StructureDefinition/Patient');
+                   * // Reads /path/to/definitions/Patient.json
+                   * ```
+                   */
+                  export declare class FileSystemLoader implements StructureDefinitionLoader {
+                      private readonly _basePath;
+                      /**
+                       * @param basePath - Directory containing `{ResourceName}.json` files
+                       */
+                      constructor(basePath: string);
+                      load(url: string): Promise<StructureDefinition | null>;
+                      canLoad(url: string): boolean;
+                      getSourceType(): string;
+                      /**
+                       * The base directory this loader reads from.
+                       */
+                      get basePath(): string;
+                  }
+
+                  /**
+                   * Resolve the absolute path to the `core-definitions/` directory.
+                   *
+                   * Works both in ESM (via `import.meta.url`) and when a custom
+                   * `specDirectory` is provided.
+                   *
+                   * @param specDirectory - Optional override directory path
+                   * @returns Absolute path to the core definitions directory
+                   */
+                  export declare function getCoreDefinitionsDir(specDirectory?: string): string;
+
+                  /**
+                   * Check whether an issues array contains at least one error (not just warnings).
+                   *
+                   * Useful for determining whether to return success or failure after
+                   * collecting issues from sub-parsers.
+                   */
+                  export declare function hasErrors(issues: readonly ParseIssue[]): boolean;
+
+                  /**
+                   * An identifier intended for computation (e.g., MRN, NPI).
+                   * @see https://hl7.org/fhir/R4/datatypes.html#Identifier
+                   */
+                  export declare interface Identifier extends Element {
+                      /** usual | official | temp | secondary | old (0..1) */
+                      use?: FhirCode;
+                      /** Description of identifier (0..1) */
+                      type?: CodeableConcept;
+                      /** The namespace for the identifier value (0..1) */
+                      system?: FhirUri;
+                      /** The value that is unique (0..1) */
+                      value?: FhirString;
+                      /** Time period when id is/was valid for use (0..1) */
+                      period?: Period;
+                      /** Organization that issued id (0..1) */
+                      assigner?: Reference;
+                  }
+
+                  /**
+                   * Resolves profile inheritance chains by walking `baseDefinition` links.
+                   *
+                   * The resolver loads each StructureDefinition on demand via the provided
+                   * {@link DefinitionProvider}, detects circular dependencies, and caches
+                   * resolved chains for repeated lookups.
+                   *
+                   * @example
+                   * ```typescript
+                   * const resolver = new InheritanceChainResolver(provider);
+                   * const chain = await resolver.resolve(
+                   *   'http://hl7.org/fhir/StructureDefinition/Patient'
+                   * );
+                   * // → ['http://hl7.org/fhir/StructureDefinition/Patient',
+                   * //    'http://hl7.org/fhir/StructureDefinition/DomainResource',
+                   * //    'http://hl7.org/fhir/StructureDefinition/Resource']
+                   * ```
+                   */
+                  declare class InheritanceChainResolver {
+                      private readonly _provider;
+                      /** Cache of resolved chains: canonical URL → chain array */
+                      private readonly _cache;
+                      /** Statistics counter */
+                      private _resolutionCount;
+                      constructor(provider: DefinitionProvider);
+                      /**
+                       * Resolve the full inheritance chain for a profile.
+                       *
+                       * Returns an array of canonical URLs ordered from child to root:
+                       * `[startUrl, ..., parentUrl, rootUrl]`
+                       *
+                       * @param url - Canonical URL of the starting StructureDefinition
+                       * @returns Inheritance chain from child to root
+                       * @throws {@link CircularDependencyError} if a cycle is detected
+                           * @throws {@link ResourceNotFoundError} if a definition cannot be loaded
+                               */
+                           resolve(url: string): Promise<string[]>;
+                           /**
+                            * Invalidate the cached chain for a specific URL.
+                            *
+                            * Should be called when a StructureDefinition is re-registered,
+                            * as its `baseDefinition` may have changed.
+                            *
+                            * @param url - Canonical URL to invalidate
+                            */
+                           invalidate(url: string): void;
+                           /**
+                            * Clear all cached chains.
+                            */
+                           clearCache(): void;
+                           /**
+                            * Number of chains that have been resolved (not from cache).
+                            */
+                           get resolutionCount(): number;
+                           /**
+                            * Number of chains currently in the cache.
+                            */
+                           get cacheSize(): number;
+                           /**
+                            * Recursive resolution with circular dependency detection.
+                            *
+                            * @param url - Current URL to resolve
+                            * @param inFlight - Set of URLs currently being resolved (cycle detection)
+                            * @returns Chain from current URL to root
+                            */
+                           private _resolveRecursive;
+                       }
+
+                       /**
+                        * Thrown when a loaded or registered StructureDefinition is missing
+                        * required fields or has invalid structure.
+                        *
+                        * Required fields for a valid StructureDefinition:
+                        * - `url` — canonical URL
+                        * - `name` — computer-friendly name
+                        * - `status` — publication status
+                        * - `kind` — resource | complex-type | primitive-type | logical
+                        *
+                        * @example
+                        * ```typescript
+                        * throw new InvalidStructureDefinitionError(
+                        *   'Missing required field: url',
+                        *   'http://example.org/MyProfile'
+                        * );
+                        * ```
+                        */
+                       export declare class InvalidStructureDefinitionError extends ContextError {
+                           readonly name = "InvalidStructureDefinitionError";
+                           /** The URL of the invalid definition (if available) */
+                           readonly url: string | undefined;
+                           constructor(reason: string, url?: string);
+                       }
+
+                       /**
+                        * A resolved constraint (invariant) on a canonical element.
+                        *
+                        * Corresponds to a simplified version of `ElementDefinition.constraint`.
+                        */
+                       export declare interface Invariant {
+                           /** Unique key identifying this constraint. */
+                           key: string;
+                           /**
+                            * error | warning
+                            * @see https://hl7.org/fhir/R4/valueset-constraint-severity.html
+                            */
+                           severity: ConstraintSeverity;
+                           /** Human-readable description of the constraint. */
+                           human: string;
+                           /** FHIRPath expression that must evaluate to `true`. */
+                           expression?: string;
+                           /**
+                            * Canonical URL of the StructureDefinition where this constraint
+                            * was originally defined.
+                            */
+                           source?: string;
+                       }
+
+                       /**
+                        * Load all core definitions and return them as a Map.
+                        *
+                        * Loads in dependency order (base → primitives → complex → resources).
+                        *
+                        * @param specDirectory - Optional override directory path
+                        * @returns Map of canonical URL → StructureDefinition
+                        */
+                       export declare function loadAllCoreDefinitions(specDirectory?: string): Promise<Map<string, StructureDefinition>>;
+
+                       /**
+                        * Load a single core StructureDefinition by name (async).
+                        *
+                        * @param name - Definition name (e.g., `"Patient"`, `"string"`)
+                        * @param baseDir - Directory containing the JSON files
+                        * @returns Parsed StructureDefinition
+                        * @throws {@link LoaderError} if the file cannot be read or parsed
+                            */
+                        export declare function loadCoreDefinition(name: string, baseDir: string): Promise<StructureDefinition>;
+
+                        /**
+                         * Load a single core StructureDefinition by name (synchronous).
+                         *
+                         * @param name - Definition name (e.g., `"Patient"`, `"string"`)
+                         * @param baseDir - Directory containing the JSON files
+                         * @returns Parsed StructureDefinition
+                         * @throws {@link LoaderError} if the file cannot be read or parsed
+                             */
+                         export declare function loadCoreDefinitionSync(name: string, baseDir: string): StructureDefinition;
+
+                         /**
+                          * Thrown when a {@link StructureDefinitionLoader} encounters an I/O
+                          * or parse failure while loading a definition.
+                          *
+                          * The original error is preserved as `cause` for debugging.
+                          *
+                          * @example
+                          * ```typescript
+                          * throw new LoaderError(
+                          *   'http://hl7.org/fhir/StructureDefinition/Patient',
+                          *   'filesystem',
+                          *   originalError
+                          * );
+                          * ```
+                          */
+                         export declare class LoaderError extends ContextError {
+                             readonly name = "LoaderError";
+                             /** The canonical URL being loaded when the error occurred */
+                             readonly url: string;
+                             /** The loader source type that failed */
+                             readonly sourceType: string;
+                             constructor(url: string, sourceType: string, cause?: Error);
+                         }
+
+                         /**
+                          * Options for individual loader instances.
+                          */
+                         export declare interface LoaderOptions {
+                             /**
+                              * Base directory or URL prefix for resolving relative paths.
+                              */
+                             basePath?: string;
+                             /**
+                              * Request timeout in milliseconds (for future HTTP loaders).
+                              *
+                              * @defaultValue `30000`
+                              */
+                             timeout?: number;
+                             /**
+                              * Number of retry attempts on transient failures.
+                              *
+                              * @defaultValue `0`
+                              */
+                             retryCount?: number;
+                         }
+
+                         /**
+                          * A loader that resolves StructureDefinitions from an in-memory Map.
+                          *
+                          * The map is keyed by canonical URL. Lookups are synchronous but the
+                          * interface returns a Promise for consistency with other loaders.
+                          *
+                          * @example
+                          * ```typescript
+                          * const definitions = new Map<string, StructureDefinition>();
+                          * definitions.set('http://hl7.org/fhir/StructureDefinition/Patient', patientSD);
+                          * const loader = new MemoryLoader(definitions);
+                          * ```
+                          */
+                         export declare class MemoryLoader implements StructureDefinitionLoader {
+                             private readonly _definitions;
+                             /**
+                              * @param definitions - Map of canonical URL → StructureDefinition.
+                              *                      The map is **not** copied; mutations to the
+                              *                      original map are visible to the loader.
+                              */
+                             constructor(definitions: Map<string, StructureDefinition>);
+                             load(url: string): Promise<StructureDefinition | null>;
+                             canLoad(url: string): boolean;
+                             getSourceType(): string;
+                             /**
+                              * Number of definitions currently held in the map.
+                              */
+                             get size(): number;
+                         }
+
+                         /**
+                          * The metadata about a resource. This is content in the resource that is
+                          * maintained by the infrastructure.
+                          * @see https://hl7.org/fhir/R4/resource.html#Meta
+                          */
+                         export declare interface Meta extends Element {
+                             /** Version specific identifier (0..1) */
+                             versionId?: FhirId;
+                             /** When the resource version last changed (0..1) */
+                             lastUpdated?: FhirInstant;
+                             /** Identifies where the resource comes from (0..1) */
+                             source?: FhirUri;
+                             /** Profiles this resource claims to conform to (0..*) */
+                             profile?: FhirCanonical[];
+                             /** Security Labels applied to this resource (0..*) */
+                             security?: Coding[];
+                             /** Tags applied to this resource (0..*) */
+                             tag?: Coding[];
+                         }
+
+                         /**
+                          * A human-readable summary of the resource conveying the essential
+                          * clinical and business information.
+                          * @see https://hl7.org/fhir/R4/narrative.html#Narrative
+                          */
+                         export declare interface Narrative extends Element {
+                             /** generated | extensions | additional | empty (1..1) */
+                             status: NarrativeStatus;
+                             /** Limited xhtml content (1..1) */
+                             div: FhirXhtml;
+                         }
+
+                         /**
+                          * The status of a narrative.
+                          * @see https://hl7.org/fhir/R4/valueset-narrative-status.html
+                          */
+                         export declare type NarrativeStatus = 'generated' | 'extensions' | 'additional' | 'empty';
+
+                         /**
+                          * Parse an ElementDefinition JSON object.
+                          *
+                          * ElementDefinition is the most complex data type in FHIR,
+                          * with ~37 fields and 8 sub-types.
+                          */
+                         export declare function parseElementDefinition(obj: Record<string, unknown>, path: string): {
+                             result: ElementDefinition;
+                             issues: ParseIssue[];
+                         };
+
+                         /**
+                          * Machine-readable error codes for parse issues.
+                          *
+                          * Each code corresponds to a specific category of parsing problem.
+                          * Consumers can switch on these codes for programmatic error handling.
+                          */
+                         export declare type ParseErrorCode = 
+                         /** JSON syntax error (e.g., malformed JSON string) */
+                         'INVALID_JSON'
+                         /** Missing required `resourceType` property */
+                         | 'MISSING_RESOURCE_TYPE'
+                         /** `resourceType` value is not a recognized FHIR resource type */
+                         | 'UNKNOWN_RESOURCE_TYPE'
+                         /** Primitive value has wrong JavaScript type (e.g., string where number expected) */
+                         | 'INVALID_PRIMITIVE'
+                         /** Object structure does not match expected shape (e.g., array where object expected) */
+                         | 'INVALID_STRUCTURE'
+                         /** Choice type `[x]` property name has an unrecognized type suffix */
+                         | 'INVALID_CHOICE_TYPE'
+                         /** Multiple variants of the same choice type field are present */
+                         | 'MULTIPLE_CHOICE_VALUES'
+                         /** `_element` array length does not match the corresponding value array */
+                         | 'ARRAY_MISMATCH'
+                         /** Unexpected `null` value in a non-nullable position */
+                         | 'UNEXPECTED_NULL'
+                         /** Property name not recognized for this type (severity: warning) */
+                         | 'UNEXPECTED_PROPERTY';
+
+                         /**
+                          * Create a failed parse result.
+                          *
+                          * @param issues - The error(s) that caused the failure (must contain at least one error)
+                          */
+                         export declare function parseFailure<T>(issues: ParseIssue[]): ParseResult<T>;
+
+                         /**
+                          * Parse a FHIR JSON string into a Resource object.
+                          *
+                          * This is the main entry point for the parser. It:
+                          * 1. Calls `JSON.parse()` with error capture
+                          * 2. Delegates to {@link parseFhirObject} for structural parsing
+                          *
+                          * Stage-1 supports dedicated parsing for `StructureDefinition` (Task 2.5).
+                          * All other resource types are parsed generically.
+                          *
+                          * @param json - A FHIR JSON string
+                          * @returns A `ParseResult` containing the parsed `Resource` or error details
+                          *
+                          * @example
+                          * ```typescript
+                          * const result = parseFhirJson('{"resourceType":"Patient","id":"123"}');
+                          * if (result.success) {
+                          *   console.log(result.data.resourceType); // "Patient"
+                          * }
+                          * ```
+                          */
+                         export declare function parseFhirJson(json: string): ParseResult<Resource>;
+
+                         /**
+                          * Parse an already-parsed JSON value into a Resource object.
+                          *
+                          * Use this when you already have a JavaScript object (e.g., from a database
+                          * or from `JSON.parse()` called externally).
+                          *
+                          * @param obj - An unknown value (expected to be a plain JSON object with `resourceType`)
+                          * @returns A `ParseResult` containing the parsed `Resource` or error details
+                          */
+                         export declare function parseFhirObject(obj: unknown): ParseResult<Resource>;
+
+                         /**
+                          * A single issue encountered during parsing.
+                          *
+                          * Issues are collected throughout the parse process and returned in the
+                          * {@link ParseResult}. Both errors and warnings use this same structure.
+                          *
+                          * @example
+                          * ```typescript
+                          * const issue: ParseIssue = {
+                          *   severity: 'error',
+                          *   code: 'MISSING_RESOURCE_TYPE',
+                          *   message: 'Object is missing the required "resourceType" property',
+                          *   path: '$',
+                          * };
+                          * ```
+                          */
+                         export declare interface ParseIssue {
+                             /** Severity level — `error` blocks successful parsing, `warning` does not */
+                             readonly severity: ParseSeverity;
+                             /** Machine-readable error code for programmatic handling */
+                             readonly code: ParseErrorCode;
+                             /** Human-readable description of the issue */
+                             readonly message: string;
+                             /**
+                              * JSON path where the issue was detected.
+                              *
+                              * Uses dot notation with array indices:
+                              * - `"StructureDefinition"` — root level
+                              * - `"StructureDefinition.snapshot.element[0].type[1].code"` — nested
+                              * - `"$"` — before resourceType is known
+                              */
+                             readonly path: string;
+                         }
+
+                         /**
+                          * Result of a parse operation.
+                          *
+                          * Uses a discriminated union on `success`:
+                          * - `success: true` — parsing succeeded; `data` contains the parsed value,
+                          *   `issues` may contain warnings
+                          * - `success: false` — parsing failed; `data` is `undefined`,
+                          *   `issues` contains at least one error
+                          *
+                          * @typeParam T - The expected output type (e.g., `StructureDefinition`)
+                          *
+                          * @example
+                          * ```typescript
+                          * const result = parseFhirJson(jsonString);
+                          * if (result.success) {
+                          *   console.log(result.data.url); // T is available
+                          * } else {
+                          *   for (const issue of result.issues) {
+                          *     console.error(`[${issue.path}] ${issue.message}`);
+                          *   }
+                          * }
+                          * ```
+                          */
+                         export declare type ParseResult<T> = {
+                             readonly success: true;
+                             readonly data: T;
+                             readonly issues: readonly ParseIssue[];
+                         } | {
+                             readonly success: false;
+                             readonly data: undefined;
+                             readonly issues: readonly ParseIssue[];
+                         };
+
+                         /**
+                          * FHIR JSON Parse Error Types
+                          *
+                          * Structured error types for the fhir-parser module. Provides precise
+                          * error localization via JSON path tracking and supports collecting
+                          * multiple issues (errors + warnings) in a single parse pass.
+                          *
+                          * Design decisions:
+                          * - Result type over exceptions: allows multi-error collection
+                          * - Path tracking: every issue carries the JSON path for precise localization
+                          * - Warning support: non-fatal issues (e.g., unknown properties) reported
+                          *   as warnings without blocking the parse
+                          *
+                          * @module fhir-parser
+                          */
+                         /**
+                          * Severity level of a parse issue.
+                          *
+                          * - `error` — the issue prevents correct interpretation of the data
+                          * - `warning` — the data can still be used, but something unexpected was found
+                          */
+                         export declare type ParseSeverity = 'error' | 'warning';
+
+                         /**
+                          * Parse a StructureDefinition JSON object.
+                          *
+                          * This is the most important parse function in Stage-1. All downstream
+                          * modules (fhir-context, fhir-profile, fhir-validator) depend on
+                          * correctly parsed StructureDefinitions.
+                          *
+                          * @param obj - A parsed JSON object (already validated as having resourceType = "StructureDefinition")
+                          * @param path - Current JSON path (for error reporting)
+                          */
+                         export declare function parseStructureDefinition(obj: Record<string, unknown>, path: string): ParseResult<StructureDefinition>;
+
+                         /**
+                          * Create a successful parse result.
+                          *
+                          * @param data - The parsed value
+                          * @param issues - Any warnings collected during parsing (default: none)
+                          */
+                         export declare function parseSuccess<T>(data: T, issues?: ParseIssue[]): ParseResult<T>;
+
+                         /**
+                          * A time period defined by a start and end date/time.
+                          * @see https://hl7.org/fhir/R4/datatypes.html#Period
+                          */
+                         export declare interface Period extends Element {
+                             /** Starting time with inclusive boundary (0..1) */
+                             start?: FhirDateTime;
+                             /** End time with inclusive boundary, if not ongoing (0..1) */
+                             end?: FhirDateTime;
+                         }
+
+                         /**
+                          * Primitive types — FHIR primitive data types.
+                          */
+                         export declare const PRIMITIVE_TYPES: readonly ["base64Binary", "boolean", "canonical", "code", "date", "dateTime", "decimal", "id", "instant", "integer", "markdown", "oid", "positiveInt", "string", "time", "unsignedInt", "uri", "url", "uuid", "xhtml"];
+
+                         /**
+                          * How a property is represented when serialized.
+                          * @see https://hl7.org/fhir/R4/valueset-property-representation.html
+                          */
+                         export declare type PropertyRepresentation = 'xmlAttr' | 'xmlText' | 'typeAttr' | 'cdaText' | 'xhtml';
+
+                         /**
+                          * Publication status of a FHIR conformance resource.
+                          * @see https://hl7.org/fhir/R4/valueset-publication-status.html
+                          */
+                         export declare type PublicationStatus = 'draft' | 'active' | 'retired' | 'unknown';
+
+                         /**
+                          * A measured amount (or an amount that can potentially be measured).
+                          * @see https://hl7.org/fhir/R4/datatypes.html#Quantity
+                          */
+                         export declare interface Quantity extends Element {
+                             /** Numerical value (with implicit precision) (0..1) */
+                             value?: FhirDecimal;
+                             /** `<` | `<=` | `>=` | `>` — how to understand the value (0..1) */
+                             comparator?: FhirCode;
+                             /** Unit representation (0..1) */
+                             unit?: FhirString;
+                             /** System that defines coded unit form (0..1) */
+                             system?: FhirUri;
+                             /** Coded form of the unit (0..1) */
+                             code?: FhirCode;
+                         }
+
+                         /**
+                          * A reference from one resource to another.
+                          * @see https://hl7.org/fhir/R4/references.html#Reference
+                          */
+                         export declare interface Reference extends Element {
+                             /** Literal reference, Relative, internal or absolute URL (0..1) */
+                             reference?: FhirString;
+                             /** Type the reference refers to (e.g., "Patient") (0..1) */
+                             type?: FhirUri;
+                             /** Logical reference, when literal reference is not known (0..1) */
+                             identifier?: Identifier;
+                             /** Text alternative for the resource (0..1) */
+                             display?: FhirString;
+                         }
+
+                         /**
+                          * Whether all resource references need to be version-specific.
+                          * @see https://hl7.org/fhir/R4/valueset-reference-version-rules.html
+                          */
+                         export declare type ReferenceVersionRules = 'either' | 'independent' | 'specific';
+
+                         /**
+                          * Abstract base for all FHIR resources.
+                          * @see https://hl7.org/fhir/R4/resource.html
+                          */
+                         export declare interface Resource {
+                             /**
+                              * The type of the resource (1..1)
+                              *
+                              * This is typed as `string` rather than `FhirString` because it serves
+                              * as a discriminator field that concrete resource interfaces narrow to
+                              * a string literal (e.g., `'StructureDefinition'`, `'Patient'`).
+                              * Branded types would prevent this narrowing.
+                              */
+                             resourceType: string;
+                             /** Logical id of this artifact (0..1) */
+                             id?: FhirId;
+                             /** Metadata about the resource (0..1) */
+                             meta?: Meta;
+                             /** A set of rules under which this content was created (0..1) */
+                             implicitRules?: FhirUri;
+                             /** Language of the resource content (0..1) */
+                             language?: FhirCode;
+                         }
+
+                         /**
+                          * Thrown when a StructureDefinition cannot be resolved by any loader.
+                          *
+                          * @example
+                          * ```typescript
+                          * throw new ResourceNotFoundError(
+                          *   'http://hl7.org/fhir/StructureDefinition/UnknownType',
+                          *   ['memory', 'filesystem']
+                          * );
+                          * ```
+                          */
+                         export declare class ResourceNotFoundError extends ContextError {
+                             readonly name = "ResourceNotFoundError";
+                             /** The canonical URL that could not be resolved */
+                             readonly url: string;
+                             /** Loader source types that were tried */
+                             readonly triedSources: readonly string[];
+                             constructor(url: string, triedSources?: string[]);
+                         }
+
+                         /**
+                          * Serialize a Resource object to a FHIR JSON string.
+                          *
+                          * Output conforms to FHIR R4 JSON conventions:
+                          * - `resourceType` is the first property
+                          * - Remaining properties are in alphabetical order
+                          * - Choice type fields use their original JSON property names
+                          * - Empty values (`undefined`, `[]`, `{}`) are omitted
+                          *
+                          * @param resource - The Resource to serialize
+                          * @returns A FHIR JSON string (pretty-printed with 2-space indent)
+                          *
+                          * @example
+                          * ```typescript
+                          * const sd: StructureDefinition = { resourceType: 'StructureDefinition', ... };
+                          * const json = serializeToFhirJson(sd);
+                          * // '{\n  "resourceType": "StructureDefinition",\n  ...\n}'
+                          * ```
+                          */
+                         export declare function serializeToFhirJson(resource: Resource): string;
+
+                         /**
+                          * Serialize a Resource object to a plain JavaScript object suitable
+                          * for FHIR JSON (without calling `JSON.stringify`).
+                          *
+                          * Use this when you need the object form (e.g., for storage or
+                          * further manipulation) rather than a string.
+                          *
+                          * @param resource - The Resource to serialize
+                          * @returns A plain object conforming to FHIR JSON conventions
+                          */
+                         export declare function serializeToFhirObject(resource: Resource): Record<string, unknown>;
+
+                         /**
+                          * A resolved slicing definition on a canonical element.
+                          *
+                          * Corresponds to a simplified version of `ElementDefinition.slicing`.
+                          * Unlike the FHIR version, `ordered` is always a boolean (default `false`).
+                          */
+                         export declare interface SlicingDefinition {
+                             /** Discriminators used to match slices. */
+                             discriminators: SlicingDiscriminatorDef[];
+                             /**
+                              * closed | open | openAtEnd
+                              * @see https://hl7.org/fhir/R4/valueset-resource-slicing-rules.html
+                              */
+                             rules: SlicingRules;
+                             /**
+                              * Whether elements must appear in the same order as slices.
+                              *
+                              * Always has a value (default `false`), unlike the FHIR spec where
+                              * this is optional.
+                              */
+                             ordered: boolean;
+                             /** Human-readable description of the slicing. */
+                             description?: string;
+                         }
+
+                         /**
+                          * Designates a discriminator to differentiate between slices.
+                          * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.slicing.discriminator
+                          */
+                         export declare interface SlicingDiscriminator {
+                             /** Unique id for inter-element referencing (0..1) */
+                             id?: FhirString;
+                             /** Additional content defined by implementations (0..*) */
+                             extension?: Extension[];
+                             /**
+                              * value | exists | pattern | type | profile (1..1)
+                              * @see https://hl7.org/fhir/R4/valueset-discriminator-type.html
+                              */
+                             type: DiscriminatorType;
+                             /**
+                              * Path to element value (1..1)
+                              *
+                              * A FHIRPath expression that identifies the element within the
+                              * resource/type to be used as the discriminator.
+                              */
+                             path: FhirString;
+                         }
+
+                         /**
+                          * A single discriminator within a slicing definition.
+                          *
+                          * Corresponds to `ElementDefinition.slicing.discriminator`.
+                          */
+                         export declare interface SlicingDiscriminatorDef {
+                             /**
+                              * value | exists | pattern | type | profile
+                              * @see https://hl7.org/fhir/R4/valueset-discriminator-type.html
+                              */
+                             type: DiscriminatorType;
+                             /**
+                              * FHIRPath expression identifying the discriminating element.
+                              */
+                             path: string;
+                         }
+
+                         /**
+                          * How slices are interpreted when evaluating an instance.
+                          * @see https://hl7.org/fhir/R4/valueset-resource-slicing-rules.html
+                          */
+                         export declare type SlicingRules = 'closed' | 'open' | 'openAtEnd';
+
+                         /**
+                          * A definition of a FHIR structure — a resource, data type, or extension.
+                          *
+                          * StructureDefinition is the central metadata resource in FHIR. It defines:
+                          * - The shape of resources and data types (via snapshot/differential)
+                          * - Profile constraints (via derivation = 'constraint')
+                          * - Extension definitions (via kind = 'resource', type = 'Extension')
+                          *
+                          * This interface extends DomainResource and includes all fields defined
+                          * in the FHIR R4 specification.
+                          *
+                          * @see https://hl7.org/fhir/R4/structuredefinition.html
+                          */
+                         export declare interface StructureDefinition extends DomainResource {
+                             /** Resource type discriminator (1..1) */
+                             resourceType: 'StructureDefinition';
+                             /**
+                              * Canonical identifier for this structure definition, represented as a URI
+                              * (globally unique) (1..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.url
+                              */
+                             url: FhirUri;
+                             /**
+                              * Additional identifier for the structure definition (0..*)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.identifier
+                              */
+                             identifier?: Identifier[];
+                             /**
+                              * Business version of the structure definition (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.version
+                              */
+                             version?: FhirString;
+                             /**
+                              * Computer-readable name of the structure definition (1..1)
+                              *
+                              * Name should be usable as an identifier for the module by machine
+                              * processing applications such as code generation.
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.name
+                              */
+                             name: FhirString;
+                             /**
+                              * Human-readable name for the structure definition (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.title
+                              */
+                             title?: FhirString;
+                             /**
+                              * Publication status: draft | active | retired | unknown (1..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.status
+                              */
+                             status: PublicationStatus;
+                             /**
+                              * For testing purposes, not real usage (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.experimental
+                              */
+                             experimental?: FhirBoolean;
+                             /**
+                              * Date last changed (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.date
+                              */
+                             date?: FhirDateTime;
+                             /**
+                              * Name of the publisher (organization or individual) (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.publisher
+                              */
+                             publisher?: FhirString;
+                             /**
+                              * Contact details for the publisher (0..*)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.contact
+                              */
+                             contact?: ContactDetail[];
+                             /**
+                              * Natural language description of the structure definition (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.description
+                              */
+                             description?: FhirMarkdown;
+                             /**
+                              * The context that the content is intended to support (0..*)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.useContext
+                              */
+                             useContext?: UsageContext[];
+                             /**
+                              * Intended jurisdiction for structure definition (0..*)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.jurisdiction
+                              */
+                             jurisdiction?: CodeableConcept[];
+                             /**
+                              * Why this structure definition is defined (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.purpose
+                              */
+                             purpose?: FhirMarkdown;
+                             /**
+                              * Use and/or publishing restrictions (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.copyright
+                              */
+                             copyright?: FhirMarkdown;
+                             /**
+                              * Assist with indexing and finding (0..*)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.keyword
+                              */
+                             keyword?: Coding[];
+                             /**
+                              * FHIR Version this StructureDefinition targets (0..1)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.fhirVersion
+                              */
+                             fhirVersion?: FhirVersionCode;
+                             /**
+                              * External specification that the content is mapped to (0..*)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.mapping
+                              */
+                             mapping?: StructureDefinitionMapping[];
+                             /**
+                              * The kind of structure: primitive-type | complex-type | resource | logical (1..1)
+                              *
+                              * Determines the fundamental nature of the structure being defined.
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.kind
+                              */
+                             kind: StructureDefinitionKind;
+                             /**
+                              * Whether the structure is abstract (1..1)
+                              *
+                              * Abstract types cannot be instantiated directly. For example,
+                              * `DomainResource` is abstract — you cannot create a resource
+                              * with `resourceType: "DomainResource"`.
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.abstract
+                              */
+                             abstract: FhirBoolean;
+                             /**
+                              * If an extension, where it can be used in instances (0..*)
+                              *
+                              * Only meaningful when kind = 'resource' and type = 'Extension'.
+                              * Defines the contexts in which the extension can appear.
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.context
+                              */
+                             context?: StructureDefinitionContext[];
+                             /**
+                              * FHIRPath invariants — conditions that must be true for the
+                              * extension to be valid in a given context (0..*)
+                              *
+                              * Only meaningful when kind = 'resource' and type = 'Extension'.
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.contextInvariant
+                              */
+                             contextInvariant?: FhirString[];
+                             /**
+                              * Type defined or constrained by this structure (1..1)
+                              *
+                              * For base definitions (derivation = 'specialization'), this is the
+                              * type being defined (e.g., 'Patient', 'Observation').
+                              * For profiles (derivation = 'constraint'), this is the type being
+                              * constrained (must match the type of the base definition).
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.type
+                              */
+                             type: FhirUri;
+                             /**
+                              * Definition that this type is constrained/specialized from (0..1)
+                              *
+                              * The canonical URL of the base StructureDefinition. This forms the
+                              * inheritance chain used in snapshot generation.
+                              * - For specializations: points to the parent type
+                              * - For constraints: points to the profile being constrained
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.baseDefinition
+                              */
+                             baseDefinition?: FhirCanonical;
+                             /**
+                              * specialization | constraint (0..1)
+                              *
+                              * - `specialization`: defines a new type (e.g., Patient specializes DomainResource)
+                              * - `constraint`: constrains an existing type (e.g., USCorePatient constrains Patient)
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.derivation
+                              */
+                             derivation?: TypeDerivationRule;
+                             /**
+                              * Snapshot view of the structure (0..1)
+                              *
+                              * Contains the complete, flattened element tree with all constraints
+                              * from the inheritance chain resolved. Generated by the snapshot
+                              * generation algorithm (fhir-profile module).
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.snapshot
+                              */
+                             snapshot?: StructureDefinitionSnapshot;
+                             /**
+                              * Differential constraints of the structure (0..1)
+                              *
+                              * Contains only the constraints that differ from the base definition.
+                              * This is the authoring format — profiles are typically written as
+                              * differentials to avoid repeating base constraints.
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.differential
+                              */
+                             differential?: StructureDefinitionDifferential;
+                         }
+
+                         /**
+                          * Identifies the types of resource or data type elements to which the
+                          * extension can be applied. Only relevant when kind = 'resource' and
+                          * type = 'Extension'.
+                          * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.context
+                          */
+                         export declare interface StructureDefinitionContext {
+                             /** Unique id for inter-element referencing (0..1) */
+                             id?: FhirString;
+                             /** Additional content defined by implementations (0..*) */
+                             extension?: Extension[];
+                             /** Extensions that cannot be ignored even if unrecognized (0..*) */
+                             modifierExtension?: Extension[];
+                             /** fhirpath | element | extension (1..1) */
+                             type: ExtensionContextType;
+                             /** Where the extension can be used in instances (1..1) */
+                             expression: FhirString;
+                         }
+
+                         /**
+                          * A differential view of the structure, containing only the constraints
+                          * that differ from the base definition. This is the compact authoring
+                          * format used when creating profiles.
+                          * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.differential
+                          */
+                         export declare interface StructureDefinitionDifferential {
+                             /** Unique id for inter-element referencing (0..1) */
+                             id?: FhirString;
+                             /** Additional content defined by implementations (0..*) */
+                             extension?: Extension[];
+                             /** Extensions that cannot be ignored even if unrecognized (0..*) */
+                             modifierExtension?: Extension[];
+                             /**
+                              * Definition of elements in the resource (if no StructureDefinition) (1..*)
+                              *
+                              * The differential contains only the constraints that differ from the base
+                              * profile. It MUST NOT be used directly for semantic interpretation — it
+                              * must first be expanded into a snapshot via snapshot generation.
+                              */
+                             element: ElementDefinition[];
+                         }
+
+                         /**
+                          * The kind of structure being defined by a StructureDefinition.
+                          * @see https://hl7.org/fhir/R4/valueset-structure-definition-kind.html
+                          */
+                         export declare type StructureDefinitionKind = 'primitive-type' | 'complex-type' | 'resource' | 'logical';
+
+                         /**
+                          * Pluggable strategy for loading StructureDefinitions from an external source.
+                          *
+                          * Implementations include:
+                          * - `MemoryLoader` — loads from an in-memory map (for testing / preloaded data)
+                          * - `FileSystemLoader` — loads from local JSON files
+                          * - `CompositeLoader` — chains multiple loaders (fallback pattern)
+                          *
+                          * Conceptually equivalent to HAPI's `IValidationSupport` implementations.
+                          */
+                         export declare interface StructureDefinitionLoader {
+                             /**
+                              * Attempt to load a StructureDefinition by canonical URL.
+                              *
+                              * @param url - Canonical URL (without `|version` — version is stripped
+                              *              by the caller before delegation)
+                              * @returns The loaded StructureDefinition, or `null` if this loader
+                              *          cannot resolve the URL (allows fallback to next loader)
+                              * @throws {@link LoaderError} on I/O or parse failures
+                                  */
+                              load(url: string): Promise<StructureDefinition | null>;
+                              /**
+                               * Quick check whether this loader is likely able to resolve the URL.
+                               *
+                               * This is a hint — returning `true` does not guarantee `load()` will
+                               * succeed. Returning `false` allows the composite loader to skip this
+                               * source entirely.
+                               *
+                               * @param url - Canonical URL to check
+                               */
+                              canLoad(url: string): boolean;
+                              /**
+                               * Human-readable identifier for the loader source.
+                               *
+                               * Used in error messages and diagnostics.
+                               *
+                               * @returns Source type label (e.g., `'memory'`, `'filesystem'`, `'http'`)
+                               */
+                              getSourceType(): string;
+                             }
+
+                             /**
+                              * A mapping to an external specification that the structure conforms to.
+                              * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.mapping
+                              */
+                             export declare interface StructureDefinitionMapping {
+                                 /** Unique id for inter-element referencing (0..1) */
+                                 id?: FhirString;
+                                 /** Additional content defined by implementations (0..*) */
+                                 extension?: Extension[];
+                                 /** Extensions that cannot be ignored even if unrecognized (0..*) */
+                                 modifierExtension?: Extension[];
+                                 /** Internal id when this mapping is used (1..1) */
+                                 identity: FhirId;
+                                 /** Identifies what this mapping refers to (0..1) */
+                                 uri?: FhirUri;
+                                 /** Names what this mapping refers to (0..1) */
+                                 name?: FhirString;
+                                 /** Versions, issues, scope limitations, etc. (0..1) */
+                                 comment?: FhirString;
+                             }
+
+                             /**
+                              * In-memory registry for StructureDefinitions.
+                              *
+                              * Storage strategy:
+                              * - **Primary map**: keyed by `url|version` (exact match)
+                              * - **Latest map**: keyed by bare `url` → points to the most recently
+                              *   registered version (for unversioned lookups)
+                              *
+                              * When a lookup uses a bare URL (no `|version`), the latest map is consulted.
+                              * When a lookup uses `url|version`, the primary map is used for exact match.
+                              */
+                             declare class StructureDefinitionRegistry {
+                                 /** Primary storage: `url|version` → StructureDefinition */
+                                 private readonly _entries;
+                                 /** Latest-version index: bare `url` → `url|version` key in _entries */
+                                 private readonly _latestIndex;
+                                 /** Statistics counters */
+                                 private _queryCount;
+                                 private _hitCount;
+                                 /**
+                                  * Register a StructureDefinition.
+                                  *
+                                  * Validates that the definition has a `url` field. If a definition with
+                                  * the same URL (and version) already exists, it is silently replaced.
+                                  *
+                                  * @param sd - The StructureDefinition to register
+                                  * @throws {@link InvalidStructureDefinitionError} if `sd.url` is missing
+                                      */
+                                  register(sd: StructureDefinition): void;
+                                  /**
+                                   * Remove a StructureDefinition by canonical URL.
+                                   *
+                                   * @param urlWithVersion - Canonical URL (with optional `|version`)
+                                   * @returns `true` if a definition was removed, `false` if not found
+                                   */
+                                  delete(urlWithVersion: string): boolean;
+                                  /**
+                                   * Remove all entries and reset statistics.
+                                   */
+                                  clear(): void;
+                                  /**
+                                   * Retrieve a StructureDefinition by canonical URL.
+                                   *
+                                   * - If `urlWithVersion` contains `|version`, performs exact match.
+                                   * - If no version, returns the latest registered version.
+                                   *
+                                   * @param urlWithVersion - Canonical URL (with optional `|version`)
+                                   * @returns The StructureDefinition, or `undefined` if not found
+                                   */
+                                  get(urlWithVersion: string): StructureDefinition | undefined;
+                                  /**
+                                   * Check whether a StructureDefinition is registered.
+                                   *
+                                   * @param urlWithVersion - Canonical URL (with optional `|version`)
+                                   */
+                                  has(urlWithVersion: string): boolean;
+                                  /**
+                                   * Total number of registered StructureDefinitions.
+                                   */
+                                  get size(): number;
+                                  /**
+                                   * Return all registered canonical URLs (including version suffixes).
+                                   */
+                                  getAllKeys(): string[];
+                                  /**
+                                   * Return all registered bare URLs (without version suffixes).
+                                   */
+                                  getAllUrls(): string[];
+                                  /**
+                                   * Total number of `get()` calls.
+                                   */
+                                  get queryCount(): number;
+                                  /**
+                                   * Number of `get()` calls that returned a result (cache hits).
+                                   */
+                                  get hitCount(): number;
+                                  /**
+                                   * Number of `get()` calls that returned `undefined` (cache misses).
+                                   */
+                                  get missCount(): number;
+                                  /**
+                                   * Cache hit ratio (0–1). Returns 0 if no queries have been made.
+                                   */
+                                  get hitRate(): number;
+                                 }
+
+                                 /**
+                                  * A snapshot view of the structure, containing all element definitions
+                                  * with their complete constraint information resolved from the
+                                  * inheritance chain.
+                                  * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.snapshot
+                                  */
+                                 export declare interface StructureDefinitionSnapshot {
+                                     /** Unique id for inter-element referencing (0..1) */
+                                     id?: FhirString;
+                                     /** Additional content defined by implementations (0..*) */
+                                     extension?: Extension[];
+                                     /** Extensions that cannot be ignored even if unrecognized (0..*) */
+                                     modifierExtension?: Extension[];
+                                     /**
+                                      * Definition of elements in the resource (if no StructureDefinition) (1..*)
+                                      *
+                                      * The snapshot contains the complete, flattened list of all ElementDefinition
+                                      * entries with all constraints from the inheritance chain fully resolved.
+                                      * This is the "semantic truth" used for validation and interpretation.
+                                      */
+                                     element: ElementDefinition[];
+                                 }
+
+                                 /**
+                                  * A resolved type constraint on a canonical element.
+                                  *
+                                  * Corresponds to a simplified, pre-validated version of
+                                  * `ElementDefinition.type` from the FHIR spec.
+                                  */
+                                 export declare interface TypeConstraint {
+                                     /**
+                                      * The data type or resource name (e.g., `string`, `Reference`, `Patient`).
+                                      *
+                                      * Unlike `ElementDefinitionType.code` (which is a URI), this is the
+                                      * resolved short name used for runtime dispatch.
+                                      */
+                                     code: string;
+                                     /**
+                                      * Profiles that the type must conform to (resolved canonical URLs).
+                                      *
+                                      * Corresponds to `ElementDefinitionType.profile`.
+                                      */
+                                     profiles?: string[];
+                                     /**
+                                      * For Reference/canonical types, profiles that the target must conform to.
+                                      *
+                                      * Corresponds to `ElementDefinitionType.targetProfile`.
+                                      */
+                                     targetProfiles?: string[];
+                                 }
+
+                                 /**
+                                  * Whether a StructureDefinition is a specialization or a constraint.
+                                  * - `specialization`: defines a new type (e.g., Patient specializes DomainResource)
+                                  * - `constraint`: constrains an existing type (e.g., USCorePatient constrains Patient)
+                                  * @see https://hl7.org/fhir/R4/valueset-type-derivation-rule.html
+                                  */
+                                 export declare type TypeDerivationRule = 'specialization' | 'constraint';
+
+                                 /**
+                                  * Specifies clinical/business/etc. context in which a conformance
+                                  * artifact is applicable.
+                                  * @see https://hl7.org/fhir/R4/metadatatypes.html#UsageContext
+                                  */
+                                 export declare interface UsageContext extends Element {
+                                     /** Type of context being specified (1..1) */
+                                     code: Coding;
+                                     /**
+                                      * Value that defines the context.
+                                      * Choice type [x]: valueCodeableConcept | valueQuantity | valueRange | valueReference
+                                      * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
+                                      */
+                                     value?: unknown;
+                                 }
+
+                                 export { }

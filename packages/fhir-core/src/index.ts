@@ -1,9 +1,9 @@
 /**
  * `@medxai/fhir-core` — Public API
  *
- * Re-exports all public types from the model and parser layers.
- * Additional modules (context, profile, validator) will be
- * added here as they are implemented in later phases.
+ * Re-exports all public types from the model, parser, and context layers.
+ * Additional modules (profile, validator) will be added here as they
+ * are implemented in later phases.
  *
  * @packageDocumentation
  */
@@ -115,3 +115,34 @@ export type {
   SlicingDefinition,
   SlicingDiscriminatorDef,
 } from './model/index.js';
+
+// ─── Context module ─────────────────────────────────────────────────────────
+export type {
+  FhirContext,
+  FhirContextOptions,
+  StructureDefinitionLoader,
+  LoaderOptions,
+  ContextStatistics,
+} from './context/index.js';
+
+export {
+  FhirContextImpl,
+  createEmptyStatistics,
+  MemoryLoader,
+  FileSystemLoader,
+  CompositeLoader,
+  ContextError,
+  ResourceNotFoundError,
+  CircularDependencyError,
+  LoaderError,
+  InvalidStructureDefinitionError,
+  BASE_RESOURCES,
+  PRIMITIVE_TYPES,
+  COMPLEX_TYPES,
+  CORE_RESOURCES,
+  ALL_CORE_DEFINITIONS,
+  loadAllCoreDefinitions,
+  loadCoreDefinition,
+  loadCoreDefinitionSync,
+  getCoreDefinitionsDir,
+} from './context/index.js';
