@@ -89,223 +89,131 @@ StructureDefinition (with differential only)
 
 ---
 
-## Task 4.1: 核心接口与错误类型 (Day 1, ~0.5 day)
+## Task 4.1: 核心接口与错误类型 (Day 1, ~0.5 day) ✅ Completed
 
-### 文件: `types.ts` + `errors.ts`
+### 文件: `types.ts` + `errors.ts` + `index.ts`
 
 定义 fhir-profile 模块的公共接口和内部类型。
 
-### 核心接口
+### Implementation Notes
 
-```typescript
-/** Snapshot generation options. */
-export interface SnapshotGeneratorOptions {
-  /** Whether to throw on first error or collect all. Default: false. */
-  readonly throwOnError?: boolean;
-  /** Maximum recursion depth. Default: 50. */
-  readonly maxRecursionDepth?: number;
-  /** Whether to also produce CanonicalProfile. Default: false. */
-  readonly generateCanonical?: boolean;
-}
+**已创建文件：**
 
-/** Result of snapshot generation. */
-export interface SnapshotResult {
-  readonly structureDefinition: StructureDefinition;
-  readonly canonical?: CanonicalProfile;
-  readonly issues: SnapshotIssue[];
-  readonly success: boolean;
-}
+1. **`profile/types.ts`** (~260 lines) — 核心接口与类型
+   - `SnapshotGeneratorOptions` — 生成配置（throwOnError, maxRecursionDepth, generateCanonical）
+   - `SnapshotResult` — 生成结果（SD + issues + success flag + optional CanonicalProfile）
+   - `SnapshotIssue` + `SnapshotIssueCode` — 11 种 issue code 覆盖所有已知场景
+   - `DiffElementTracker` — HAPI consumed marker 模式
+   - `TraversalScope` — cursor-based 遍历范围（start/end inclusive）
+   - `createSnapshotIssue()` — issue 工厂函数
+   - `createDiffTracker()` — tracker 工厂函数
 
-/** An issue encountered during snapshot generation. */
-export interface SnapshotIssue {
-  readonly severity: "error" | "warning" | "information";
-  readonly code: SnapshotIssueCode;
-  readonly message: string;
-  readonly path?: string;
-  readonly details?: string;
-}
+2. **`profile/errors.ts`** (~210 lines) — 错误层级
+   - `ProfileError` — base class（含 `Object.setPrototypeOf` prototype chain 修复）
+   - `SnapshotCircularDependencyError` — 循环依赖（url + chain）
+   - `BaseNotFoundError` — base SD 未找到（derivedUrl + baseUrl + cause）
+   - `ConstraintViolationError` — 约束违规（violationType + path）
+   - `UnconsumedDifferentialError` — 未消费 diff（unconsumedPaths，截断显示前 5 个）
 
-export type SnapshotIssueCode =
-  | "CIRCULAR_DEPENDENCY"
-  | "BASE_NOT_FOUND"
-  | "BASE_MISSING_SNAPSHOT"
-  | "DIFFERENTIAL_NOT_CONSUMED"
-  | "CARDINALITY_VIOLATION"
-  | "TYPE_INCOMPATIBLE"
-  | "BINDING_VIOLATION"
-  | "SLICING_ERROR"
-  | "PATH_NOT_FOUND"
-  | "INVALID_CONSTRAINT"
-  | "INTERNAL_ERROR";
+3. **`profile/index.ts`** (~35 lines) — Barrel exports
 
-/** Internal: tracks a differential element during processing (HAPI marker pattern). */
-export interface DiffElementTracker {
-  readonly element: ElementDefinition;
-  consumed: boolean;
-}
+**设计决策：**
 
-/** Internal: cursor-based scope for base-driven traversal. */
-export interface TraversalScope {
-  readonly elements: readonly ElementDefinition[];
-  readonly start: number;
-  readonly end: number;
-}
-```
-
-### 错误类型 (`errors.ts`)
-
-```typescript
-export class ProfileError extends Error { ... }
-export class SnapshotCircularDependencyError extends ProfileError { ... }
-export class BaseNotFoundError extends ProfileError { ... }
-export class ConstraintViolationError extends ProfileError { ... }
-export class UnconsumedDifferentialError extends ProfileError { ... }
-```
+- 错误类风格与 `context/errors.ts` 保持一致（`Object.setPrototypeOf`、`override readonly name`、`ErrorOptions` cause 传递）
+- `SnapshotResult.issues` 使用 `readonly SnapshotIssue[]` 而非 mutable array
+- `createSnapshotIssue` 工厂函数避免 optional 字段的 undefined 赋值
 
 ### 验收标准
 
-- [ ] 所有公共接口定义完整
-- [ ] 错误类型覆盖所有已知失败场景
-- [ ] `DiffElementTracker` 实现 HAPI 的 consumed marker 模式
-- [ ] `TraversalScope` 支持 cursor-based 遍历
-- [ ] TypeScript 编译通过
+- [x] 所有公共接口定义完整（6 types + 2 helper functions）
+- [x] 错误类型覆盖所有已知失败场景（4 error classes）
+- [x] `DiffElementTracker` 实现 HAPI 的 consumed marker 模式
+- [x] `TraversalScope` 支持 cursor-based 遍历
+- [x] TypeScript 编译通过（`tsc --noEmit` 零错误）
+- [x] 750/750 现有测试无回归
 
 ---
 
-## Task 4.2: 路径工具函数 (Day 1-2, ~1.5 days)
+## Task 4.2: 路径工具函数 (Day 1-2, ~1.5 days) ✅ Completed
 
 ### 文件: `path-utils.ts`
 
 路径匹配是 snapshot 生成的基础。HAPI 的 `processPaths()` 大量依赖路径操作。
 
-### 核心函数
+### Implementation Notes
 
-```typescript
-// --- 基础路径操作 ---
-export function pathMatches(basePath: string, diffPath: string): boolean;
-export function isDirectChild(parentPath: string, childPath: string): boolean;
-export function isDescendant(
-  ancestorPath: string,
-  descendantPath: string,
-): boolean;
-export function pathDepth(path: string): number;
-export function parentPath(path: string): string | undefined;
-export function tailSegment(path: string): string;
+**已创建文件：**
 
-// --- Choice type 路径 ---
-export function isChoiceTypePath(path: string): boolean;
-export function matchesChoiceType(
-  choicePath: string,
-  concretePath: string,
-): boolean;
-export function extractChoiceTypeName(
-  choicePath: string,
-  concretePath: string,
-): string | undefined;
+1. **`profile/path-utils.ts`** (~290 lines, 5 sections) — 15 个导出函数
+   - Section 1: 基础路径操作 — `pathMatches`, `isDirectChild`, `isDescendant`, `pathDepth`, `parentPath`, `tailSegment`
+   - Section 2: Choice type 路径 — `isChoiceTypePath`, `matchesChoiceType`, `extractChoiceTypeName`
+   - Section 3: Slice 路径 — `hasSliceName`, `extractSliceName`
+   - Section 4: Scope 计算 — `getChildScope`, `getDiffMatches`, `hasInnerDiffMatches`
+   - Section 5: 路径重写 — `rewritePath`
 
-// --- Slice 路径 ---
-export function hasSliceName(elementId: string): boolean;
-export function extractSliceName(elementId: string): string | undefined;
+2. **`profile/__tests__/path-utils.test.ts`** (~450 lines, 15 describe blocks, **75 tests**)
 
-// --- Scope 计算（processPaths 核心依赖）---
-/** 计算 base snapshot 中某元素的子元素范围 [start, end] inclusive */
-export function getChildScope(
-  elements: readonly ElementDefinition[],
-  parentIndex: number,
-): TraversalScope | undefined;
+**设计决策：**
 
-/** 在 differential 中查找匹配 basePath 的元素（对应 HAPI getDiffMatches） */
-export function getDiffMatches(
-  differential: readonly DiffElementTracker[],
-  basePath: string,
-  diffStart: number,
-  diffEnd: number,
-): DiffElementTracker[];
-
-/** 检查 differential 中是否有 basePath 的后代元素（对应 HAPI hasInnerDiffMatches） */
-export function hasInnerDiffMatches(
-  differential: readonly DiffElementTracker[],
-  basePath: string,
-  diffStart: number,
-  diffEnd: number,
-): boolean;
-
-/** 路径重写：datatype 内部路径 → 目标路径 */
-export function rewritePath(
-  sourcePath: string,
-  sourcePrefix: string,
-  targetPrefix: string,
-): string;
-```
+- `pathDepth` 使用 charCode 循环而非 `split('.')` 以避免数组分配
+- `matchesChoiceType` 通过 charCode 范围 65-90 检测大写字母（type name 首字母）
+- `getDiffMatches` 同时支持精确匹配和 choice type 匹配（对应 HAPI `getDiffMatches`）
+- `hasInnerDiffMatches` 支持普通后代和 choice type 后代（如 `value[x]` → `valueQuantity.unit`）
+- `getChildScope` 返回 inclusive `[start, end]` 范围，与 `TraversalScope` 一致
 
 ### 验收标准
 
-- [ ] 所有路径工具函数实现并通过单元测试
-- [ ] 精确匹配、前缀匹配、choice type 匹配全覆盖
-- [ ] Slice 路径（`:sliceName`）正确处理
-- [ ] `getDiffMatches` 行为与 HAPI 语义一致
-- [ ] `hasInnerDiffMatches` 正确检测后代 diff 元素
-- [ ] `getChildScope` 正确计算子元素范围
-- [ ] 路径重写（datatype 展开）正确
-- [ ] 测试覆盖 ≥30 个 case
+- [x] 所有路径工具函数实现并通过单元测试（15 个函数）
+- [x] 精确匹配、前缀匹配、choice type 匹配全覆盖
+- [x] Slice 路径（`:sliceName`）正确处理
+- [x] `getDiffMatches` 行为与 HAPI 语义一致
+- [x] `hasInnerDiffMatches` 正确检测后代 diff 元素
+- [x] `getChildScope` 正确计算子元素范围
+- [x] 路径重写（datatype 展开）正确
+- [x] 测试覆盖 **75 个 case**（远超 ≥30 目标）
+- [x] 825/825 测试通过（750 原有 + 75 新增），零回归
 
 ---
 
-## Task 4.3: 约束合并引擎 (Day 2-4, ~3 days) ⭐
+## Task 4.3: 约束合并引擎 (Day 2-4, ~3 days) ⭐ ✅ Completed
 
 ### 文件: `constraint-merger.ts`
 
 对应 HAPI 的 `updateFromDefinition()` + `updateFromBase()`。
 字段级别的合并逻辑，是最精细的部分。
 
-### 核心函数
+### Implementation Notes
 
-```typescript
-/** 将 differential 约束合并到 snapshot 元素（对应 HAPI updateFromDefinition） */
-export function mergeConstraints(
-  dest: ElementDefinition,
-  source: ElementDefinition,
-  issues: SnapshotIssue[],
-): ElementDefinition;
+**已创建文件：**
 
-/** 设置元素的 base 追溯信息（对应 HAPI updateFromBase） */
-export function setBaseTraceability(
-  dest: ElementDefinition,
-  base: ElementDefinition,
-): void;
+1. **`profile/constraint-merger.ts`** (~370 lines, 8 sections) — 7 个导出函数 + 3 个内部 helper
+   - Section 1: `mergeConstraints` — 主入口，处理所有字段类别
+   - Section 2: `setBaseTraceability` — 设置 `element.base`（ancestry preservation）
+   - Section 3: `mergeCardinality` — min/max 验证 + slice exception
+   - Section 4: `mergeTypes` + `isTypeCompatible` — 类型兼容性检查（Extension, Element, \*, Resource, uri/string）
+   - Section 5: `mergeBinding` — binding strength 验证（REQUIRED relaxation guard）
+   - Section 6: `mergeConstraintList` — constraint 追加 + key 去重
+   - Section 7: `mergeStringArray`, `mergeExampleList`, `mergeMappingList` — 并集追加
+   - Section 8: `isLargerMax` — max 值比较（`"*"` = 无穷大）
 
-/** 合并 cardinality */
-export function mergeCardinality(
-  dest: ElementDefinition,
-  source: ElementDefinition,
-  issues: SnapshotIssue[],
-): void;
+2. **`profile/__tests__/constraint-merger.test.ts`** (~670 lines, 12 describe blocks, **65 tests**)
+   - Unit tests: isLargerMax(8), mergeCardinality(6), mergeTypes(7), mergeBinding(5), mergeConstraintList(5), setBaseTraceability(3), mergeConstraints integration(6)
+   - Fixture tests: 01-cardinality(5), 02-types(5), 03-binding(5), 04-constraints(5), 05-full-merge(5)
 
-/** 合并 type 约束 */
-export function mergeTypes(
-  baseTypes: readonly ElementDefinitionType[] | undefined,
-  diffTypes: readonly ElementDefinitionType[] | undefined,
-  issues: SnapshotIssue[],
-  path: string,
-): ElementDefinitionType[] | undefined;
+3. **25 JSON test fixtures** across 5 categories:
+   - `01-cardinality/` — valid-tighten-min, valid-tighten-max, invalid-loosen-min, invalid-widen-max, slice-min-exception
+   - `02-types/` — valid-subset, valid-extension-wildcard, valid-resource-compat, invalid-incompatible, valid-uri-string-compat
+   - `03-binding/` — valid-tighten-strength, invalid-relax-required, valid-same-required, valid-add-binding, valid-tighten-example-to-preferred
+   - `04-constraints/` — append-new-constraint, dedup-by-key, multiple-append, diff-only, no-diff-constraints
+   - `05-full-merge/` — documentation-overwrite, value-constraints-overwrite, combined-cardinality-type-binding, multiple-violations, alias-example-mapping-union
 
-/** 合并 binding 约束 */
-export function mergeBinding(
-  baseBinding: ElementDefinitionBinding | undefined,
-  diffBinding: ElementDefinitionBinding | undefined,
-  issues: SnapshotIssue[],
-  path: string,
-): ElementDefinitionBinding | undefined;
+**设计决策：**
 
-/** 合并 constraint（invariant）列表 */
-export function mergeConstraintList(
-  baseConstraints: readonly ElementDefinitionConstraint[] | undefined,
-  diffConstraints: readonly ElementDefinitionConstraint[] | undefined,
-): ElementDefinitionConstraint[];
-
-/** 判断 max 值大小关系（'*' = 无穷大） */
-export function isLargerMax(a: string, b: string): boolean;
-```
+- `mergeConstraints` 采用 HAPI "apply pattern"：if diff has field → compare → validate → apply
+- Branded type 处理：实现文件使用 `as FhirString` / `as FhirUnsignedInt` cast 处理默认值；测试文件使用 `as unknown as ElementDefinition` 双重 cast
+- `mergeCardinality` 的 slice exception：通过检查 `source.sliceName` 实现，与 HAPI `!derived.hasSliceName()` 语义一致
+- `isTypeCompatible` 实现 6 种特殊兼容规则（Extension, Element, \*, Resource/DomainResource, uri/string）
+- `mergeConstraintList` 按 key 去重时替换而非跳过（derived constraint 优先）
 
 ### 合并规则详表（来自 HAPI `updateFromDefinition` 研究）
 
@@ -325,13 +233,14 @@ export function isLargerMax(a: string, b: string): boolean;
 
 ### 验收标准
 
-- [ ] `mergeConstraints` 正确处理所有字段类别（覆盖/验证后覆盖/追加）
-- [ ] `mergeCardinality` 检测 min/max 违规并记录 issue
-- [ ] `mergeTypes` 实现类型兼容性检查（含特殊兼容规则）
-- [ ] `mergeBinding` 实现 binding strength 比较
-- [ ] `mergeConstraintList` 正确追加并按 key 去重
-- [ ] `setBaseTraceability` 正确设置 `element.base`
-- [ ] 测试覆盖 ≥40 个 case
+- [x] `mergeConstraints` 正确处理所有字段类别（覆盖/验证后覆盖/追加）
+- [x] `mergeCardinality` 检测 min/max 违规并记录 issue
+- [x] `mergeTypes` 实现类型兼容性检查（含 6 种特殊兼容规则）
+- [x] `mergeBinding` 实现 binding strength 比较（REQUIRED relaxation guard）
+- [x] `mergeConstraintList` 正确追加并按 key 去重
+- [x] `setBaseTraceability` 正确设置 `element.base`（含 ancestry preservation）
+- [x] 测试覆盖 **65 个 case**（远超 ≥40 目标）+ 25 个 JSON fixtures
+- [x] 890/890 测试通过（750 原有 + 75 path-utils + 65 constraint-merger），零回归
 
 ---
 
