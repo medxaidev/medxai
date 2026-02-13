@@ -244,130 +244,68 @@ StructureDefinition (with differential only)
 
 ---
 
-## Task 4.4: 核心合并循环 — ElementMerger (Day 4-7, ~4 days) ⭐⭐
+## Task 4.4: 核心合并循环 — ElementMerger (Day 4-7, ~4 days) ⭐⭐ ✅ Completed
 
 ### 文件: `element-merger.ts`
 
 对应 HAPI 的 `processPaths()`。这是 snapshot 生成的**核心引擎**——base-driven 遍历循环。
 这是整个 Phase 4 中最复杂的单个文件。
 
-### 核心概念（来自 HAPI-processPaths-Study-Deliverable）
+### Implementation Notes
 
-- **Base-driven**: 遍历 base snapshot 的每个元素，在 differential 中查找匹配项
-- **Cursor-based scoping**: 使用 `baseCursor/baseLimit` 和 `diffCursor/diffLimit` 控制遍历范围
-- **递归**: 子元素处理、datatype 展开、contentReference 重定向均通过递归实现
-- **四种分支**: 无匹配 / 单匹配 / 多匹配-slicing / type-slicing
+**已创建文件：**
 
-### 核心函数
+1. **`profile/element-merger.ts`** (~870 lines, 11 sections) — 3 个导出函数/接口 + 8 个内部 helper
+   - Section 1: `MergeContext` interface + `createMergeContext` factory
+   - Section 2: `cloneElement` — deep clone via structuredClone/JSON fallback
+   - Section 3: `processPaths` — core base-driven merge loop (4 branches)
+   - Section 4: `getDiffMatchesForPath`, `hasDiffSlicing`, `diffsConstrainTypes`, `getInnerDiffScope`
+   - Section 5: `skipChildren`, `copyBaseChildren` — base traversal helpers
+   - Section 6: `narrowChoiceType` — choice type `[x]` narrowing
+   - Section 7: `expandDatatype` — datatype expansion via cache lookup + recursive processPaths
+   - Section 8: `processTypeSlicing` — Branch C: synthetic slicing root + per-type recursion
+   - Section 9: `processExplicitSlicing` — Branch D: slicing root + per-slice recursion
+   - Section 10: `processBaseSliced` — base already sliced: align by sliceName, CLOSED guard
+   - Section 11: `mergeSnapshot` — high-level convenience entry point
 
-```typescript
-/**
- * Base-driven merge loop（对应 HAPI processPaths）。
- *
- * 伪代码（来自研究交付物）：
- * while baseCursor <= baseLimit:
- *   currentBase = base[baseCursor]
- *   cpath = currentBase.path
- *   diffMatches = getDiffMatches(diff, cpath, diffCursor..diffLimit)
- *
- *   if currentBase NOT sliced:
- *     if diffMatches empty:
- *       copy base as-is; check for inner diff matches → recurse
- *     else if single non-slicing match:
- *       merge(base, diff); recurse into children/datatype
- *     else if diffsConstrainTypes:
- *       setup type slicing; recurse per type-slice
- *     else:
- *       setup slicing; recurse per slice
- *
- *   else (currentBase sliced):
- *     align slices by sliceName; process matching/copy non-matching
- */
-export function processPaths(
-  context: MergeContext,
-  result: ElementDefinition[],
-  baseScope: TraversalScope,
-  diffTrackers: readonly DiffElementTracker[],
-  diffStart: number,
-  diffEnd: number,
-  contextPathSrc: string,
-  contextPathDst: string,
-): void;
+2. **`profile/__tests__/element-merger.test.ts`** (~590 lines, 14 describe blocks, **54 tests**)
+   - Unit tests: mergeSnapshot(5), Branch A(3), Branch B(6), Choice type(4), Datatype expansion(5), Explicit slicing(2), Type slicing(1), Recursion depth(1), Diff consumed(2)
+   - Fixture tests: 06-inherit-base(5), 07-single-merge(5), 08-datatype-expansion(5), 09-choice-type(5), 10-slicing(5)
 
-/**
- * Merge context — 传递给 processPaths 的共享状态。
- */
-export interface MergeContext {
-  /** FhirContext for loading datatype definitions */
-  readonly fhirContext: FhirContext;
-  /** Issue collector */
-  readonly issues: SnapshotIssue[];
-  /** URL of the profile being generated (for path rewriting) */
-  readonly profileUrl: string;
-  /** Recursion depth guard */
-  depth: number;
-  readonly maxDepth: number;
-}
-```
+3. **25 JSON test fixtures** across 5 categories:
+   - `06-inherit-base/` — simple-inherit, inherit-with-children, partial-diff, base-traceability, empty-diff
+   - `07-single-merge/` — tighten-cardinality, overwrite-documentation, set-must-support, multiple-elements, set-fixed-value
+   - `08-datatype-expansion/` — identifier-system, humanname-family, no-type-error, missing-datatype, path-rewriting
+   - `09-choice-type/` — narrow-to-quantity, narrow-to-string, keep-choice-path, narrow-to-codeable-concept, single-type-no-narrow
+   - `10-slicing/` — explicit-slice-two, single-slice, type-slicing-choice, diff-consumed-check, unconsumed-diff-warning
 
-### 四种分支详解
+**设计决策：**
 
-#### Branch A: 无 diff 匹配（继承 base as-is）
+- `MergeContext.datatypeCache` 使用 `Map<string, ElementDefinition[]>` 实现同步 datatype 查找，避免 async 复杂度
+- `processPaths` 使用 cursor-based 遍历（`baseCursor/baseLimit`），与 HAPI 语义一致
+- Branch A 中 base children 的处理：无 inner diff 时 copy as-is，有 inner diff 时递归或 datatype expansion
+- Branch B 中 `skipChildren` 仅在已处理 children 后调用，避免跳过未处理的同级元素
+- `diffsConstrainTypes` 检测：choice type concrete paths OR 不同 type constraints
+- `narrowChoiceType`：从 `value[x]` + `valueString` 推导出 type 为 `string`，过滤 outcome.type
+- `expandDatatype`：从 `datatypeCache` 查找 datatype snapshot，路径重写 `Identifier.system` → `Patient.identifier.system`
+- `processBaseSliced`：按 sliceName 对齐 base/diff slices，CLOSED slicing 禁止新增 slice
 
-```
-currentBase → copy to result
-if hasInnerDiffMatches(cpath):
-  if base has children → recurse into base children scope
-  else → load datatype SD, recurse into datatype snapshot
-```
+**关键 bug 修复：**
 
-#### Branch B: 单个 diff 匹配（最常见路径）
-
-```
-outcome = clone(currentBase)
-setBaseTraceability(outcome, currentBase)
-mergeConstraints(outcome, diffMatch)
-mark diffMatch as consumed
-add outcome to result
-if has children or inner diff → recurse
-```
-
-#### Branch C: Type slicing（`diffsConstrainTypes`）
-
-```
-diff 中多个匹配项按类型约束不同的 type
-→ 插入合成的 slicing root
-→ 对每个 type-slice 递归 processPaths
-```
-
-#### Branch D: 显式 slicing
-
-```
-diff 中多个匹配项有 sliceName
-→ 插入 slicing root（从 diff 或合成）
-→ 对每个 slice 递归 processPaths（同一 base 范围）
-```
-
-### Datatype 展开（关键递归场景）
-
-当 diff 约束深入到复杂类型的子元素时（如 `Patient.identifier.system`），
-但 base snapshot 中 `Patient.identifier` 没有子元素：
-
-1. 获取 `Patient.identifier` 的类型（`Identifier`）
-2. 通过 `FhirContext` 加载 `Identifier` 的 StructureDefinition
-3. 使用 `Identifier` 的 snapshot 作为新的 base，递归 `processPaths`
-4. 路径重写：`Identifier.system` → `Patient.identifier.system`
+- 初始实现中 `skipChildren` 在 Branch A 无条件调用，导致根元素后所有子元素被跳过
+- 修复：改为 `getChildScope` + `bc++` 组合，仅在递归/copy 后跳过已处理的 children
 
 ### 验收标准
 
-- [ ] Base-driven 遍历正确处理所有四种分支
-- [ ] 无 diff 匹配时正确继承 base 元素
-- [ ] 单匹配时正确调用 `mergeConstraints`
-- [ ] Datatype 展开（递归进入复杂类型 snapshot）正确
-- [ ] Choice type `[x]` 路径匹配和类型缩窄正确
-- [ ] 递归深度保护生效
-- [ ] Diff element consumed 标记正确设置
-- [ ] 测试覆盖 ≥50 个 case（含 datatype 展开、choice type、多级嵌套）
+- [x] Base-driven 遍历正确处理所有四种分支
+- [x] 无 diff 匹配时正确继承 base 元素（含 children copy）
+- [x] 单匹配时正确调用 `mergeConstraints`（含 children 递归）
+- [x] Datatype 展开（递归进入复杂类型 snapshot）正确（含路径重写）
+- [x] Choice type `[x]` 路径匹配和类型缩窄正确
+- [x] 递归深度保护生效（maxDepth guard + INTERNAL_ERROR issue）
+- [x] Diff element consumed 标记正确设置（unconsumed → DIFFERENTIAL_NOT_CONSUMED warning）
+- [x] 测试覆盖 **54 个 case** + 25 个 JSON fixtures
+- [x] 944/944 测试通过（890 原有 + 54 element-merger），零回归
 
 ---
 
