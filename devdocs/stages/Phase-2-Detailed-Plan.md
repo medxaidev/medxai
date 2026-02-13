@@ -268,24 +268,28 @@ parseFhirJson(json: string)
  *
  * @param obj - 原始 JSON 对象
  * @param path - 当前 JSON path（用于错误报告）
- * @param knownProperties - 该类型已知的属性名集合
+ * @param schema - 属性描述符 Map（PropertySchema）
+ * @param choiceFieldBases - choice type 字段的基础名称数组
  */
-function parseComplexType(
-  obj: Record<string, unknown>,
+export function parseComplexObject(
+  obj: JsonObject,
   path: string,
-  knownProperties: ReadonlySet<string>,
-): { result: Record<string, unknown>; issues: ParseIssue[] };
+  schema: PropertySchema,
+  choiceFieldBases: readonly string[] = [],
+): ComplexParseResult;
 ```
+
+**注**: 实际实现使用 `PropertySchema` (Map<string, PropertyDescriptor>) 而非简单的属性名集合，以支持更丰富的元数据（isPrimitive, isArray, parseElement 等）。
 
 ### 关键实现细节
 
-1. **属性遍历策略**: 遍历 JSON 对象的所有 key，分类处理：
-   - 以 `_` 开头 → 原始类型扩展，与对应值属性合并
-   - 匹配已知 choice type 前缀 → 委托给 choice-type-parser
-   - 匹配已知属性名 → 直接映射
-   - 其他 → 记录 warning（UNEXPECTED_PROPERTY）
+1. **四遍处理策略** (4-pass):
+   - **Pass 1**: 处理已知属性（schema 中定义的）
+   - **Pass 2**: 收集 `_element` 伴随属性（仅针对 primitive 类型）
+   - **Pass 3**: 识别 choice type 属性（匹配 choiceFieldBases）
+   - **Pass 4**: 报告未消费的属性为 UNEXPECTED_PROPERTY warning
 
-2. **递归解析**: 复合类型属性递归调用 `parseComplexType`
+2. **递归解析**: 复合类型属性通过 `descriptor.parseElement()` 递归调用
 
 3. **数组处理**:
    - 检查 FHIR 规范中该属性是否为数组类型
@@ -308,6 +312,7 @@ function parseComplexType(
 - **Tests**: `__tests__/json-parser.test.ts` — 48 tests (11 fixtures in `fixtures/` and `fixtures/invalid/`)
 - **Bug found by tests**: Pass 4 `_element` filtering used `consumedKeys.has(key.slice(1))` which incorrectly suppressed warnings for `_element` companions of non-primitive properties — fixed to `consumedKeys.has(key)`
 - **Architecture**: 4-pass strategy (known props → \_element companions → choice type [x] → unexpected warnings), schema-driven via `PropertySchema`
+- **Design note — `parseComplexObject`**: 通用 schema-driven 解析引擎已就绪并通过测试锁定行为（~20 条测试覆盖 known props / `_element` / choice `[x]` / unexpected warning）。当前 `parseStructureDefinition`（Task 2.5）采用手写字段解析，暂未采用此引擎。`parseComplexObject` 作为基础设施预留，待后续阶段解析具体资源实例（Patient、Observation 等）时启用。
 
 ---
 
