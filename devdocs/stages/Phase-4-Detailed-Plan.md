@@ -309,101 +309,63 @@ StructureDefinition (with differential only)
 
 ---
 
-## Task 4.5: Snapshot Generator 编排器 (Day 7-8, ~2 days)
+## Task 4.5: Snapshot Generator 编排器 (Day 7-8, ~2 days) ✅ Completed
 
 ### 文件: `snapshot-generator.ts`
 
 对应 HAPI 的 `generateSnapshot()` 方法。
 这是**顶层编排器**，协调整个快照生成流程。
 
-### 核心类
+### Implementation Notes
 
-```typescript
-/**
- * Snapshot Generator — 快照生成编排器。
- *
- * 对应 HAPI ProfileUtilities.generateSnapshot()。
- * 编排以下步骤：
- * 1. 输入验证
- * 2. 循环检测（snapshot generation stack）
- * 3. 加载 base SD（递归确保 base 有 snapshot）
- * 4. 初始化 snapshot（clone base.snapshot.element）
- * 5. 调用 ElementMerger.processPaths()
- * 6. 验证 differential 全覆盖
- * 7. 设置 element IDs
- * 8. 缓存结果
- */
-export class SnapshotGenerator {
-  constructor(
-    private readonly context: FhirContext,
-    private readonly options: SnapshotGeneratorOptions = {},
-  ) {}
+**已创建文件：**
 
-  /**
-   * Generate snapshot for a StructureDefinition.
-   *
-   * @param sd - StructureDefinition with differential
-   * @returns SnapshotResult with populated snapshot
-   * @throws SnapshotCircularDependencyError if circular reference detected
-   * @throws BaseNotFoundError if base SD cannot be loaded
-   */
-  async generate(sd: StructureDefinition): Promise<SnapshotResult>;
-}
-```
+1. **`profile/snapshot-generator.ts`** (~400 lines, 2 sections) — 1 个导出类 + 5 个内部 helper
+   - `SnapshotGenerator` class — main orchestrator with `generate()` method
+   - `validateInput()` — checks url, baseDefinition, root type detection
+   - `loadBase()` — loads base SD via FhirContext, error handling
+   - `populateDatatypeCache()` — pre-loads complex type snapshots for merge
+   - `buildResult()` — assembles SnapshotResult with success flag
+   - `isRootStructureDefinition()` — detects Element/Resource root types
+   - `isComplexType()` — filters primitive/special types from datatype cache
+   - `deepCloneElements()` — structuredClone/JSON fallback
+   - `ensureElementIds()` — generates `path` or `path:sliceName` IDs
 
-### 编排步骤详解
+2. **`profile/__tests__/snapshot-generator.test.ts`** (~1000 lines, 10 describe blocks, **49 tests**)
+   - Unit tests: Input validation(4), Base loading(5), Circular dependency(5), End-to-end(5), Post-processing(5)
+   - Fixture tests: 11-input-validation(5), 12-base-loading(5), 13-circular-dependency(5), 14-end-to-end(5), 15-post-processing(5)
 
-```typescript
-async generate(sd: StructureDefinition): Promise<SnapshotResult> {
-  // Step 1: Validate inputs
-  //   - sd must not be null
-  //   - sd.baseDefinition must exist (unless root type like Element/Resource)
+3. **25 JSON test fixtures** across 5 categories:
+   - `11-input-validation/` — missing-url, missing-base-definition, root-type-element, root-type-resource, valid-minimal-profile
+   - `12-base-loading/` — base-not-found, base-has-snapshot, base-missing-snapshot, empty-differential, throw-on-error-base
+   - `13-circular-dependency/` — self-reference, two-profile-cycle, stack-cleanup-on-error, no-cycle-chain, snapshot-cleared-on-throw
+   - `14-end-to-end/` — simple-constraint-profile, documentation-override, multi-level-inheritance, no-diff-elements, fixed-value-profile
+   - `15-post-processing/` — element-ids-generated, unconsumed-diff-warning, throw-on-unconsumed, cached-in-context, base-not-mutated
 
-  // Step 2: Circular dependency detection
-  //   - Maintain a Set<string> of URLs currently being generated
-  //   - If sd.url already in set → throw SnapshotCircularDependencyError
-  //   - Push sd.url to set
+**设计决策：**
 
-  // Step 3: Load base StructureDefinition
-  //   - base = await context.loadStructureDefinition(sd.baseDefinition)
-  //   - If base has no snapshot → recursively generate(base)
+- `SnapshotGenerator` 使用 `generationStack: Set<string>` 检测循环依赖（与 HAPI snapshotStack 一致）
+- Root types (Element, Resource) 无 baseDefinition — 直接用 differential 作为 snapshot
+- `populateDatatypeCache` 预加载所有 base/diff 中引用的复杂类型 snapshot，避免 merge 时 async 查找
+- `ensureElementIds` 为所有元素生成 `id`（path 或 path:sliceName）
+- 异常时清理 snapshot（设为 undefined）并从 generationStack 弹出 URL
+- 测试使用 `createMockContext` 工厂函数，vi.fn() mock FhirContext 接口
 
-  // Step 4: Initialize snapshot
-  //   - snapshot = deepClone(base.snapshot.element)
+**关键 bug 修复：**
 
-  // Step 5: Prepare differential trackers
-  //   - Clone differential elements into DiffElementTracker[]
-  //   - Each tracker starts with consumed = false
-
-  // Step 6: Call ElementMerger.processPaths()
-  //   - Pass base scope, diff trackers, result array
-
-  // Step 7: Post-processing
-  //   - Verify all diff trackers are consumed
-  //   - Unconsumed → record DIFFERENTIAL_NOT_CONSUMED issue
-  //   - Set element IDs (ensureElementIds)
-  //   - Sort elements if needed
-
-  // Step 8: Assemble result
-  //   - Set sd.snapshot = { element: result }
-  //   - Optionally build CanonicalProfile
-  //   - Pop sd.url from generation stack
-  //   - Cache in context
-
-  // Error handling: if exception during generation,
-  //   set sd.snapshot = undefined, pop stack, re-throw
-}
-```
+- Root types (Element, Resource) 无 baseDefinition 时，`generate()` 尝试加载 `undefined` URL 导致 BASE_NOT_FOUND
+- 修复：在 Step 3 前增加 Step 2b，检测 `!sd.baseDefinition` 并直接用 differential 构建 snapshot
 
 ### 验收标准
 
-- [ ] 输入验证（null SD, missing baseDefinition）
-- [ ] 循环检测正确（A→B→A 抛出 SnapshotCircularDependencyError）
-- [ ] 递归确保 base 有 snapshot（base 无 snapshot 时递归生成）
-- [ ] Differential 全覆盖验证（未消费的 diff element 产生 issue）
-- [ ] 异常时清理 snapshot（设为 undefined）并弹出 stack
-- [ ] 结果缓存到 FhirContext
-- [ ] 测试覆盖 ≥25 个 case
+- [x] 输入验证（missing url → INTERNAL_ERROR, missing baseDefinition → BASE_NOT_FOUND）
+- [x] 循环检测正确（self-ref 和 A→B→A 均抛出 SnapshotCircularDependencyError）
+- [x] 递归确保 base 有 snapshot（base 无 snapshot 时递归 generate）
+- [x] Differential 全覆盖验证（未消费的 diff element → DIFFERENTIAL_NOT_CONSUMED warning）
+- [x] 异常时清理 snapshot（设为 undefined）并弹出 stack（stack-cleanup-on-error 测试验证）
+- [x] 结果缓存到 FhirContext（registerStructureDefinition 调用验证）
+- [x] 测试覆盖 **49 个 case** + 25 个 JSON fixtures（远超 ≥25 目标）
+- [x] 993/993 测试通过（944 原有 + 49 snapshot-generator），零回归
 
 ---
 
