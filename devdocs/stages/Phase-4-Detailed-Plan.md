@@ -424,71 +424,52 @@ Slicing 是 snapshot 生成中**第二复杂的部分**（仅次于 processPaths
 
 ---
 
-## Task 4.7: 元素排序 (Day 11-12, ~1 day)
+## Task 4.7: 元素排序 (Day 11-12, ~1 day) ✅ Completed
 
 ### 文件: `element-sorter.ts`
 
 对应 HAPI 的 `sortDifferential()` + `sortElements()`。
 
-### 核心概念（来自 HAPI-sortElements-Study-Deliverable）
+### Implementation Notes
 
-- 排序的权威顺序是 **base snapshot 中元素的顺序**，不是字典序
-- Differential 在处理前可能需要预排序
-- 排序通过构建树结构、按 base index 排序、再序列化回线性列表实现
+**已创建文件：**
 
-### 核心函数
+1. **`profile/element-sorter.ts`** (~360 lines, 5 sections) — 4 个导出函数 + 4 个内部 helper
+   - `findBaseIndex()` — locate path in base snapshot (exact, choice type, sliceName match)
+   - `sortDifferential()` — build tree → sort by base index → flatten (pre-order traversal)
+   - `validateElementOrder()` — verify parent-before-child ordering
+   - `ensureElementIds()` — generate `path` or `path:sliceName` IDs
 
-```typescript
-/**
- * 对 differential 元素按 base snapshot 顺序排序。
- * 对应 HAPI sortDifferential()。
- *
- * 步骤：
- * 1. 构建 ElementDefinition 树
- * 2. 在每个层级按 base snapshot index 排序
- * 3. 序列化回线性列表
- */
-export function sortDifferential(
-  differential: ElementDefinition[],
-  baseSnapshot: readonly ElementDefinition[],
-  issues: SnapshotIssue[],
-): ElementDefinition[];
+2. **`profile/__tests__/element-sorter.test.ts`** (~520 lines, 8 describe blocks, **46 tests**)
+   - Unit tests: findBaseIndex(7), sortDifferential(7), validateElementOrder(6), ensureElementIds(6)
+   - Fixture tests: 23-sort-differential(5), 24-find-base-index(5), 25-validate-order(5), 26-ensure-element-ids(5)
 
-/**
- * 在 base snapshot 中查找路径的 index。
- * 处理 choice type 和 contentReference 重定向。
- */
-export function findBaseIndex(
-  baseSnapshot: readonly ElementDefinition[],
-  path: string,
-): number;
+3. **20 JSON test fixtures** across 4 categories:
+   - `23-sort-differential/` — already-sorted, out-of-order, choice-type-sort, with-children, unknown-path-warning
+   - `24-find-base-index/` — exact-match, choice-type-match, not-found, slice-name-match, root-element
+   - `25-validate-order/` — valid-order, child-before-parent, sliced-order, single-element, deep-nesting
+   - `26-ensure-element-ids/` — basic-ids, sliced-ids, preserve-existing-ids, empty-elements, nested-sliced-ids
 
-/**
- * 验证 snapshot 元素顺序是否正确。
- * 用于生成后的最终验证。
- */
-export function validateElementOrder(
-  snapshot: readonly ElementDefinition[],
-  issues: SnapshotIssue[],
-): boolean;
+**设计决策：**
 
-/**
- * 确保所有 snapshot 元素有正确的 id。
- * 对应 HAPI setIds()。
- */
-export function ensureElementIds(
-  elements: ElementDefinition[],
-  resourceType: string,
-): void;
-```
+- `sortDifferential` 使用 SortNode 树结构，每层按 baseIndex 排序后 pre-order 展平
+- `findBaseIndex` 优先 sliceName 精确匹配 → 路径精确匹配 → choice type 匹配
+- `validateElementOrder` 只检查 parent-before-child（Rule 1），避免过度检测 interleaving
+- `ensureElementIds` 从 `snapshot-generator.ts` 提取为公共函数，支持 `resourceType` 参数
+
+**关键 bug 修复：**
+
+- Rule 4 interleaving 检查产生 false positive（如 `Patient.identifier.value` → `Patient.name` 被误报）
+- 修复：移除 Rule 4，仅保留 Rule 1（parent-before-child）作为核心验证
 
 ### 验收标准
 
-- [ ] Differential 排序按 base snapshot 顺序
-- [ ] Choice type 路径正确映射到 base index
-- [ ] Slice 元素保持在 slicing root 之后
-- [ ] `ensureElementIds` 正确生成 element id
-- [ ] 测试覆盖 ≥15 个 case
+- [x] Differential 排序按 base snapshot 顺序（tree-based sort by base index）
+- [x] Choice type 路径正确映射到 base index（`valueString` → `value[x]`）
+- [x] Slice 元素保持在 slicing root 之后（sliceName 精确匹配）
+- [x] `ensureElementIds` 正确生成 element id（path 或 path:sliceName）
+- [x] 测试覆盖 **46 个 case** + 20 个 JSON fixtures（远超 ≥15 目标）
+- [x] 1068/1068 测试通过（1022 原有 + 46 element-sorter 新增），零回归
 
 ---
 
