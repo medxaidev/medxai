@@ -146,3 +146,79 @@ export {
   loadCoreDefinitionSync,
   getCoreDefinitionsDir,
 } from './context/index.js';
+
+// ─── Profile module ────────────────────────────────────────────────────────
+export type {
+  SnapshotGeneratorOptions,
+  SnapshotResult,
+  SnapshotIssue,
+  SnapshotIssueCode,
+  DiffElementTracker,
+  TraversalScope,
+  MergeContext,
+} from './profile/index.js';
+
+export {
+  // SnapshotGenerator
+  SnapshotGenerator,
+
+  // CanonicalBuilder
+  buildCanonicalProfile,
+  buildCanonicalElement,
+  buildTypeConstraints,
+  buildBindingConstraint,
+  buildInvariants,
+  buildSlicingDefinition,
+
+  // Errors
+  ProfileError,
+  SnapshotCircularDependencyError,
+  BaseNotFoundError,
+  ConstraintViolationError,
+  UnconsumedDifferentialError,
+
+  // Type helpers
+  createSnapshotIssue,
+  createDiffTracker,
+
+  // Path utilities
+  pathMatches,
+  isDirectChild,
+  isDescendant,
+  pathDepth,
+  parentPath,
+  tailSegment,
+  isChoiceTypePath,
+  matchesChoiceType,
+  extractChoiceTypeName,
+  hasSliceName,
+  extractSliceName,
+
+  // Element sorter
+  findBaseIndex,
+  sortDifferential,
+  validateElementOrder,
+  ensureElementIds,
+
+  // Constraint merger
+  mergeConstraints,
+  setBaseTraceability,
+  mergeCardinality,
+  mergeTypes,
+  mergeBinding,
+  mergeConstraintList,
+  isLargerMax,
+
+  // Element merger
+  createMergeContext,
+  processPaths,
+  mergeSnapshot,
+
+  // Slicing handler
+  makeExtensionSlicing,
+  getSliceSiblings,
+  validateSlicingCompatibility,
+  diffsConstrainTypes,
+  handleNewSlicing,
+  handleExistingSlicing,
+} from './profile/index.js';
