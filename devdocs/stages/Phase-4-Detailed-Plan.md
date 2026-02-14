@@ -473,81 +473,58 @@ Slicing 是 snapshot 生成中**第二复杂的部分**（仅次于 processPaths
 
 ---
 
-## Task 4.8: CanonicalProfile 构建器 (Day 12-13, ~1.5 days)
+## Task 4.8: CanonicalProfile 构建器 (Day 12-13, ~1.5 days) ✅ Completed
 
 ### 文件: `canonical-builder.ts`
 
 将生成的 StructureDefinition snapshot 转换为 Phase 1 定义的 `CanonicalProfile` 内部语义模型。
 
-### 核心概念
+### Implementation Notes
 
-`CanonicalProfile` 是 MedXAI 自有的语义抽象（定义在 `fhir-model/canonical-profile.ts`），
-设计用于高效的下游消费（验证、运行时、应用层）。
+**已创建文件：**
 
-转换规则：
+1. **`profile/canonical-builder.ts`** (~280 lines, 7 sections) — 6 个导出函数 + 1 个内部 helper
+   - `buildCanonicalProfile()` — SD → CanonicalProfile (validates snapshot exists, builds elements Map)
+   - `buildCanonicalElement()` — ElementDefinition → CanonicalElement (normalizes all fields)
+   - `buildTypeConstraints()` — ElementDefinitionType[] → TypeConstraint[] (profiles, targetProfiles)
+   - `buildBindingConstraint()` — ElementDefinitionBinding → BindingConstraint (strength, valueSetUrl)
+   - `buildInvariants()` — ElementDefinitionConstraint[] → Invariant[] (key, severity, human, expression)
+   - `buildSlicingDefinition()` — ElementDefinitionSlicing → SlicingDefinition (discriminators, rules, ordered)
+   - `convertMax()` — internal: `"*"` → `'unbounded'`, numeric string → number, undefined → 1
 
-- `ElementDefinition` → `CanonicalElement`
-- `max: "*"` → `max: 'unbounded'`
-- `mustSupport/isModifier/isSummary: undefined` → `false`
-- `constraint: undefined` → `[]`
-- `type: undefined` → `[]`
-- `elements` 使用 `Map<string, CanonicalElement>`（O(1) lookup，保持插入顺序）
+2. **`profile/__tests__/canonical-builder.test.ts`** (~600 lines, 12 describe blocks, **65 tests**)
+   - Unit tests: buildCanonicalProfile(5), buildCanonicalElement(10), buildTypeConstraints(5), buildBindingConstraint(5), buildInvariants(5), buildSlicingDefinition(5)
+   - Fixture tests: 27-build-canonical-profile(5), 28-build-canonical-element(5), 29-build-type-constraints(5), 30-build-binding(5), 31-build-invariants(5), 32-build-slicing-def(5)
 
-### 核心函数
+3. **30 JSON test fixtures** across 6 categories:
+   - `27-build-canonical-profile/` — basic-profile, abstract-type, no-snapshot-error, no-version, element-order-preserved
+   - `28-build-canonical-element/` — basic-element, max-star-to-unbounded, max-numeric, boolean-flags, defaults-for-missing
+   - `29-build-type-constraints/` — single-type, multiple-types, type-with-profiles, undefined-types, empty-types
+   - `30-build-binding/` — required-binding, extensible-binding, undefined-binding, no-valueset, example-binding
+   - `31-build-invariants/` — single-invariant, multiple-invariants, undefined-constraints, warning-severity, no-expression
+   - `32-build-slicing-def/` — basic-slicing, closed-ordered, undefined-slicing, ordered-defaults-false, no-discriminators
 
-```typescript
-/**
- * 将 StructureDefinition（含 snapshot）转换为 CanonicalProfile。
- *
- * 前提：sd.snapshot 必须已存在（由 SnapshotGenerator 生成）。
- */
-export function buildCanonicalProfile(
-  sd: StructureDefinition,
-): CanonicalProfile;
+**转换规则实现：**
 
-/**
- * 将单个 ElementDefinition 转换为 CanonicalElement。
- */
-export function buildCanonicalElement(ed: ElementDefinition): CanonicalElement;
-
-/**
- * 转换 ElementDefinitionType[] → TypeConstraint[]。
- */
-export function buildTypeConstraints(
-  types: readonly ElementDefinitionType[] | undefined,
-): TypeConstraint[];
-
-/**
- * 转换 ElementDefinitionBinding → BindingConstraint。
- */
-export function buildBindingConstraint(
-  binding: ElementDefinitionBinding | undefined,
-): BindingConstraint | undefined;
-
-/**
- * 转换 ElementDefinitionConstraint[] → Invariant[]。
- */
-export function buildInvariants(
-  constraints: readonly ElementDefinitionConstraint[] | undefined,
-): Invariant[];
-
-/**
- * 转换 ElementDefinitionSlicing → SlicingDefinition。
- */
-export function buildSlicingDefinition(
-  slicing: ElementDefinitionSlicing | undefined,
-): SlicingDefinition | undefined;
-```
+- `max: "*"` → `'unbounded'`; numeric strings → numbers; undefined → 1 (FHIR default)
+- `min`: undefined → 0 (FHIR default)
+- `mustSupport/isModifier/isSummary`: undefined → `false` (always boolean)
+- `constraint/type`: undefined → `[]` (always array)
+- `id`: undefined → path (fallback)
+- `ordered`: undefined → `false` (always boolean)
+- `elements`: `Map<string, CanonicalElement>` preserves snapshot insertion order
+- Missing snapshot → throws Error
 
 ### 验收标准
 
-- [ ] `buildCanonicalProfile` 正确转换完整 SD
-- [ ] `max: "*"` → `'unbounded'` 转换正确
-- [ ] 所有 boolean flag 默认为 `false`（非 undefined）
-- [ ] `constraints` 和 `types` 默认为 `[]`（非 undefined）
-- [ ] `elements` Map 保持 snapshot 元素顺序
-- [ ] Slicing 定义正确转换
-- [ ] 测试覆盖 ≥20 个 case
+- [x] `buildCanonicalProfile` 正确转换完整 SD（metadata + elements Map）
+- [x] `max: "*"` → `'unbounded'` 转换正确（含 numeric string → number）
+- [x] 所有 boolean flag 默认为 `false`（非 undefined）
+- [x] `constraints` 和 `types` 默认为 `[]`（非 undefined）
+- [x] `elements` Map 保持 snapshot 元素顺序（insertion order 验证）
+- [x] Slicing 定义正确转换（discriminators, rules, ordered, description）
+- [x] 测试覆盖 **65 个 case** + 30 个 JSON fixtures（远超 ≥20 目标）
+- [x] 1133/1133 测试通过（1068 原有 + 65 canonical-builder 新增），零回归
 
 ---
 
