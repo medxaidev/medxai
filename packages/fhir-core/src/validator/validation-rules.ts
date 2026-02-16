@@ -1,11 +1,17 @@
 /**
- * fhir-validator — Validation Rules: Cardinality & Type
+ * fhir-validator — Validation Rules: Cardinality, Type, Fixed/Pattern & Reference
  *
  * Implements the core structural validation rules:
  * - {@link validateCardinality} — min/max cardinality checks
  * - {@link validateType} — FHIR type constraint checks
  * - {@link inferFhirType} — heuristic FHIR type inference from JS values
  * - {@link validateRequired} — required element (min≥1) presence check
+ * - {@link validateFixed} — fixed value exact-match checks
+ * - {@link validatePattern} — pattern value partial-match checks
+ * - {@link matchesPattern} — recursive partial object matching
+ * - {@link deepEqual} — recursive deep equality comparison
+ * - {@link validateReference} — reference target profile checks
+ * - {@link extractReferenceType} — extract resource type from reference string
  *
  * These functions operate on individual {@link CanonicalElement} definitions
  * and produce {@link ValidationIssue} entries when violations are found.
@@ -456,6 +462,338 @@ export function validateChoiceType(
         'INVALID_CHOICE_TYPE',
         `Element '${element.path}' does not allow type '${concreteFieldSuffix}'; allowed: [${allowedCodes.join(', ')}]`,
         { path: element.path },
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Section 6: deepEqual
+// =============================================================================
+
+/**
+ * Perform a recursive deep equality comparison between two values.
+ *
+ * Handles primitives, `null`, `undefined`, arrays (order-sensitive),
+ * and plain objects. Does NOT handle `Date`, `RegExp`, `Map`, `Set`,
+ * or other special JS types — those are not relevant for FHIR JSON.
+ *
+ * @param a - First value.
+ * @param b - Second value.
+ * @returns `true` if the values are deeply equal.
+ */
+export function deepEqual(a: unknown, b: unknown): boolean {
+  // Identical references or both primitives with same value
+  if (a === b) {
+    return true;
+  }
+
+  // If either is null/undefined (and they're not ===), they differ
+  if (a === null || a === undefined || b === null || b === undefined) {
+    return false;
+  }
+
+  // Different JS types
+  if (typeof a !== typeof b) {
+    return false;
+  }
+
+  // Arrays
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  // Objects
+  if (typeof a === 'object' && typeof b === 'object') {
+    const objA = a as Record<string, unknown>;
+    const objB = b as Record<string, unknown>;
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (!(key in objB)) return false;
+      if (!deepEqual(objA[key], objB[key])) return false;
+    }
+    return true;
+  }
+
+  // Primitives that aren't === (e.g., NaN !== NaN)
+  return false;
+}
+
+// =============================================================================
+// Section 7: validateFixed
+// =============================================================================
+
+/**
+ * Validate a fixed value constraint on an element.
+ *
+ * When `element.fixed` is defined, the actual value MUST be deeply equal
+ * to the fixed value. This is an exact-match constraint — no additional
+ * or missing fields are allowed.
+ *
+ * @param element - The canonical element definition (may have `fixed`).
+ * @param value - The actual value to validate.
+ * @param issues - Mutable array to push validation issues into.
+ */
+export function validateFixed(
+  element: CanonicalElement,
+  value: unknown,
+  issues: ValidationIssue[],
+): void {
+  if (element.fixed === undefined) {
+    return;
+  }
+
+  // Null/undefined values are handled by cardinality
+  if (value === null || value === undefined) {
+    return;
+  }
+
+  if (!deepEqual(value, element.fixed)) {
+    issues.push(
+      createValidationIssue(
+        'error',
+        'FIXED_VALUE_MISMATCH',
+        `Element '${element.path}' must have fixed value ${JSON.stringify(element.fixed)}, but found ${JSON.stringify(value)}`,
+        {
+          path: element.path,
+          diagnostics: `Expected: ${JSON.stringify(element.fixed)}, Actual: ${JSON.stringify(value)}`,
+        },
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Section 8: matchesPattern & validatePattern
+// =============================================================================
+
+/**
+ * Check if a value matches a pattern (partial/subset match).
+ *
+ * A pattern match means: every field present in the `pattern` must also
+ * be present in `value` with the same value. However, `value` may contain
+ * additional fields not in the pattern.
+ *
+ * For primitives and arrays, this falls back to deep equality.
+ * For objects, it performs recursive subset matching.
+ *
+ * @param value - The actual value to check.
+ * @param pattern - The pattern to match against.
+ * @returns `true` if the value matches the pattern.
+ */
+export function matchesPattern(value: unknown, pattern: unknown): boolean {
+  // Primitives and null: exact match
+  if (pattern === null || pattern === undefined) {
+    return value === pattern;
+  }
+
+  if (typeof pattern !== 'object') {
+    return value === pattern;
+  }
+
+  // Pattern is an array → value must be an array with matching elements
+  if (Array.isArray(pattern)) {
+    if (!Array.isArray(value)) return false;
+    // Each element in the pattern array must have a matching element in value
+    for (const patternItem of pattern) {
+      const found = value.some((v) => matchesPattern(v, patternItem));
+      if (!found) return false;
+    }
+    return true;
+  }
+
+  // Pattern is an object → value must be an object with all pattern keys
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const objValue = value as Record<string, unknown>;
+  const objPattern = pattern as Record<string, unknown>;
+
+  for (const key of Object.keys(objPattern)) {
+    if (!(key in objValue)) return false;
+    if (!matchesPattern(objValue[key], objPattern[key])) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validate a pattern value constraint on an element.
+ *
+ * When `element.pattern` is defined, the actual value must be a superset
+ * of the pattern — all fields in the pattern must exist in the value with
+ * matching values, but the value may contain additional fields.
+ *
+ * @param element - The canonical element definition (may have `pattern`).
+ * @param value - The actual value to validate.
+ * @param issues - Mutable array to push validation issues into.
+ */
+export function validatePattern(
+  element: CanonicalElement,
+  value: unknown,
+  issues: ValidationIssue[],
+): void {
+  if (element.pattern === undefined) {
+    return;
+  }
+
+  // Null/undefined values are handled by cardinality
+  if (value === null || value === undefined) {
+    return;
+  }
+
+  if (!matchesPattern(value, element.pattern)) {
+    issues.push(
+      createValidationIssue(
+        'error',
+        'PATTERN_VALUE_MISMATCH',
+        `Element '${element.path}' must match pattern ${JSON.stringify(element.pattern)}, but found ${JSON.stringify(value)}`,
+        {
+          path: element.path,
+          diagnostics: `Pattern: ${JSON.stringify(element.pattern)}, Actual: ${JSON.stringify(value)}`,
+        },
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Section 9: extractReferenceType & validateReference
+// =============================================================================
+
+/**
+ * Extract the resource type from a FHIR reference string.
+ *
+ * Handles the following reference formats:
+ * - Relative: `"Patient/123"` → `"Patient"`
+ * - Absolute: `"http://example.org/fhir/Patient/123"` → `"Patient"`
+ * - URN: `"urn:uuid:abc-123"` → `undefined` (cannot determine type)
+ * - Fragment: `"#contained-1"` → `undefined`
+ *
+ * @param reference - The reference string to parse.
+ * @returns The resource type, or `undefined` if it cannot be determined.
+ */
+export function extractReferenceType(reference: string | undefined): string | undefined {
+  if (!reference) {
+    return undefined;
+  }
+
+  // Fragment references
+  if (reference.startsWith('#')) {
+    return undefined;
+  }
+
+  // URN references
+  if (reference.startsWith('urn:')) {
+    return undefined;
+  }
+
+  // Absolute or relative: extract the segment before the last "/"
+  // e.g., "Patient/123" → "Patient"
+  // e.g., "http://example.org/fhir/Patient/123" → "Patient"
+  const parts = reference.split('/');
+
+  // Need at least 2 parts: [ResourceType, id]
+  if (parts.length < 2) {
+    return undefined;
+  }
+
+  // Walk backwards to find the resource type (first segment that starts with uppercase)
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const segment = parts[i];
+    if (segment.length > 0 && segment[0] >= 'A' && segment[0] <= 'Z') {
+      return segment;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Validate reference target profile constraints.
+ *
+ * Checks that a Reference value's target resource type matches at least
+ * one of the allowed target profiles defined in the element's type
+ * constraints.
+ *
+ * @param element - The canonical element definition with Reference type constraints.
+ * @param value - The actual value (expected to be a Reference object).
+ * @param issues - Mutable array to push validation issues into.
+ */
+export function validateReference(
+  element: CanonicalElement,
+  value: unknown,
+  issues: ValidationIssue[],
+): void {
+  // Only validate objects that look like References
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value !== 'object' ||
+    !('reference' in (value as Record<string, unknown>))
+  ) {
+    return;
+  }
+
+  const ref = value as { reference?: string; type?: string };
+
+  // Collect all targetProfiles from Reference type constraints
+  const targetProfiles = element.types
+    .filter((t) => t.code === 'Reference')
+    .flatMap((t) => t.targetProfiles ?? []);
+
+  // No target profile constraints → any reference is valid
+  if (targetProfiles.length === 0) {
+    return;
+  }
+
+  // Extract resource type from the reference string
+  const refType = extractReferenceType(ref.reference);
+
+  if (!refType) {
+    // Cannot determine type (URN, fragment, or invalid format)
+    issues.push(
+      createValidationIssue(
+        'warning',
+        'REFERENCE_TARGET_MISMATCH',
+        `Element '${element.path}': reference format '${ref.reference ?? ''}' cannot be validated against target profiles`,
+        { path: element.path },
+      ),
+    );
+    return;
+  }
+
+  // Check if the reference type matches any target profile
+  // Target profiles are canonical URLs like "http://hl7.org/fhir/StructureDefinition/Patient"
+  const matchesProfile = targetProfiles.some((profile) => {
+    // Extract the type name from the profile URL
+    const profileType = profile.split('/').pop();
+    return profileType === refType;
+  });
+
+  if (!matchesProfile) {
+    const allowedTypes = targetProfiles
+      .map((p) => p.split('/').pop() ?? p)
+      .join(', ');
+    issues.push(
+      createValidationIssue(
+        'error',
+        'REFERENCE_TARGET_MISMATCH',
+        `Element '${element.path}' reference must target [${allowedTypes}], but found '${refType}'`,
+        {
+          path: element.path,
+          diagnostics: `Reference: ${ref.reference}, allowed target profiles: [${targetProfiles.join(', ')}]`,
+        },
       ),
     );
   }

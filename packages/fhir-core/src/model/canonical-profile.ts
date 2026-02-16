@@ -274,6 +274,30 @@ export interface CanonicalElement {
    * Defaults to `false` during snapshot resolution.
    */
   isSummary: boolean;
+
+  /**
+   * Fixed value constraint for this element.
+   *
+   * When present, the element value MUST exactly equal this value.
+   * Corresponds to `ElementDefinition.fixed[x]` in the FHIR spec.
+   *
+   * **Design decision:** Stored as `unknown` because fixed values can
+   * be any FHIR type (primitive or complex). The validator performs
+   * deep equality comparison at runtime.
+   */
+  fixed?: unknown;
+
+  /**
+   * Pattern value constraint for this element.
+   *
+   * When present, the element value must be a superset of this pattern —
+   * all fields in the pattern must exist in the value with matching values,
+   * but the value may contain additional fields.
+   * Corresponds to `ElementDefinition.pattern[x]` in the FHIR spec.
+   *
+   * **Design decision:** Stored as `unknown` for the same reason as `fixed`.
+   */
+  pattern?: unknown;
 }
 
 // =============================================================================

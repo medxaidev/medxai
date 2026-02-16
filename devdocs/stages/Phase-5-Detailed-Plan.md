@@ -265,167 +265,90 @@ Phase 5 implements **structural validation** of FHIR resource instances against 
 
 ---
 
-### Task 5.4: Validation Rules — Fixed/Pattern & Reference (Day 5, ~1 day)
+### Task 5.4: Validation Rules — Fixed/Pattern & Reference (Day 5, ~1 day) ✅ Completed
 
 #### 文件: `validator/validation-rules.ts` (continued)
 
 实现 fixed/pattern value 和 reference target profile 验证。
 
-#### 核心函数
+#### Implementation Notes
 
-```typescript
-/**
- * Validate fixed value constraint.
- */
-export function validateFixed(
-  element: CanonicalElement,
-  value: unknown,
-  issues: ValidationIssue[],
-): void {
-  if (!element.fixed) return;
+**Model 变更：**
 
-  if (!deepEqual(value, element.fixed)) {
-    issues.push(
-      createValidationIssue(
-        "error",
-        "FIXED_VALUE_MISMATCH",
-        `Element '${element.path}' must have fixed value ${JSON.stringify(element.fixed)}, but found ${JSON.stringify(value)}`,
-        { path: element.path },
-      ),
-    );
-  }
-}
+- 在 `CanonicalElement` 中新增 `fixed?: unknown` 和 `pattern?: unknown` 两个可选字段
+- 使用 `unknown` 类型因为 fixed/pattern 值可以是任何 FHIR 类型（primitive 或 complex）
 
-/**
- * Validate pattern value constraint (partial match).
- */
-export function validatePattern(
-  element: CanonicalElement,
-  value: unknown,
-  issues: ValidationIssue[],
-): void {
-  if (!element.pattern) return;
+**已添加到 `validator/validation-rules.ts` 的新函数（Sections 6-9）：**
 
-  if (!matchesPattern(value, element.pattern)) {
-    issues.push(
-      createValidationIssue(
-        "error",
-        "PATTERN_VALUE_MISMATCH",
-        `Element '${element.path}' must match pattern ${JSON.stringify(element.pattern)}`,
-        { path: element.path },
-      ),
-    );
-  }
-}
+1. **`deepEqual(a, b)`** — 递归深度相等比较，处理 primitives、null、arrays（顺序敏感）、plain objects
+2. **`validateFixed(element, value, issues)`** — fixed 值精确匹配验证（使用 deepEqual）
+3. **`matchesPattern(value, pattern)`** — 递归部分匹配（pattern 是 value 的子集）
+   - 对象：pattern 的所有字段必须存在于 value 中且值匹配
+   - 数组：pattern 中每个元素必须在 value 数组中找到匹配
+   - 原始类型：精确匹配
+4. **`validatePattern(element, value, issues)`** — pattern 值部分匹配验证
+5. **`extractReferenceType(reference)`** — 从 FHIR reference 字符串提取资源类型
+   - 支持相对引用 (`Patient/123`)、绝对 URL、URN、fragment
+6. **`validateReference(element, value, issues)`** — reference target profile 验证
 
-/**
- * Check if a value matches a pattern (partial object match).
- */
-export function matchesPattern(value: unknown, pattern: unknown): boolean {
-  // Pattern is a subset match: all fields in pattern must exist in value
-  // with the same values, but value can have additional fields
-  if (typeof pattern !== "object" || pattern === null) {
-    return deepEqual(value, pattern);
-  }
+**测试文件：`validator/__tests__/validation-rules-fixed-pattern.test.ts`** (~700 lines, **114 tests**)
 
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
+- deepEqual unit tests: 22 tests
+- validateFixed unit tests: 14 tests
+- matchesPattern unit tests: 16 tests
+- validatePattern unit tests: 6 tests
+- extractReferenceType unit tests: 10 tests
+- validateReference unit tests: 11 tests
+- Fixture fixed tests: 8 tests (6 fixture files)
+- Fixture pattern tests: 13 tests (6 fixture files)
+- Fixture reference tests: 13 tests (5 fixture files)
+- Barrel exports: 1 test
 
-  for (const key in pattern) {
-    if (!matchesPattern((value as any)[key], (pattern as any)[key])) {
-      return false;
-    }
-  }
+**17 个 JSON 专项 fixtures：**
 
-  return true;
-}
+- **6 Fixed fixtures** (`fixtures/validation-rules/fixed/`)
+  - `01-fixed-string-match.json` — 字符串精确匹配
+  - `02-fixed-string-mismatch.json` — 字符串不匹配
+  - `03-fixed-coding-match.json` — CodeableConcept 精确匹配
+  - `04-fixed-coding-mismatch.json` — CodeableConcept 不匹配
+  - `05-fixed-quantity.json` — 3 scenarios: 精确匹配/值不同/多余字段
+  - `06-fixed-no-constraint.json` — 无 fixed 约束
 
-/**
- * Validate reference target profile.
- */
-export function validateReference(
-  element: CanonicalElement,
-  value: unknown,
-  issues: ValidationIssue[],
-): void {
-  if (!isReference(value)) return;
+- **6 Pattern fixtures** (`fixtures/validation-rules/pattern/`)
+  - `01-pattern-subset-match.json` — 子集匹配（value 有额外字段）
+  - `02-pattern-system-mismatch.json` — system 不匹配
+  - `03-pattern-primitive.json` — 5 scenarios: string/boolean/number 匹配和不匹配
+  - `04-pattern-nested.json` — 3 scenarios: 嵌套对象匹配
+  - `05-pattern-no-constraint.json` — 无 pattern 约束
+  - `06-pattern-missing-field.json` — value 缺少 pattern 要求的字段
 
-  const ref = value as { reference?: string; type?: string };
-  const targetProfiles = element.types
-    .filter((t) => t.code === "Reference")
-    .flatMap((t) => t.targetProfile || []);
+- **5 Reference fixtures** (`fixtures/validation-rules/reference/`)
+  - `01-reference-valid-target.json` — 正确的 target profile
+  - `02-reference-wrong-target.json` — 错误的 target type
+  - `03-reference-no-constraint.json` — 无 targetProfile 约束
+  - `04-reference-urn-warning.json` — URN 引用产生 warning
+  - `05-reference-multiple-targets.json` — 5 scenarios: 多 target profiles + absolute URL + fragment
 
-  if (targetProfiles.length === 0) return; // No constraint
+**Key design decisions:**
 
-  // Extract resource type from reference
-  const refType = extractReferenceType(ref.reference);
-
-  if (!refType) {
-    issues.push(
-      createValidationIssue(
-        "warning",
-        "REFERENCE_TARGET_PROFILE_MISMATCH",
-        `Element '${element.path}' reference format is invalid or cannot be checked`,
-        { path: element.path },
-      ),
-    );
-    return;
-  }
-
-  // Check if reference type matches any target profile
-  const matchesProfile = targetProfiles.some((profile) =>
-    profile.includes(refType),
-  );
-
-  if (!matchesProfile) {
-    issues.push(
-      createValidationIssue(
-        "error",
-        "REFERENCE_TARGET_PROFILE_MISMATCH",
-        `Element '${element.path}' reference must target [${targetProfiles.join(", ")}], but found '${refType}'`,
-        { path: element.path },
-      ),
-    );
-  }
-}
-```
-
-#### 测试用例（≥20）
-
-**Fixed (8 tests):**
-
-- Fixed string, matching value → valid
-- Fixed string, different value → error
-- Fixed CodeableConcept, matching → valid
-- Fixed CodeableConcept, different → error
-- Fixed Quantity, matching → valid
-- Fixed Quantity, different → error
-- No fixed constraint → valid (any value)
-
-**Pattern (8 tests):**
-
-- Pattern { system: 'X' }, value { system: 'X', code: 'Y' } → valid (subset match)
-- Pattern { system: 'X' }, value { system: 'Z' } → error
-- Pattern { value: 100 }, value { value: 100, unit: 'mg' } → valid
-- Pattern { value: 100 }, value { value: 200 } → error
-- Nested pattern → valid/error cases
-
-**Reference (4 tests):**
-
-- Reference to Patient, targetProfile = Patient → valid
-- Reference to Observation, targetProfile = Patient → error
-- Reference with no targetProfile constraint → valid
-- Invalid reference format → warning
+- `deepEqual` 自实现（不依赖 lodash），仅处理 FHIR JSON 相关类型
+- `matchesPattern` 对数组使用"每个 pattern 元素必须在 value 中找到匹配"语义
+- `validateFixed`/`validatePattern` 跳过 null/undefined 值（由 cardinality 处理）
+- `validateReference` 对 URN/fragment 引用产生 warning 而非 error
+- 错误消息包含 diagnostics（Expected/Actual 或 Pattern/Actual）
 
 #### 验收标准
 
-- [ ] `validateFixed` 实现完整
-- [ ] `validatePattern` 实现完整（支持 partial match）
-- [ ] `validateReference` 实现完整
-- [ ] `matchesPattern` 正确处理嵌套对象
-- [ ] `deepEqual` helper 实现（或使用 lodash）
-- [ ] ≥20 测试用例全部通过
+- [x] `validateFixed` 实现完整（支持 primitive + complex 类型精确匹配）
+- [x] `validatePattern` 实现完整（支持 partial match + 嵌套对象 + 数组）
+- [x] `validateReference` 实现完整（支持相对/绝对/URN/fragment 引用）
+- [x] `matchesPattern` 正确处理嵌套对象和数组
+- [x] `deepEqual` 自实现（递归比较 primitives/arrays/objects）
+- [x] `extractReferenceType` 实现完整
+- [x] `CanonicalElement` 新增 `fixed?` 和 `pattern?` 字段
+- [x] 114 测试用例全部通过（远超 ≥20 要求）
+- [x] 17 个 JSON 专项 fixtures 全部通过（6 fixed + 6 pattern + 5 reference）
+- [x] 1596/1596 测试通过（1482 原有 + 114 新增），零回归
 
 ---
 

@@ -47,6 +47,12 @@ export {
   validateType,
   validateChoiceType,
   inferFhirType,
+  deepEqual,
+  validateFixed,
+  matchesPattern,
+  validatePattern,
+  extractReferenceType,
+  validateReference,
 } from './validation-rules.js';
 
 // ─── Errors ───
