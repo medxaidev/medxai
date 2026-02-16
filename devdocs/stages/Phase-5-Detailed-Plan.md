@@ -134,82 +134,68 @@ Phase 5 implements **structural validation** of FHIR resource instances against 
 
 ---
 
-### Task 5.2: Path Extractor (Day 2, ~1 day)
+### Task 5.2: Path Extractor (Day 2, ~1 day) ✅ Completed
 
 #### 文件: `validator/path-extractor.ts`
 
 实现从 resource 实例中按 element path 提取值的逻辑。
 
-#### 核心功能
+#### Implementation Notes
 
-```typescript
-/**
- * Extract values from a resource instance using an element path.
- *
- * @example
- * extractValues(patient, 'Patient.name')
- * // → [{ family: 'Smith', given: ['John'] }, { family: 'Doe' }]
- *
- * extractValues(patient, 'Patient.name.family')
- * // → ['Smith', 'Doe']
- *
- * extractValues(observation, 'Observation.value[x]')
- * // → [{ valueQuantity: { value: 120, unit: 'mmHg' } }]
- */
-export function extractValues(
-  resource: Record<string, unknown>,
-  path: string,
-): unknown[];
+**已创建文件：**
 
-/**
- * Check if a path exists in the resource (even if value is null/undefined).
- */
-export function pathExists(
-  resource: Record<string, unknown>,
-  path: string,
-): boolean;
+1. **`validator/path-extractor.ts`** (~370 lines, 6 sections)
+   - Section 1: `CHOICE_TYPE_SUFFIXES` — 43 known FHIR type suffixes (primitive + complex)
+   - Section 2: `extractValues(resource, path)` — recursive path extraction with array expansion
+   - Section 3: `pathExists(resource, path)` — property existence check (distinct from value extraction)
+   - Section 4: `findChoiceTypeField(obj, baseName)` — locate concrete choice type property
+   - Section 5: `normalizeChoicePath(basePath, concreteField)` — replace `[x]` with concrete suffix
+   - Section 6: `extractChoiceTypeSuffix(concreteField, baseName)` — extract type name from property
 
-/**
- * Normalize a choice type path for extraction.
- *
- * @example
- * normalizeChoicePath('Observation.value[x]', 'valueQuantity')
- * // → 'Observation.valueQuantity'
- */
-export function normalizeChoicePath(
-  basePath: string,
-  concreteField: string,
-): string;
-```
+2. **`validator/__tests__/path-extractor.test.ts`** (~620 lines, **108 tests**)
+   - extractValues unit tests: 30 tests (scalar, array, missing, empty, choice type, deep nesting, edge cases, extension value[x])
+   - pathExists unit tests: 10 tests
+   - findChoiceTypeField unit tests: 9 tests
+   - normalizeChoicePath unit tests: 6 tests
+   - extractChoiceTypeSuffix unit tests: 7 tests
+   - Fixture 01 (simple-patient): 11 tests
+   - Fixture 02 (choice-types): 5 tests
+   - Fixture 03 (deep-nesting): 7 tests
+   - Fixture 04 (edge-cases): 11 tests
+   - Fixture 05 (extensions-and-references): 7 tests
+   - pathExists fixture-driven: 5 tests + 3 choice type tests
 
-#### 实现要点
+3. **5 JSON fixtures** (`validator/__tests__/fixtures/path-extractor/`)
+   - `01-simple-patient.json` — scalar fields, arrays, nested paths, missing paths
+   - `02-choice-types.json` — value[x], effective[x], component.value[x]
+   - `03-deep-nesting.json` — contact.name.family, contact.address.line (4-level deep)
+   - `04-edge-cases.json` — empty arrays, null values, primitives-only, deeply empty objects
+   - `05-extensions-and-references.json` — extension.value[x] (3 different types), references
 
-1. **路径解析**: `'Patient.name.family'` → `['Patient', 'name', 'family']`
-2. **数组展开**: 如果中间节点是数组，递归展开所有元素
-3. **Choice type 处理**: `value[x]` 需要检查所有可能的具体字段（`valueString`, `valueQuantity` 等）
-4. **嵌套对象**: 支持任意深度嵌套
-5. **边界情况**: `undefined` / `null` / 空数组
+**Key design decisions:**
 
-#### 测试用例（≥20）
+- `extractValues` returns `[null]` for properties that exist with value `null` (not `[]`)
+- Array expansion is automatic at every level — `Patient.name.given` flattens all `given` arrays
+- Choice type resolution uses known suffixes first (fast path), then fallback key scan
+- `pathExists` is distinct from `extractValues(…).length > 0` — empty arrays still "exist"
 
-- 简单路径提取（`Patient.id`）
-- 嵌套路径提取（`Patient.name.family`）
-- 数组字段提取（`Patient.name` → 多个 HumanName）
-- 数组中嵌套字段（`Patient.name.given` → 所有 given 展开）
-- Choice type 提取（`Observation.value[x]` → 找到 `valueQuantity`）
-- 不存在的路径（返回 `[]`）
-- Root 路径（`Patient` → 整个 resource）
-- 深度嵌套（`Patient.contact.name.family`）
+**Bug fix during development:**
+
+- Initial `extractFromNode` filtered out `null` values at the top of recursion. Fixed by moving the null check after the "all segments consumed" check, so `null` is returned as a valid leaf value.
 
 #### 验收标准
 
-- [ ] `extractValues` 实现完整
-- [ ] `pathExists` 实现完整
-- [ ] `normalizeChoicePath` 实现完整
-- [ ] ≥20 测试用例全部通过
-- [ ] 处理所有边界情况（undefined/null/空数组）
-- [ ] 支持任意深度嵌套
-- [ ] Choice type 正确处理
+- [x] `extractValues` 实现完整（含数组展开、choice type、深度嵌套）
+- [x] `pathExists` 实现完整（含 choice type 支持）
+- [x] `normalizeChoicePath` 实现完整
+- [x] `findChoiceTypeField` 实现完整（known suffixes + fallback scan）
+- [x] `extractChoiceTypeSuffix` 实现完整
+- [x] 108 测试用例全部通过（远超 ≥20 要求）
+- [x] 处理所有边界情况（undefined/null/空数组/空对象）
+- [x] 支持任意深度嵌套（4+ levels tested）
+- [x] Choice type 正确处理（value[x], effective[x], extension.value[x]）
+- [x] 5 个 JSON 专项 fixtures 全部通过
+- [x] 1360/1360 测试通过（1252 原有 + 108 新增），零回归
 
 ---
 

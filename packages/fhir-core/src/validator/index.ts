@@ -31,6 +31,15 @@ export {
   filterIssuesByCode,
 } from './types.js';
 
+// ─── Path Extractor ───
+export {
+  extractValues,
+  pathExists,
+  findChoiceTypeField,
+  normalizeChoicePath,
+  extractChoiceTypeSuffix,
+} from './path-extractor.js';
+
 // ─── Errors ───
 export {
   ValidatorError,
