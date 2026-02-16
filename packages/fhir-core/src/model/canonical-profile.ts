@@ -276,6 +276,16 @@ export interface CanonicalElement {
   isSummary: boolean;
 
   /**
+   * Slice name for this element, if it is a named slice.
+   *
+   * Corresponds to `ElementDefinition.sliceName`. Only present on
+   * elements that represent a specific slice within a sliced array.
+   *
+   * @example `'MRN'` for `Patient.identifier:MRN`
+   */
+  sliceName?: string;
+
+  /**
    * Fixed value constraint for this element.
    *
    * When present, the element value MUST exactly equal this value.

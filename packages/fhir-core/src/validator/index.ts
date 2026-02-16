@@ -55,6 +55,17 @@ export {
   validateReference,
 } from './validation-rules.js';
 
+// ─── Slicing Validator ───
+export {
+  validateSlicing,
+  findMatchingSlice,
+  matchesDiscriminator,
+  isSliceOrderValid,
+  extractValueAtPath,
+  getSliceDiscriminatorValue,
+  getSliceTypes,
+} from './slicing-validator.js';
+
 // ─── Errors ───
 export {
   ValidatorError,
