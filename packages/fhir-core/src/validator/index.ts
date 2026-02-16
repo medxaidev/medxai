@@ -40,6 +40,15 @@ export {
   extractChoiceTypeSuffix,
 } from './path-extractor.js';
 
+// ─── Validation Rules ───
+export {
+  validateCardinality,
+  validateRequired,
+  validateType,
+  validateChoiceType,
+  inferFhirType,
+} from './validation-rules.js';
+
 // ─── Errors ───
 export {
   ValidatorError,

@@ -199,137 +199,69 @@ Phase 5 implements **structural validation** of FHIR resource instances against 
 
 ---
 
-### Task 5.3: Validation Rules — Cardinality & Type (Day 3-4, ~2 days)
+### Task 5.3: Validation Rules — Cardinality & Type (Day 3-4, ~2 days) ✅ Completed
 
 #### 文件: `validator/validation-rules.ts`
 
 实现核心验证规则：cardinality 和 type checking。
 
-#### 核心函数
+#### Implementation Notes
 
-```typescript
-/**
- * Validate cardinality (min/max) for an element.
- */
-export function validateCardinality(
-  element: CanonicalElement,
-  values: unknown[],
-  issues: ValidationIssue[],
-): void {
-  const count = values.length;
+**已创建文件：**
 
-  // Check min
-  if (element.min > 0 && count < element.min) {
-    issues.push(
-      createValidationIssue(
-        "error",
-        "CARDINALITY_MIN_VIOLATION",
-        `Element '${element.path}' requires at least ${element.min} value(s), but found ${count}`,
-        { path: element.path },
-      ),
-    );
-  }
+1. **`validator/validation-rules.ts`** (~340 lines, 5 sections)
+   - Section 1: `validateCardinality(element, values, issues)` — min/max cardinality checks
+   - Section 2: `validateRequired(element, exists, issues)` — required element presence check
+   - Section 3: `inferFhirType(value)` — heuristic FHIR type inference (15+ complex types: Coding, CodeableConcept, Quantity, Reference, Period, Ratio, HumanName, Address, Identifier, Attachment, Extension, Meta, Narrative, BackboneElement)
+   - Section 4: `validateType(element, value, issues)` — type constraint validation with `isTypeCompatible` (handles string-like primitives, integer variants, Quantity sub-types, BackboneElement fallback)
+   - Section 5: `validateChoiceType(element, suffix, issues)` — choice type suffix validation
 
-  // Check max
-  if (element.max !== "unbounded") {
-    const maxNum = parseInt(element.max, 10);
-    if (count > maxNum) {
-      issues.push(
-        createValidationIssue(
-          "error",
-          "CARDINALITY_MAX_VIOLATION",
-          `Element '${element.path}' allows at most ${element.max} value(s), but found ${count}`,
-          { path: element.path },
-        ),
-      );
-    }
-  }
-}
+2. **`validator/__tests__/validation-rules.test.ts`** (~680 lines, **122 tests**)
+   - validateCardinality unit tests: 15 tests (valid, min violation, max violation, prohibited, message content)
+   - validateRequired unit tests: 5 tests
+   - inferFhirType unit tests: 30 tests (primitives + 15 complex types + null/array)
+   - validateType unit tests: 22 tests (valid matches, mismatches, special cases, choice types, BackboneElement)
+   - validateChoiceType unit tests: 7 tests
+   - Fixture cardinality tests: 10 tests (6 fixture files)
+   - Fixture type tests: 32 tests (6 fixture files)
+   - Barrel exports: 1 test
 
-/**
- * Validate type constraints for an element.
- */
-export function validateType(
-  element: CanonicalElement,
-  value: unknown,
-  issues: ValidationIssue[],
-): void {
-  if (element.types.length === 0) return; // No type constraint
+3. **6 Cardinality JSON fixtures** (`fixtures/validation-rules/cardinality/`)
+   - `01-optional-absent.json` — min=0, max=1, count=0 → valid
+   - `02-required-missing.json` — min=1, max=\*, count=0 → CARDINALITY_MIN_VIOLATION
+   - `03-max-exceeded.json` — min=0, max=1, count=2 → CARDINALITY_MAX_VIOLATION
+   - `04-range-valid.json` — min=2, max=5, count=3 → valid
+   - `05-range-both-violations.json` — 2 scenarios: below min + above max
+   - `06-unbounded-max.json` — 4 scenarios: 0/1/5/100 values with unbounded max
 
-  const actualType = inferFhirType(value);
-  const allowedTypes = element.types.map((t) => t.code);
+4. **6 Type JSON fixtures** (`fixtures/validation-rules/type/`)
+   - `01-primitive-types.json` — 5 scenarios: string, boolean, integer, decimal, integer→decimal
+   - `02-type-mismatches.json` — 5 scenarios: number→string, string→boolean, decimal→integer, boolean→integer, string→CodeableConcept
+   - `03-complex-types.json` — 6 scenarios: Coding, CodeableConcept, Quantity, Reference, HumanName, Period
+   - `04-choice-types.json` — 5 scenarios: multi-type matches and mismatches
+   - `05-backbone-and-special.json` — 5 scenarios: backbone, null, Identifier, Address, Extension
+   - `06-choice-type-suffix.json` — 5 scenarios: allowed/disallowed suffixes
 
-  if (!allowedTypes.includes(actualType)) {
-    issues.push(
-      createValidationIssue(
-        "error",
-        "TYPE_MISMATCH",
-        `Element '${element.path}' expects type(s) [${allowedTypes.join(", ")}], but found '${actualType}'`,
-        { path: element.path },
-      ),
-    );
-  }
-}
+**Key design decisions:**
 
-/**
- * Infer FHIR type from a JavaScript value.
- */
-export function inferFhirType(value: unknown): string {
-  if (typeof value === "string") return "string";
-  if (typeof value === "boolean") return "boolean";
-  if (typeof value === "number")
-    return Number.isInteger(value) ? "integer" : "decimal";
-  if (value && typeof value === "object") {
-    // Check for complex types by presence of specific fields
-    if ("system" in value && "code" in value) return "Coding";
-    if ("value" in value && "unit" in value) return "Quantity";
-    if ("reference" in value) return "Reference";
-    // ... more heuristics
-    return "object"; // Generic complex type
-  }
-  return "unknown";
-}
-```
-
-#### 测试用例（≥30）
-
-**Cardinality (15 tests):**
-
-- min=0, max=1, count=0 → valid
-- min=0, max=1, count=1 → valid
-- min=0, max=1, count=2 → error
-- min=1, max=1, count=0 → error (required)
-- min=1, max=1, count=1 → valid
-- min=1, max=\*, count=0 → error
-- min=1, max=\*, count=5 → valid
-- min=0, max=\*, count=100 → valid
-- min=2, max=5, count=1 → error
-- min=2, max=5, count=3 → valid
-- min=2, max=5, count=6 → error
-
-**Type (15 tests):**
-
-- string type, string value → valid
-- string type, number value → error
-- boolean type, boolean value → valid
-- integer type, integer value → valid
-- integer type, decimal value → error
-- Coding type, Coding object → valid
-- Coding type, string → error
-- Quantity type, Quantity object → valid
-- Reference type, Reference object → valid
-- Choice type [string, Quantity], string → valid
-- Choice type [string, Quantity], Quantity → valid
-- Choice type [string, Quantity], boolean → error
+- `inferFhirType` uses shape-based heuristics (15+ complex types) — inherently imperfect but sufficient for structural validation
+- `isTypeCompatible` handles FHIR type hierarchy: string-like primitives, integer variants, Quantity sub-types, BackboneElement fallback
+- `validateType` skips null/undefined (handled by cardinality) and empty type arrays (backbone elements)
+- `validateChoiceType` uses case-insensitive comparison for suffix matching
+- Error messages include both expected and actual types with diagnostics
 
 #### 验收标准
 
-- [ ] `validateCardinality` 实现完整
-- [ ] `validateType` 实现完整
-- [ ] `inferFhirType` 实现完整（支持 10+ FHIR 类型）
-- [ ] ≥30 测试用例全部通过
-- [ ] 错误消息清晰（包含 expected vs actual）
-- [ ] 支持 choice type 验证
+- [x] `validateCardinality` 实现完整（min/max/unbounded/prohibited）
+- [x] `validateRequired` 实现完整
+- [x] `validateType` 实现完整（含 type hierarchy 兼容性）
+- [x] `validateChoiceType` 实现完整
+- [x] `inferFhirType` 实现完整（支持 15+ FHIR 类型）
+- [x] 122 测试用例全部通过（远超 ≥30 要求）
+- [x] 错误消息清晰（包含 expected vs actual + diagnostics）
+- [x] 支持 choice type 验证
+- [x] 12 个 JSON 专项 fixtures 全部通过（6 cardinality + 6 type）
+- [x] 1482/1482 测试通过（1360 原有 + 122 新增），零回归
 
 ---
 
