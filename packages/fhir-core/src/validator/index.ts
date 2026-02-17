@@ -66,6 +66,9 @@ export {
   getSliceTypes,
 } from './slicing-validator.js';
 
+// ─── Structure Validator ───
+export { StructureValidator } from './structure-validator.js';
+
 // ─── Errors ───
 export {
   ValidatorError,

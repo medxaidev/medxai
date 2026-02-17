@@ -444,197 +444,88 @@ Phase 5 implements **structural validation** of FHIR resource instances against 
 
 ---
 
-### Task 5.6: StructureValidator (Orchestrator) (Day 7, ~1 day)
+### Task 5.6: StructureValidator (Orchestrator) (Day 7, ~1 day) ✅ Completed
 
 #### 文件: `validator/structure-validator.ts`
 
 实现主验证器类，协调所有验证规则。
 
-#### 核心类
+#### Implementation Notes
 
-```typescript
-/**
- * Main validator class for structural validation.
- */
-export class StructureValidator {
-  private readonly context: FhirContext;
-  private readonly options: ValidationOptions;
+**新文件 `validator/structure-validator.ts`：**
 
-  constructor(context: FhirContext, options?: ValidationOptions) {
-    this.context = context;
-    this.options = {
-      validateSlicing: true,
-      validateFixed: true,
-      maxDepth: 50,
-      failFast: false,
-      ...options,
-    };
-  }
+`StructureValidator` 类 — 主验证器，协调所有 Task 5.2-5.5 的验证规则。
 
-  /**
-   * Validate a resource instance against a profile.
-   */
-  async validate(
-    resource: Resource,
-    profileUrl?: string,
-  ): Promise<ValidationResult> {
-    const issues: ValidationIssue[] = [];
+**设计决策（与计划的差异）：**
 
-    // 1. Determine profile URL
-    const targetProfile = profileUrl || this.extractProfileFromMeta(resource);
-    if (!targetProfile) {
-      throw new ProfileNotFoundError("No profile specified");
-    }
+- **同步 API**：`validate(resource, profile, options?)` 是同步方法，直接接受 `CanonicalProfile`
+  - 计划中的 `async validate(resource, profileUrl?)` 依赖 FhirContext 异步加载
+  - 实际实现将 profile 解析与验证解耦，FhirContext 集成留给 Task 5.7 的集成层
+  - 这使得 StructureValidator 可以独立于 FhirContext 使用
+- **per-call options override**：`validate()` 接受可选的 per-call options，覆盖构造函数 options
+- **maxDepth 使用 `>=` 而非 `>`**：确保 `maxDepth=0` 正确跳过元素遍历
 
-    // 2. Load profile snapshot
-    const sd = await this.context.getStructureDefinition(targetProfile);
-    if (!sd?.snapshot) {
-      throw new ProfileNotFoundError(targetProfile);
-    }
+**验证流程（4 步）：**
 
-    // 3. Convert to CanonicalProfile
-    const profile = buildCanonicalProfile(sd);
+1. **Resource type check** — 检查 `resource.resourceType` 是否匹配 `profile.type`
+2. **Element traversal** — 遍历 profile 中所有非根、非切片元素
+3. **Per-element validation** — 对每个元素执行：
+   - 基数验证（validateCardinality）
+   - 类型验证（validateType）
+   - Fixed/Pattern 验证（validateFixed, validatePattern）— 受 `validateFixed` 选项控制
+   - Reference 验证（validateReference）— 仅对 Reference 类型元素
+   - Slicing 验证（validateSlicing）— 受 `validateSlicing` 选项控制
+4. **failFast check** — 每步后检查是否需要提前终止
 
-    // 4. Validate root element
-    const rootElement = profile.elements.get(profile.type);
-    if (!rootElement) {
-      throw new ValidatorError(
-        `Profile '${targetProfile}' has no root element`,
-      );
-    }
+**测试文件：`validator/__tests__/structure-validator.test.ts`** — **38 tests**
 
-    // Check resource type matches
-    if (resource.resourceType !== profile.type) {
-      issues.push(
-        createValidationIssue(
-          "error",
-          "RESOURCE_TYPE_MISMATCH",
-          `Expected resourceType '${profile.type}', but found '${resource.resourceType}'`,
-        ),
-      );
+- Constructor: 2 tests
+- Basic validate: 7 tests (ProfileNotFoundError, valid, type mismatch, cardinality, profileUrl)
+- Options: 7 tests (failFast, validateFixed, validateSlicing, per-call override, maxDepth)
+- Advanced: 4 tests (fixed, pattern, reference, warnings)
+- Fixture basic: 6 tests (6 fixture files)
+- Fixture advanced: 6 tests (6 fixture files)
+- Fixture options: 5 tests (5 fixture files)
+- Barrel exports: 1 test
 
-      if (this.options.failFast) {
-        throw new ValidationFailedError("Resource type mismatch", issues);
-      }
-    }
+**17 个 JSON 专项 fixtures：**
 
-    // 5. Validate all elements
-    this.validateElements(resource, profile, issues);
+- **6 Basic fixtures** (`fixtures/structure-validator/basic/`)
+  - `01-valid-patient.json` — 有效最小 Patient
+  - `02-missing-required.json` — 缺少必填字段 → CARDINALITY_MIN_VIOLATION
+  - `03-wrong-resourcetype.json` — resourceType 不匹配 → RESOURCE_TYPE_MISMATCH
+  - `04-cardinality-max-violation.json` — 基数上限超出 → CARDINALITY_MAX_VIOLATION
+  - `05-multiple-errors.json` — 多个错误同时存在
+  - `06-valid-observation.json` — 有效 Observation
 
-    // 6. Return result
-    return {
-      valid: !issues.some((i) => i.severity === "error"),
-      resource,
-      issues,
-      profileUrl: targetProfile,
-    };
-  }
+- **6 Advanced fixtures** (`fixtures/structure-validator/advanced/`)
+  - `01-fixed-value-mismatch.json` — fixed 值不匹配
+  - `02-pattern-value-mismatch.json` — pattern 值不匹配
+  - `03-reference-target-mismatch.json` — reference target 不匹配
+  - `04-slicing-closed-violation.json` — closed slicing 违规
+  - `05-valid-with-all-rules.json` — 所有规则类型都通过
+  - `06-fixed-pattern-combined.json` — fixed + pattern 组合验证
 
-  /**
-   * Validate all elements in the profile against the resource.
-   */
-  private validateElements(
-    resource: Resource,
-    profile: CanonicalProfile,
-    issues: ValidationIssue[],
-  ): void {
-    for (const element of profile.elements.values()) {
-      // Skip root element (already validated)
-      if (element.path === profile.type) continue;
-
-      // Extract values from resource
-      const values = extractValues(resource, element.path);
-
-      // Validate cardinality
-      validateCardinality(element, values, issues);
-
-      // Validate each value
-      for (const value of values) {
-        // Type validation
-        validateType(element, value, issues);
-
-        // Fixed/pattern validation
-        if (this.options.validateFixed) {
-          validateFixed(element, value, issues);
-          validatePattern(element, value, issues);
-        }
-
-        // Reference validation
-        if (element.types.some((t) => t.code === "Reference")) {
-          validateReference(element, value, issues);
-        }
-      }
-
-      // Slicing validation
-      if (this.options.validateSlicing && element.slicing) {
-        const sliceElements = this.getSliceElements(profile, element.path);
-        validateSlicing(element, sliceElements, values, issues);
-      }
-
-      // Fail fast if requested
-      if (this.options.failFast && issues.some((i) => i.severity === "error")) {
-        throw new ValidationFailedError("Validation failed", issues);
-      }
-    }
-  }
-
-  /**
-   * Get all slice elements for a slicing root.
-   */
-  private getSliceElements(
-    profile: CanonicalProfile,
-    slicingRootPath: string,
-  ): CanonicalElement[] {
-    const slices: CanonicalElement[] = [];
-
-    for (const element of profile.elements.values()) {
-      if (element.path === slicingRootPath && element.sliceName) {
-        slices.push(element);
-      }
-    }
-
-    return slices;
-  }
-
-  /**
-   * Extract profile URL from resource.meta.profile.
-   */
-  private extractProfileFromMeta(resource: Resource): string | undefined {
-    return resource.meta?.profile?.[0] as string | undefined;
-  }
-}
-```
-
-#### 测试用例（≥20）
-
-- Valid Patient resource → valid
-- Patient missing required field (name) → error
-- Patient with invalid type (name as string) → error
-- Patient with cardinality violation (max=1, count=2) → error
-- Patient with fixed value mismatch → error
-- Patient with pattern value mismatch → error
-- Patient with invalid reference target → error
-- Patient with valid slicing → valid
-- Patient with invalid slicing (closed, unmatched) → error
-- Observation with choice type (valueQuantity) → valid
-- Observation with invalid choice type → error
-- Resource with unknown profile → error
-- Resource with mismatched resourceType → error
-- Nested validation (Patient.contact.name)
-- Deep nesting (max depth check)
-- failFast mode → throws on first error
-- Collect all issues mode → returns all issues
+- **5 Options fixtures** (`fixtures/structure-validator/options/`)
+  - `01-failfast-throws.json` — failFast 模式抛出异常
+  - `02-skip-fixed-validation.json` — validateFixed=false 跳过 fixed 检查
+  - `03-skip-slicing-validation.json` — validateSlicing=false 跳过 slicing 检查
+  - `04-no-profile-throws.json` — 无 profile → ProfileNotFoundError
+  - `05-warnings-still-valid.json` — 仅 warning 不影响 valid 状态
 
 #### 验收标准
 
-- [ ] `StructureValidator` 类实现完整
-- [ ] `validate()` 方法协调所有验证规则
-- [ ] 支持 ValidationOptions 配置
-- [ ] 正确处理 profile URL (参数 vs meta.profile)
-- [ ] 集成所有 Task 5.2-5.5 的验证规则
-- [ ] ≥20 集成测试用例全部通过
-- [ ] failFast 模式正确工作
-- [ ] 错误消息清晰且可操作
+- [x] `StructureValidator` 类实现完整（同步 API，接受 CanonicalProfile）
+- [x] `validate()` 方法协调所有验证规则（cardinality, type, fixed, pattern, reference, slicing）
+- [x] 支持 ValidationOptions 配置（构造函数 + per-call override）
+- [x] 正确处理 profileUrl（options.profileUrl > profile.url）
+- [x] 集成所有 Task 5.2-5.5 的验证规则
+- [x] 38 测试用例全部通过（远超 ≥20 要求）
+- [x] 17 个 JSON 专项 fixtures 全部通过（6 basic + 6 advanced + 5 options）
+- [x] failFast 模式正确工作（抛出 ValidationFailedError，包含 issues）
+- [x] maxDepth 正确工作（depth >= maxDepth 时产生 warning）
+- [x] 错误消息清晰且可操作（包含 diagnostics）
+- [x] 1710/1710 测试通过（1672 原有 + 38 新增），零回归
 
 ---
 
