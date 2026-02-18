@@ -18,7 +18,10 @@ export { ParserBuilder, Parser } from './lexer/parse.js';
 export { tokenize, FHIRPATH_KEYWORDS, FHIRPATH_OPERATORS } from './tokenize.js';
 
 // FHIRPath parser & evaluator
-export { parseFhirPath, evalFhirPath, evalFhirPathTyped, OperatorPrecedence, initFhirPathParserBuilder } from './parse.js';
+export { parseFhirPath, evalFhirPath, evalFhirPathTyped, evalFhirPathBoolean, evalFhirPathString, OperatorPrecedence, initFhirPathParserBuilder } from './parse.js';
+
+// Expression cache
+export { LRUCache, getExpressionCache, setExpressionCache, clearExpressionCache, DEFAULT_CACHE_SIZE } from './cache.js';
 
 // Atoms
 export {

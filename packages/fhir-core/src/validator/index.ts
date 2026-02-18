@@ -69,6 +69,14 @@ export {
 // ─── Structure Validator ───
 export { StructureValidator } from './structure-validator.js';
 
+// ─── Invariant Validator ───
+export type { InvariantValidationOptions } from './invariant-validator.js';
+export {
+  validateInvariants,
+  validateSingleInvariant,
+  validateAllInvariants,
+} from './invariant-validator.js';
+
 // ─── Errors ───
 export {
   ValidatorError,

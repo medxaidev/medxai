@@ -390,6 +390,8 @@ describe('ValidationIssueCode', () => {
       'RESOURCE_TYPE_MISMATCH',
       'UNKNOWN_ELEMENT',
       'INVARIANT_NOT_EVALUATED',
+      'INVARIANT_VIOLATION',
+      'INVARIANT_EVALUATION_ERROR',
       'INTERNAL_ERROR',
     ];
 
@@ -398,8 +400,8 @@ describe('ValidationIssueCode', () => {
       expect(issue.code).toBe(code);
     }
 
-    // Verify we covered all 16 codes
-    expect(codes.length).toBe(16);
+    // Verify we covered all 18 codes
+    expect(codes.length).toBe(18);
   });
 });
 

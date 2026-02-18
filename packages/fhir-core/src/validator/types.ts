@@ -86,6 +86,17 @@ export interface ValidationOptions {
    * @default false
    */
   readonly failFast?: boolean;
+
+  /**
+   * Whether to skip FHIRPath invariant validation.
+   *
+   * When `true`, constraint expressions from the profile are not
+   * evaluated. Useful for performance or when FHIRPath evaluation
+   * is not needed.
+   *
+   * @default false
+   */
+  readonly skipInvariants?: boolean;
 }
 
 // =============================================================================
@@ -241,9 +252,13 @@ export type ValidationIssueCode =
   /** Resource contains an element not defined in the profile. */
   | 'UNKNOWN_ELEMENT'
 
-  // ─── Invariant (placeholder for Phase 6) ───
-  /** FHIRPath invariant evaluation is not yet supported. */
+  // ─── Invariant ───
+  /** FHIRPath invariant evaluation is not yet supported (skipped). */
   | 'INVARIANT_NOT_EVALUATED'
+  /** FHIRPath invariant constraint evaluated to false. */
+  | 'INVARIANT_VIOLATION'
+  /** FHIRPath invariant expression failed to evaluate (runtime error). */
+  | 'INVARIANT_EVALUATION_ERROR'
 
   // ─── Internal ───
   /** Internal validator error (should not happen). */
@@ -335,6 +350,7 @@ export function createValidationContext(
       validateFixed: options?.validateFixed ?? true,
       maxDepth: options?.maxDepth ?? 50,
       failFast: options?.failFast ?? false,
+      skipInvariants: options?.skipInvariants ?? false,
     },
     depth: 0,
   };
@@ -357,6 +373,7 @@ export function resolveValidationOptions(
     validateFixed: options?.validateFixed ?? true,
     maxDepth: options?.maxDepth ?? 50,
     failFast: options?.failFast ?? false,
+    skipInvariants: options?.skipInvariants ?? false,
   };
 }
 

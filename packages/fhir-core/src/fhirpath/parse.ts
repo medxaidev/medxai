@@ -41,8 +41,9 @@ import {
 } from './atoms.js';
 import { parseDateString } from './date.js';
 import { tokenize } from './tokenize.js';
-import { toTypedValue } from './utils.js';
+import { toTypedValue, toJsBoolean } from './utils.js';
 import { functions } from './functions.js';
+import { getExpressionCache } from './cache.js';
 
 // Wire the function registry into atoms
 setFunctionRegistry(functions);
@@ -256,16 +257,23 @@ const fhirPathParserBuilder = initFhirPathParserBuilder();
 
 /**
  * Parse a FHIRPath expression string into an AST.
- * The result can be reused to evaluate the same expression against different inputs.
+ * Results are cached in the global expression cache for reuse.
  *
  * @param input - The FHIRPath expression string.
  * @returns The parsed AST as a {@link FhirPathAtom}.
  */
 export function parseFhirPath(input: string): FhirPathAtom {
+  const cache = getExpressionCache();
+  const cached = cache.get(input) as FhirPathAtom | undefined;
+  if (cached) {
+    return cached;
+  }
   const tokens = tokenize(input);
   const parser = fhirPathParserBuilder.construct(tokens);
   parser.removeComments();
-  return new FhirPathAtom(input, parser.consumeAndParse());
+  const ast = new FhirPathAtom(input, parser.consumeAndParse());
+  cache.set(input, ast);
+  return ast;
 }
 
 /**
@@ -305,4 +313,58 @@ export function evalFhirPathTyped(
     type: v.type,
     value: v.value?.valueOf(),
   }));
+}
+
+// =============================================================================
+// High-level convenience API
+// =============================================================================
+
+/**
+ * Evaluate a FHIRPath expression and return a boolean result.
+ *
+ * Useful for invariant validation where the expression must evaluate to `true`.
+ * Uses FHIRPath boolean semantics: empty → false, single truthy → true.
+ *
+ * @param expression - FHIRPath expression string or pre-parsed AST.
+ * @param input - The resource or typed values to evaluate against.
+ * @param variables - Optional variable bindings.
+ * @returns Boolean result of the expression.
+ */
+export function evalFhirPathBoolean(
+  expression: string | FhirPathAtom,
+  input: unknown,
+  variables: Record<string, TypedValue> = {},
+): boolean {
+  const array = Array.isArray(input) ? input : [input];
+  for (let i = 0; i < array.length; i++) {
+    const el = array[i];
+    if (!(typeof el === 'object' && el !== null && 'type' in el && 'value' in el)) {
+      array[i] = toTypedValue(array[i]);
+    }
+  }
+  const result = evalFhirPathTyped(expression, array as TypedValue[], variables);
+  return toJsBoolean(result);
+}
+
+/**
+ * Evaluate a FHIRPath expression and return the first result as a string.
+ *
+ * Useful for extracting display values, identifiers, etc.
+ *
+ * @param expression - FHIRPath expression string or pre-parsed AST.
+ * @param input - The resource or typed values to evaluate against.
+ * @param variables - Optional variable bindings.
+ * @returns The first result value as a string, or `undefined` if empty.
+ */
+export function evalFhirPathString(
+  expression: string | FhirPathAtom,
+  input: unknown,
+  variables: Record<string, TypedValue> = {},
+): string | undefined {
+  const results = evalFhirPath(expression, input);
+  if (results.length === 0) {
+    return undefined;
+  }
+  const first = results[0];
+  return first === undefined || first === null ? undefined : String(first);
 }
