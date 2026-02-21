@@ -1,0 +1,26 @@
+package,file,exportType,name,visibility,loc,status,desc,algorithmTag,workflowTag
+@medplum/fhirtypes,dist/index.d.ts,re-export,index,public,auto-generated,Understood,总入口：re-export 所有 FHIR 类型,,
+@medplum/fhirtypes,dist/Resource.d.ts,type,Resource,public,auto-generated,Understood,所有 FHIR 资源的联合类型 (Patient | Observation | ...),,
+@medplum/fhirtypes,dist/ResourceType.d.ts,type,ResourceType,public,auto-generated,Understood,所有资源类型名称的字符串字面量联合 ('Patient' | 'Observation' | ...),,
+@medplum/fhirtypes,dist/ResourceType.d.ts,type,ExtractResource,public,auto-generated,Understood,泛型工具类型：从 ResourceType 字符串提取具体资源接口,,
+@medplum/fhirtypes,dist/Bundle.d.ts,interface,Bundle,public,auto-generated,Understood,FHIR Bundle 泛型接口 Bundle<T extends Resource = Resource>,,WF-003
+@medplum/fhirtypes,dist/BundleEntry.d.ts,interface,BundleEntry,public,auto-generated,Understood,Bundle 条目泛型接口 BundleEntry<T extends Resource = Resource>,,WF-003
+@medplum/fhirtypes,dist/Reference.d.ts,interface,Reference,public,auto-generated,Understood,FHIR Reference 泛型接口；含 Medplum 扩展字段 resource?: T,,
+@medplum/fhirtypes,dist/Patient.d.ts,interface,Patient,public,auto-generated,Understood,FHIR Patient 资源接口,,WF-001
+@medplum/fhirtypes,dist/OperationOutcome.d.ts,interface,OperationOutcome,public,auto-generated,Understood,FHIR 操作结果/错误描述接口,,
+@medplum/fhirtypes,dist/OperationOutcome.d.ts,interface,OperationOutcomeIssue,public,auto-generated,Understood,OperationOutcome 中的单条问题描述,,
+@medplum/fhirtypes,dist/Observation.d.ts,interface,Observation,public,auto-generated,Understood,FHIR Observation 资源接口,,
+@medplum/fhirtypes,dist/CodeableConcept.d.ts,interface,CodeableConcept,public,auto-generated,Understood,可编码概念：coding[] + text,,
+@medplum/fhirtypes,dist/Coding.d.ts,interface,Coding,public,auto-generated,Understood,单个编码：system + code + display,,
+@medplum/fhirtypes,dist/HumanName.d.ts,interface,HumanName,public,auto-generated,Understood,人名结构：family + given[] + prefix[] + suffix[],,
+@medplum/fhirtypes,dist/Identifier.d.ts,interface,Identifier,public,auto-generated,Understood,标识符：system + value,,
+@medplum/fhirtypes,dist/Meta.d.ts,interface,Meta,public,auto-generated,Understood,资源元数据：versionId + lastUpdated + tag[] + profile[],,
+@medplum/fhirtypes,dist/Extension.d.ts,interface,Extension,public,auto-generated,Understood,FHIR 扩展机制：url + value[x],,
+@medplum/fhirtypes,dist/StructureDefinition.d.ts,interface,StructureDefinition,public,auto-generated,Understood,FHIR 结构定义资源,,ALG-001
+@medplum/fhirtypes,dist/ElementDefinition.d.ts,interface,ElementDefinition,public,auto-generated,Understood,StructureDefinition 中的元素定义,,ALG-001
+@medplum/fhirtypes,dist/SearchParameter.d.ts,interface,SearchParameter,public,auto-generated,Understood,搜索参数定义资源,,ALG-003
+@medplum/fhirtypes,dist/ValueSet.d.ts,interface,ValueSet,public,auto-generated,Understood,值集定义资源,,
+@medplum/fhirtypes,dist/CodeSystem.d.ts,interface,CodeSystem,public,auto-generated,Understood,代码系统定义资源,,
+@medplum/definitions,src/index.ts,function,readJson,public,11,Understood,读取 definitions 包内的 FHIR JSON 数据文件（StructureDefinition/ValueSet 等）,,
+@medplum/definitions,src/index.ts,function,getDataDir,public,20,Understood,定位 definitions 包的数据目录（兼容 CJS/ESM/多版本路径）,,
+@medplum/definitions,src/index.ts,const,SEARCH_PARAMETER_BUNDLE_FILES,public,5,Understood,所有搜索参数 Bundle 文件路径列表（r4 + medplum + uscore）,,ALG-003
