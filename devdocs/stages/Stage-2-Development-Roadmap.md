@@ -46,59 +46,76 @@ Phase 13: Search Execution Layer
 
 ---
 
-## Phase 7: FHIR Model Completeness
+## Phase 7: FHIR Model Completeness & Bundle Loading
 
 **Duration:** 3-5 days  
-**Complexity:** Low  
+**Complexity:** Low-Medium  
 **Risk:** Low  
-**Depends On:** Phase 1-6 ✅
+**Depends On:** Phase 1-6 ✅  
+**Detailed Plan:** [Phase-7-Detailed-Plan.md](./Phase-7-Detailed-Plan.md)
 
 ### Objectives
 
-Ensure the FHIR model layer is complete and ready to drive table generation. All resource types needed for hospital deployment must be representable.
+Validate and extend the existing `StructureDefinitionParser` to handle the **full** FHIR R4 specification bundles (`profiles-resources.json`, `profiles-types.json`, `profiles-others.json`), implement `BundleLoader` as the entry point for Phase 8's schema generation pipeline, and establish the `spec/` directory structure.
+
+**Key insight:** The 73 individual JSON files in `core-definitions/` are a Stage-1 subset for the validation layer. Phase 8 requires the complete bundles — all ~148 resources from `profiles-resources.json`.
 
 ### Tasks
 
-#### Task 7.1: Audit Existing Model Coverage
+#### Task 7.1: Parser Completeness Audit
 
-- Review `packages/fhir-core/src/model/` for missing FHIR R4 resource types
-- Identify gaps: MedicationRequest, Encounter, Condition, DiagnosticReport, etc.
-- Document which resource types are needed for Phase A (Persistence Core)
+- Run all entries from `profiles-resources.json`, `profiles-types.json`, `profiles-others.json` through `StructureDefinitionParser`
+- Document and fix any parse failures
+- Existing 73-file `core-definitions/` path is **unchanged** (Stage-1 validation use only)
 
-#### Task 7.2: Complete Core Resource Types
+#### Task 7.2: BundleLoader Implementation
 
-**Target resource types (minimum for hospital deployment):**
+**File:** `packages/fhir-core/src/context/bundle-loader.ts`
 
-| Category | Resources |
-|----------|-----------|
-| Patient | Patient, RelatedPerson |
-| Clinical | Observation, Condition, Procedure, AllergyIntolerance, Immunization |
-| Medication | Medication, MedicationRequest, MedicationAdministration |
-| Encounter | Encounter, EpisodeOfCare |
-| Diagnostic | DiagnosticReport, Specimen, ImagingStudy |
-| Documents | DocumentReference, Composition |
-| Workflow | ServiceRequest, Task, Appointment |
-| Infrastructure | Organization, Practitioner, PractitionerRole, Location, Device |
-| Financial | Coverage, Claim, ExplanationOfBenefit |
-| Terminology | ValueSet, CodeSystem, ConceptMap |
-| Conformance | CapabilityStatement, SearchParameter |
+- `loadBundleFromFile(path, options?)` → `BundleLoadResult`
+- `loadBundleFromObject(bundle, options?)` → `BundleLoadResult`
+- `loadBundlesFromFiles(paths[], options?)` → merged `BundleLoadResult`
+- Filter options: `filterKind`, `excludeAbstract`, `filterTypes`
+- Error reporting: partial failures don't abort the load
 
-#### Task 7.3: Canonical Model Extensions
+#### Task 7.3: spec/ Directory Structure
 
-- Ensure `CanonicalElement` supports all fields needed for table generation
-- Add `tableColumn` metadata to `CanonicalElement` for schema generation hints
-- Verify `Invariant`, `SlicingDefinition`, `TypeConstraint` are complete
+```
+spec/
+  fhir/r4/          ← Official FHIR R4 (already present, unchanged)
+  platform/         ← NEW: empty Bundle stubs (Phase 9 will populate)
+    profiles-platform.json
+    search-parameters-platform.json
+    README.md
+  cn/               ← Future: Chinese localization (Stage-3+, not created yet)
+```
 
-#### Task 7.4: Model Tests
+Loading order for Phase 8:
 
-- Unit tests for all new resource type models
-- Fixture-driven tests for parsing new resource types
+1. `spec/fhir/r4/profiles-types.json` — type system (no tables)
+2. `spec/fhir/r4/profiles-resources.json` — clinical resources
+3. `spec/fhir/r4/profiles-others.json` — conformance resources
+4. `spec/platform/profiles-platform.json` — platform resources (Phase 9)
+
+#### Task 7.4: CanonicalProfile Sufficiency Verification
+
+- Verify (without modifying) that existing `CanonicalProfile` fields are sufficient for Phase 8
+- `kind`, `abstract`, `type`, `elements[].types[].code`, `elements[].max` — all present ✅
+- **No changes to `CanonicalElement` or `CanonicalProfile` interfaces**
+
+#### Task 7.5: Export & Integration
+
+- Export `BundleLoader` from `fhir-core` public API
+- Ensure all existing Phase 1-6 tests still pass
 
 ### Acceptance Criteria
 
-- [ ] All hospital-core resource types modeled
-- [ ] `CanonicalElement` supports table generation metadata
-- [ ] All existing tests still pass (no regressions)
+- [ ] `BundleLoader` loads all entries from `profiles-resources.json` without errors (~148 resources)
+- [ ] `BundleLoader` loads all entries from `profiles-types.json` and `profiles-others.json`
+- [ ] `spec/platform/` directory created with stub files
+- [ ] `CanonicalProfile` sufficiency verified (no interface changes)
+- [ ] 25+ new tests passing
+- [ ] All 1745 existing tests still passing (zero regressions)
 - [ ] `tsc --noEmit` clean
 
 ---
@@ -108,127 +125,101 @@ Ensure the FHIR model layer is complete and ready to drive table generation. All
 **Duration:** 5-8 days  
 **Complexity:** Medium-High  
 **Risk:** Medium  
-**Depends On:** Phase 7
+**Depends On:** Phase 7  
+**Detailed Plan:** [Phase-8-Detailed-Plan.md](./Phase-8-Detailed-Plan.md)
 
 ### Objectives
 
-Generate SQL DDL (CREATE TABLE statements) from StructureDefinition snapshots. This is the bridge between the FHIR semantic model and the database schema.
+Implement the schema generation pipeline in a new `fhir-persistence` package. Given `CanonicalProfile[]` (from Phase 7's `BundleLoader`) and `SearchParameter` definitions, produce SQL DDL strings for all resource tables. All code is **pure functions — no database dependency**.
+
+### Confirmed Design Decisions
+
+| Decision              | Choice                                             |
+| --------------------- | -------------------------------------------------- |
+| Package               | New `fhir-persistence` (separate from `fhir-core`) |
+| Phase 8 scope         | DDL generation only — no DB execution              |
+| Registry input        | `CanonicalProfile` from Phase 7 BundleLoader       |
+| `content` column type | `TEXT` (consistent with Medplum; faster writes)    |
+| SchemaDiff            | Not in Phase 8 (future phase)                      |
+| Tables per resource   | 3: main + `_History` + `_References`               |
 
 ### Architecture
 
 ```
-StructureDefinition (snapshot)
-        ↓
-  TableSchemaGenerator
-        ↓
-  TableSchema (intermediate model)
-        ↓
-  DDLGenerator (PostgreSQL)
-        ↓
-  SQL DDL strings / migration files
+spec/fhir/r4/profiles-resources.json
+  ↓ BundleLoader (Phase 7)
+CanonicalProfile[]
+  ↓ StructureDefinitionRegistry
+  Map<resourceType, CanonicalProfile>
+
+spec/fhir/r4/search-parameters.json
+  ↓ SearchParameterRegistry
+  Map<resourceType, SearchParameterImpl[]>
+
+TableSchemaBuilder.buildAll(sdRegistry, spRegistry)
+  ↓
+ResourceTableSet[]   (3 tables per resource type)
+  ↓
+DDLGenerator.generateSchemaDDL(schema)
+  ↓
+string[]   (SQL DDL — stdout / file / Phase 9 executor)
 ```
 
 ### Tasks
 
-#### Task 8.1: TableSchema Model
+#### Task 8.0: Package Scaffolding
 
-**File:** `packages/fhir-core/src/persistence/schema/table-schema.ts`
+`packages/fhir-persistence/` — `package.json`, `tsconfig.json`, `jest.config.ts`
 
-```typescript
-interface TableSchema {
-  tableName: string;           // e.g., 'patient'
-  historyTableName: string;    // e.g., 'patient_history'
-  resourceType: string;        // e.g., 'Patient'
-  columns: ColumnSchema[];
-  indexes: IndexSchema[];
-  constraints: TableConstraint[];
-}
+#### Task 8.1: TableSchema Type Definitions
 
-interface ColumnSchema {
-  name: string;                // e.g., 'id', 'version_id', 'resource'
-  sqlType: string;             // e.g., 'UUID', 'BIGINT', 'JSONB', 'TEXT'
-  nullable: boolean;
-  primaryKey: boolean;
-  fhirPath?: string;           // Source FHIRPath for extracted columns
-}
+`src/schema/table-schema.ts` — `ColumnSchema`, `IndexSchema`, `MainTableSchema`, `HistoryTableSchema`, `ReferencesTableSchema`, `ResourceTableSet`, `SchemaDefinition`
 
-interface IndexSchema {
-  name: string;
-  columns: string[];
-  unique: boolean;
-  partial?: string;            // Partial index WHERE clause
-}
-```
+#### Task 8.2: StructureDefinitionRegistry
 
-#### Task 8.2: TableSchemaGenerator
+`src/registry/structure-definition-registry.ts` — indexes `CanonicalProfile[]`, `getTableResourceTypes()` returns `kind='resource' AND abstract=false`
 
-**File:** `packages/fhir-core/src/persistence/schema/table-schema-generator.ts`
+#### Task 8.3: SearchParameterRegistry
 
-Key logic:
-- Every table gets standard columns: `id UUID PK`, `version_id BIGINT`, `last_updated TIMESTAMPTZ`, `resource JSONB`
-- History table adds: `history_id BIGSERIAL PK`, `deleted BOOLEAN`
-- Extract commonly searched fields as physical columns based on resource type conventions
-- Generate indexes for physical columns
+`src/registry/search-parameter-registry.ts` — maps SearchParam types to strategies: `column` / `token-column` / `lookup-table`
 
-#### Task 8.3: DDL Generator (PostgreSQL)
+#### Task 8.4: TableSchemaBuilder
 
-**File:** `packages/fhir-core/src/persistence/schema/ddl-generator.ts`
+`src/schema/table-schema-builder.ts` — core pure function
 
-- Generate `CREATE TABLE IF NOT EXISTS` statements
-- Generate `CREATE INDEX IF NOT EXISTS` statements
-- Generate history table DDL
-- Support migration-safe DDL (idempotent)
+**Fixed columns (all main tables):**
+`id UUID PK`, `content TEXT NOT NULL`, `lastUpdated TIMESTAMPTZ NOT NULL`, `deleted BOOLEAN DEFAULT false`, `projectId UUID NOT NULL`, `__version INTEGER NOT NULL`, `_source TEXT`, `_profile TEXT[]`, `compartments UUID[] NOT NULL` (except Binary)
 
-#### Task 8.4: Schema Registry
+**Three tables per resource:**
 
-**File:** `packages/fhir-core/src/persistence/schema/schema-registry.ts`
+- Main: fixed columns + search columns driven by SearchParameterRegistry
+- `_History`: `versionId UUID PK`, `id UUID`, `content TEXT`, `lastUpdated TIMESTAMPTZ`
+- `_References`: `resourceId UUID`, `targetId UUID`, `code TEXT` (composite PK)
 
-- Register generated schemas by resource type
-- Lookup table name by resource type
-- Lookup column name by FHIRPath
+#### Task 8.5: DDLGenerator
 
-#### Task 8.5: Schema Tests
+`src/schema/ddl-generator.ts` — `generateCreateTable()`, `generateCreateIndex()`, `generateResourceDDL()`, `generateSchemaDDL()`
 
-- Unit tests for `TableSchemaGenerator` (20+ tests)
-- Unit tests for `DDLGenerator` (15+ tests)
-- Fixture-driven tests: StructureDefinition → expected DDL (5+ fixtures)
+Output format: `CREATE TABLE IF NOT EXISTS "Patient" (...)` with all identifiers quoted.
 
-### Standard Columns (All Resource Tables)
+#### Task 8.6: CLI Entry Point
 
-```sql
-CREATE TABLE patient (
-  id              UUID            NOT NULL DEFAULT gen_random_uuid(),
-  version_id      BIGINT          NOT NULL DEFAULT 1,
-  last_updated    TIMESTAMPTZ     NOT NULL DEFAULT now(),
-  resource        JSONB           NOT NULL,
-  -- Extracted search columns (resource-specific):
-  active          BOOLEAN,
-  family          TEXT,
-  given           TEXT[],
-  birthdate       DATE,
-  gender          TEXT,
-  -- Constraints:
-  CONSTRAINT patient_pk PRIMARY KEY (id)
-);
+`src/cli/generate-schema.ts` — `npx medxai schema:generate [--spec-dir] [--output] [--resource]`
 
-CREATE TABLE patient_history (
-  history_id      BIGSERIAL       NOT NULL,
-  id              UUID            NOT NULL,
-  version_id      BIGINT          NOT NULL,
-  last_updated    TIMESTAMPTZ     NOT NULL,
-  resource        JSONB,          -- NULL if deleted
-  deleted         BOOLEAN         NOT NULL DEFAULT false,
-  CONSTRAINT patient_history_pk PRIMARY KEY (history_id)
-);
-```
+#### Task 8.7: Integration Test
+
+Full pipeline: `profiles-resources.json` → DDL for all ~140+ resource types
 
 ### Acceptance Criteria
 
-- [ ] `TableSchemaGenerator` produces correct schema from StructureDefinition
-- [ ] DDL is valid PostgreSQL (idempotent, migration-safe)
-- [ ] History table generated for every resource table
-- [ ] Standard columns present on all tables
-- [ ] 35+ tests passing
+- [ ] `fhir-persistence` package builds cleanly (ESM + CJS + `.d.ts`)
+- [ ] `StructureDefinitionRegistry` indexes all FHIR R4 resources
+- [ ] `SearchParameterRegistry` indexes all FHIR R4 search parameters
+- [ ] `TableSchemaBuilder` generates correct 3-table structure for all resource types
+- [ ] `DDLGenerator` produces valid, idempotent PostgreSQL DDL
+- [ ] CLI `schema:generate` works end-to-end
+- [ ] 95+ new tests passing
+- [ ] All existing Phase 1-6 tests still passing (zero regressions)
 - [ ] `tsc --noEmit` clean
 
 ---
@@ -295,6 +286,7 @@ interface ResourceRepository {
 **File:** `packages/fhir-core/src/persistence/repository/postgres-resource-repository.ts`
 
 Key behaviors:
+
 - **Create**: INSERT with generated UUID, version_id=1, write to history
 - **Read**: SELECT by id, return parsed resource from JSONB
 - **Update**: UPDATE with version_id++, write old version to history (optimistic locking)
@@ -374,9 +366,9 @@ interface HistoryRepository {
 }
 
 interface HistoryOptions {
-  since?: string;   // _since parameter (instant)
-  count?: number;   // _count parameter
-  at?: string;      // _at parameter (point-in-time)
+  since?: string; // _since parameter (instant)
+  count?: number; // _count parameter
+  at?: string; // _at parameter (point-in-time)
 }
 ```
 
@@ -424,17 +416,18 @@ Expose the repository layer as a FHIR R4 REST API. Implement the basic CRUD inte
 
 ### FHIR REST Interactions (Phase 11 Scope)
 
-| Method | URL | Interaction |
-|--------|-----|-------------|
-| POST | `/{resourceType}` | create |
-| GET | `/{resourceType}/{id}` | read |
-| PUT | `/{resourceType}/{id}` | update |
-| DELETE | `/{resourceType}/{id}` | delete |
-| GET | `/{resourceType}/{id}/_history` | vread (history) |
-| GET | `/{resourceType}/{id}/_history/{vid}` | vread (specific version) |
-| GET | `/metadata` | capabilities |
+| Method | URL                                   | Interaction              |
+| ------ | ------------------------------------- | ------------------------ |
+| POST   | `/{resourceType}`                     | create                   |
+| GET    | `/{resourceType}/{id}`                | read                     |
+| PUT    | `/{resourceType}/{id}`                | update                   |
+| DELETE | `/{resourceType}/{id}`                | delete                   |
+| GET    | `/{resourceType}/{id}/_history`       | vread (history)          |
+| GET    | `/{resourceType}/{id}/_history/{vid}` | vread (specific version) |
+| GET    | `/metadata`                           | capabilities             |
 
 **Excluded from Phase 11** (deferred to Phase 12-13):
+
 - `GET /{resourceType}?...` (search)
 - `POST /{resourceType}/_search`
 - `POST /` (batch/transaction bundle)
@@ -457,6 +450,7 @@ Expose the repository layer as a FHIR R4 REST API. Implement the basic CRUD inte
 **File:** `packages/fhir-server/src/routes/resource-routes.ts`
 
 Key behaviors:
+
 - **Create**: `201 Created` + `Location` header + `ETag`
 - **Read**: `200 OK` + `ETag` + `Last-Modified`; `404` if not found
 - **Update**: `200 OK` (existing) or `201 Created` (upsert); `409` on version conflict
@@ -470,11 +464,13 @@ All errors return FHIR `OperationOutcome`:
 ```json
 {
   "resourceType": "OperationOutcome",
-  "issue": [{
-    "severity": "error",
-    "code": "not-found",
-    "diagnostics": "Resource Patient/123 not found"
-  }]
+  "issue": [
+    {
+      "severity": "error",
+      "code": "not-found",
+      "diagnostics": "Resource Patient/123 not found"
+    }
+  ]
 }
 ```
 
@@ -512,18 +508,18 @@ All errors return FHIR `OperationOutcome`:
 
 Parse and register `SearchParameter` resources. Map them to physical indexed columns. Generate index DDL. Build the SQL `WHERE` clause generator for basic filtering.
 
-**Key Principle:** This phase adds *indexing strategy* only. Full search execution is Phase 13.
+**Key Principle:** This phase adds _indexing strategy_ only. Full search execution is Phase 13.
 
 ### SearchParameter Types (Phase 12 Scope)
 
-| Type | Example | SQL Column Type |
-|------|---------|-----------------|
-| token | `Patient?gender=male` | `TEXT` |
-| string | `Patient?name=Smith` | `TEXT` |
-| date | `Patient?birthdate=1990` | `DATE` / `TIMESTAMPTZ` |
-| reference | `Observation?subject=Patient/123` | `UUID` / `TEXT` |
-| number | `Observation?value-quantity=185` | `NUMERIC` |
-| uri | `ValueSet?url=http://...` | `TEXT` |
+| Type      | Example                           | SQL Column Type        |
+| --------- | --------------------------------- | ---------------------- |
+| token     | `Patient?gender=male`             | `TEXT`                 |
+| string    | `Patient?name=Smith`              | `TEXT`                 |
+| date      | `Patient?birthdate=1990`          | `DATE` / `TIMESTAMPTZ` |
+| reference | `Observation?subject=Patient/123` | `UUID` / `TEXT`        |
+| number    | `Observation?value-quantity=185`  | `NUMERIC`              |
+| uri       | `ValueSet?url=http://...`         | `TEXT`                 |
 
 ### Tasks
 
@@ -605,6 +601,7 @@ Implement full FHIR search execution. Translate FHIR search URL parameters into 
 ### Search Features (Phase 13 Scope)
 
 **In scope:**
+
 - Basic parameter filtering (all 6 types)
 - Multiple values (OR semantics): `?gender=male,female`
 - Multiple parameters (AND semantics): `?gender=male&active=true`
@@ -614,6 +611,7 @@ Implement full FHIR search execution. Translate FHIR search URL parameters into 
 - `_summary=count`
 
 **Deferred (Phase 14+):**
+
 - Chained search: `?subject.name=Smith`
 - `_include` / `_revinclude`
 - Composite parameters
@@ -646,10 +644,7 @@ Implement full FHIR search execution. Translate FHIR search URL parameters into 
 
 ```typescript
 interface SearchExecutor {
-  search(
-    resourceType: string,
-    params: SearchRequest,
-  ): Promise<Bundle>;
+  search(resourceType: string, params: SearchRequest): Promise<Bundle>;
 }
 ```
 
@@ -689,18 +684,18 @@ interface SearchExecutor {
 
 ## Success Metrics
 
-| Metric | Target |
-|--------|--------|
-| Implementation files | 25-35 |
-| Test files | 15-20 |
-| Total tests (Stage-2) | 400-600 |
-| FHIR interactions supported | 7 (CRUD + history) |
-| SearchParameter types supported | 6 |
-| Write latency (p99) | < 50ms |
-| Read latency (p99) | < 20ms |
-| Search latency (p99, simple) | < 100ms |
-| Transaction isolation | SERIALIZABLE |
-| History correctness | 100% |
+| Metric                          | Target             |
+| ------------------------------- | ------------------ |
+| Implementation files            | 25-35              |
+| Test files                      | 15-20              |
+| Total tests (Stage-2)           | 400-600            |
+| FHIR interactions supported     | 7 (CRUD + history) |
+| SearchParameter types supported | 6                  |
+| Write latency (p99)             | < 50ms             |
+| Read latency (p99)              | < 20ms             |
+| Search latency (p99, simple)    | < 100ms            |
+| Transaction isolation           | SERIALIZABLE       |
+| History correctness             | 100%               |
 
 ---
 

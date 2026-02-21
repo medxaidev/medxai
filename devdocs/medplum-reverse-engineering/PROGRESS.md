@@ -6,9 +6,9 @@
 
 ## 当前状态
 
-**当前 Step**: 待确认下一步
-**刚完成**: WF-MIG-001~005 数据库迁移系统完整分析
-**上次更新**: 2026-02-21
+**当前 Step**: Medplum 分析阶段完成，进入 Stage-2 实现
+**刚完成**: Phase 7 + Phase 8 详细设计文档输出，Stage-2 Roadmap 更新
+**上次更新**: 2026-02-22
 
 ---
 
@@ -27,6 +27,10 @@
 | WF-MIG-003     | Search Parameter → Column/Index Mapping (L3)     | ✅ Done       |
 | WF-MIG-004     | Lookup Table Strategy (L3)                       | ✅ Done       |
 | WF-MIG-005     | Schema Diff & Migration Generation (L3)          | ✅ Done       |
+| WF-REPO-001    | Repository Architecture & Write Path (L3)        | ✅ Done       |
+| WF-REPO-002    | Search Column Value Extraction (L3)              | ✅ Done       |
+| WF-REPO-003    | Compartment & Access Control (L3)                | ✅ Done       |
+| WF-REPO-004    | Read & Search Path (L3)                          | ✅ Done       |
 | Step 3b        | 阶段1: core/outcomes 分析 (L1+L2)                | ⬜ NotStarted |
 | Step 3c        | 阶段2: core/utils 分析 (L1+L2)                   | ⬜ NotStarted |
 | Step 4         | 阶段3-4: core/typeschema + fhirpath (L1+L2+L4)   | ⬜ NotStarted |

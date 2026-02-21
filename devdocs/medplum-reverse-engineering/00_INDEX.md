@@ -50,6 +50,10 @@
 | WF-MIG-003    | Search Parameter → Column/Index Mapping | buildSearchColumns()                   | ✅  | ⬜  |
 | WF-MIG-004    | Lookup Table Strategy                   | buildLookupTable()                     | ✅  | ⬜  |
 | WF-MIG-005    | Schema Diff & Migration Generation      | generateMigrationActions()             | ✅  | ⬜  |
+| WF-REPO-001   | Repository Architecture & Write Path    | Repository.createResource()            | ✅  | ⬜  |
+| WF-REPO-002   | Search Column Value Extraction          | Repository.buildResourceRow()          | ✅  | ⬜  |
+| WF-REPO-003   | Compartment & Access Control            | Repository.getCompartments()           | ✅  | ⬜  |
+| WF-REPO-004   | Read & Search Path                      | Repository.readResource() / search()   | ✅  | ⬜  |
 | WF-001        | Create Patient Resource                 | POST /fhir/R4/Patient                  | ⬜  | ⬜  |
 | WF-002        | Search Resources                        | GET /fhir/R4/{type}?...                | ⬜  | ⬜  |
 | WF-003        | FHIR Batch/Transaction                  | POST /fhir/R4/                         | ⬜  | ⬜  |
