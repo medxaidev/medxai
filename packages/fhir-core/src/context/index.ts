@@ -36,6 +36,19 @@ export {
   InvalidStructureDefinitionError,
 } from './errors.js';
 
+// ─── Bundle Loader ────────────────────────────────────────────────────────────
+export type {
+  BundleLoadOptions,
+  BundleLoadResult,
+  BundleLoadError,
+} from './bundle-loader.js';
+
+export {
+  loadBundleFromObject,
+  loadBundleFromFile,
+  loadBundlesFromFiles,
+} from './bundle-loader.js';
+
 // ─── Core Definitions ────────────────────────────────────────────────────────
 export {
   BASE_RESOURCES,

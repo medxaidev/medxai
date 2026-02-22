@@ -123,6 +123,9 @@ export type {
   StructureDefinitionLoader,
   LoaderOptions,
   ContextStatistics,
+  BundleLoadOptions,
+  BundleLoadResult,
+  BundleLoadError,
 } from './context/index.js';
 
 export {
@@ -136,6 +139,9 @@ export {
   CircularDependencyError,
   LoaderError,
   InvalidStructureDefinitionError,
+  loadBundleFromObject,
+  loadBundleFromFile,
+  loadBundlesFromFiles,
   BASE_RESOURCES,
   PRIMITIVE_TYPES,
   COMPLEX_TYPES,
