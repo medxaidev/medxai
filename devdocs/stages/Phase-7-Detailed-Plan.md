@@ -127,10 +127,23 @@ Based on Stage-1 test coverage (63 unit tests + 93 fixture tests), the parser sh
 
 #### Acceptance Criteria
 
-- [ ] All resources in `profiles-resources.json` parse without errors
-- [ ] All types in `profiles-types.json` parse without errors
-- [ ] All entries in `profiles-others.json` parse without errors
-- [ ] Any failures documented and fixed before proceeding to Task 7.2
+- [x] All resources in `profiles-resources.json` parse without errors — **149/149 ✅**
+- [x] All types in `profiles-types.json` parse without errors — **63/63 ✅**
+- [x] All entries in `profiles-others.json` parse without errors — **44/44 ✅**
+- [x] Any failures documented and fixed before proceeding to Task 7.2 — **0 failures, no fixes needed**
+
+#### Audit Results (Completed 2026-02-22)
+
+| Bundle                    | Total   | Succeeded | Failed | Warnings |
+| ------------------------- | ------- | --------- | ------ | -------- |
+| `profiles-resources.json` | 149     | 149       | 0      | 0        |
+| `profiles-types.json`     | 63      | 63        | 0      | 0        |
+| `profiles-others.json`    | 44      | 44        | 0      | 0        |
+| **Total**                 | **256** | **256**   | **0**  | **0**    |
+
+**Test file:** `packages/fhir-core/src/parser/__tests__/parser-completeness-audit.test.ts` (10 tests)
+
+**Pre-existing issue noted:** `core-definitions.test.ts` and `fhir-context.test.ts` have 4 timeout failures (5s default) unrelated to Task 7.1. These are caused by loading 73 individual JSON files sequentially and predate this task.
 
 ---
 
@@ -162,10 +175,10 @@ export interface BundleLoadResult {
   profiles: CanonicalProfile[];
   errors: BundleLoadError[];
   stats: {
-    total: number;       // total entries in bundle
-    loaded: number;      // successfully parsed
-    skipped: number;     // filtered out
-    failed: number;      // parse errors
+    total: number; // total entries in bundle
+    loaded: number; // successfully parsed
+    skipped: number; // filtered out
+    failed: number; // parse errors
   };
 }
 
@@ -187,7 +200,7 @@ export interface BundleLoadError {
 export async function loadBundleFromFile(
   filePath: string,
   options?: BundleLoadOptions,
-): Promise<BundleLoadResult>
+): Promise<BundleLoadResult>;
 
 /**
  * Load CanonicalProfiles from an already-parsed Bundle object.
@@ -196,7 +209,7 @@ export async function loadBundleFromFile(
 export function loadBundleFromObject(
   bundle: Bundle<StructureDefinition>,
   options?: BundleLoadOptions,
-): BundleLoadResult
+): BundleLoadResult;
 
 /**
  * Load and merge multiple bundle files in order.
@@ -206,7 +219,7 @@ export function loadBundleFromObject(
 export async function loadBundlesFromFiles(
   filePaths: string[],
   options?: BundleLoadOptions,
-): Promise<BundleLoadResult>
+): Promise<BundleLoadResult>;
 ```
 
 #### Internal Logic
@@ -232,34 +245,34 @@ loadBundleFromFile(path, options):
 
 ```typescript
 // Unit tests (mock bundle, no file I/O):
-describe('loadBundleFromObject', () => {
-  it('loads all entries from a valid bundle')
-  it('filters by kind=resource correctly')
-  it('excludes abstract definitions when excludeAbstract=true')
-  it('reports errors without aborting on parse failure')
-  it('returns correct stats (total/loaded/skipped/failed)')
-  it('handles empty bundle gracefully')
-  it('handles bundle with no entry array')
-})
+describe("loadBundleFromObject", () => {
+  it("loads all entries from a valid bundle");
+  it("filters by kind=resource correctly");
+  it("excludes abstract definitions when excludeAbstract=true");
+  it("reports errors without aborting on parse failure");
+  it("returns correct stats (total/loaded/skipped/failed)");
+  it("handles empty bundle gracefully");
+  it("handles bundle with no entry array");
+});
 
 // Integration tests (real spec files):
-describe('loadBundleFromFile — profiles-resources.json', () => {
-  it('loads all resource StructureDefinitions without errors')
-  it('produces CanonicalProfile with correct kind=resource')
-  it('Patient profile has expected elements (id, name, birthDate, ...)')
-  it('Observation profile has expected elements (status, code, value[x], ...)')
-})
+describe("loadBundleFromFile — profiles-resources.json", () => {
+  it("loads all resource StructureDefinitions without errors");
+  it("produces CanonicalProfile with correct kind=resource");
+  it("Patient profile has expected elements (id, name, birthDate, ...)");
+  it("Observation profile has expected elements (status, code, value[x], ...)");
+});
 
-describe('loadBundleFromFile — profiles-types.json', () => {
-  it('loads all type StructureDefinitions without errors')
-  it('HumanName profile has expected elements')
-  it('Coding profile has expected elements')
-})
+describe("loadBundleFromFile — profiles-types.json", () => {
+  it("loads all type StructureDefinitions without errors");
+  it("HumanName profile has expected elements");
+  it("Coding profile has expected elements");
+});
 
-describe('loadBundlesFromFiles — merge order', () => {
-  it('later bundle overrides earlier for same URL')
-  it('merged result contains entries from all bundles')
-})
+describe("loadBundlesFromFiles — merge order", () => {
+  it("later bundle overrides earlier for same URL");
+  it("merged result contains entries from all bundles");
+});
 ```
 
 #### Acceptance Criteria
@@ -354,16 +367,16 @@ Verify (without modifying) that `CanonicalProfile` and `CanonicalElement` contai
 
 For `TableSchemaBuilder` to generate a `ResourceTableSet`, it needs:
 
-| Information Needed | Source in CanonicalProfile | Status |
-|-------------------|---------------------------|--------|
-| Is this a resource (not a type)? | `profile.kind === 'resource'` | ✅ |
-| Should we build a table? | `profile.abstract === false` | ✅ |
-| Resource type name (table name) | `profile.type` (e.g., `'Patient'`) | ✅ |
-| Element path | `element.path` | ✅ |
-| Element type code | `element.types[0].code` | ✅ |
-| Is element a reference? | `element.types[0].code === 'Reference'` | ✅ |
-| Is element an array? | `element.max === 'unbounded' \|\| element.max > 1` | ✅ |
-| Is element required? | `element.min > 0` | ✅ |
+| Information Needed               | Source in CanonicalProfile                         | Status |
+| -------------------------------- | -------------------------------------------------- | ------ |
+| Is this a resource (not a type)? | `profile.kind === 'resource'`                      | ✅     |
+| Should we build a table?         | `profile.abstract === false`                       | ✅     |
+| Resource type name (table name)  | `profile.type` (e.g., `'Patient'`)                 | ✅     |
+| Element path                     | `element.path`                                     | ✅     |
+| Element type code                | `element.types[0].code`                            | ✅     |
+| Is element a reference?          | `element.types[0].code === 'Reference'`            | ✅     |
+| Is element an array?             | `element.max === 'unbounded' \|\| element.max > 1` | ✅     |
+| Is element required?             | `element.min > 0`                                  | ✅     |
 
 **Conclusion from verification:** `CanonicalProfile` is sufficient. No modifications needed.
 
@@ -396,11 +409,11 @@ Export `BundleLoader` from `fhir-core` public API and ensure all existing tests 
 
 ## Test Summary
 
-| Test File | Type | Count |
-|-----------|------|-------|
-| `bundle-loader.test.ts` (unit, mock bundle) | Unit | 15+ |
-| `bundle-loader.integration.test.ts` (real spec files) | Integration | 10+ |
-| Existing Phase 1-6 tests | Regression | 1745 |
+| Test File                                             | Type        | Count |
+| ----------------------------------------------------- | ----------- | ----- |
+| `bundle-loader.test.ts` (unit, mock bundle)           | Unit        | 15+   |
+| `bundle-loader.integration.test.ts` (real spec files) | Integration | 10+   |
+| Existing Phase 1-6 tests                              | Regression  | 1745  |
 
 **Total new tests: 25+**
 
@@ -410,29 +423,29 @@ Export `BundleLoader` from `fhir-core` public API and ensure all existing tests 
 
 ### New Files
 
-| File | Purpose |
-|------|---------|
-| `packages/fhir-core/src/context/bundle-loader.ts` | BundleLoader implementation |
-| `packages/fhir-core/src/context/__tests__/bundle-loader.test.ts` | Unit tests |
-| `packages/fhir-core/src/context/__tests__/bundle-loader.integration.test.ts` | Integration tests |
-| `spec/platform/profiles-platform.json` | Empty Bundle stub |
-| `spec/platform/search-parameters-platform.json` | Empty Bundle stub |
-| `spec/platform/README.md` | Platform spec documentation |
-| `spec/README.md` | Spec directory documentation |
+| File                                                                         | Purpose                      |
+| ---------------------------------------------------------------------------- | ---------------------------- |
+| `packages/fhir-core/src/context/bundle-loader.ts`                            | BundleLoader implementation  |
+| `packages/fhir-core/src/context/__tests__/bundle-loader.test.ts`             | Unit tests                   |
+| `packages/fhir-core/src/context/__tests__/bundle-loader.integration.test.ts` | Integration tests            |
+| `spec/platform/profiles-platform.json`                                       | Empty Bundle stub            |
+| `spec/platform/search-parameters-platform.json`                              | Empty Bundle stub            |
+| `spec/platform/README.md`                                                    | Platform spec documentation  |
+| `spec/README.md`                                                             | Spec directory documentation |
 
 ### Modified Files
 
-| File | Change |
-|------|--------|
+| File                                      | Change                   |
+| ----------------------------------------- | ------------------------ |
 | `packages/fhir-core/src/context/index.ts` | Add BundleLoader exports |
 
 ### Unchanged Files
 
-| File | Reason |
-|------|--------|
-| `core-definitions/*.json` (73 files) | Stage-1 validation path, not touched |
-| `core-definitions/index.ts` | Stage-1 API, not touched |
-| `model/canonical-profile.ts` | No modifications needed |
+| File                                    | Reason                                  |
+| --------------------------------------- | --------------------------------------- |
+| `core-definitions/*.json` (73 files)    | Stage-1 validation path, not touched    |
+| `core-definitions/index.ts`             | Stage-1 API, not touched                |
+| `model/canonical-profile.ts`            | No modifications needed                 |
 | `parser/structure-definition-parser.ts` | Only bug fixes if Task 7.1 finds issues |
 
 ---
@@ -454,4 +467,4 @@ Export `BundleLoader` from `fhir-core` public API and ensure all existing tests 
 
 ## Implementation Notes
 
-*(To be filled in during implementation)*
+_(To be filled in during implementation)_
