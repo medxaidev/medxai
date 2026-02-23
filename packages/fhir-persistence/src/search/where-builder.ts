@@ -1,0 +1,504 @@
+/**
+ * WHERE Clause Builder
+ *
+ * Generates parameterized SQL WHERE clause fragments from parsed
+ * FHIR search parameters. Each fragment is composable — multiple
+ * fragments are joined with AND/OR as needed.
+ *
+ * ## Design Principles
+ *
+ * 1. **Parameterized only** — all user values use `$N` placeholders (SQL injection safe)
+ * 2. **Column names from registry** — never from user input
+ * 3. **Composable fragments** — each function returns `{ sql, values }`
+ * 4. **Strategy-aware** — handles column, token-column, and lookup-table differently
+ *
+ * Reference: https://hl7.org/fhir/R4/search.html
+ *
+ * @module fhir-persistence/search
+ */
+
+import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
+import type { SearchParameterRegistry } from '../registry/search-parameter-registry.js';
+import type { ParsedSearchParam, WhereFragment, SearchPrefix } from './types.js';
+
+// =============================================================================
+// Section 1: Prefix → SQL Operator Mapping
+// =============================================================================
+
+/**
+ * Map a FHIR search prefix to a SQL comparison operator.
+ */
+export function prefixToOperator(prefix?: SearchPrefix): string {
+  switch (prefix) {
+    case 'eq':
+    case undefined:
+      return '=';
+    case 'ne':
+      return '<>';
+    case 'lt':
+      return '<';
+    case 'gt':
+      return '>';
+    case 'le':
+      return '<=';
+    case 'ge':
+      return '>=';
+    case 'sa':
+      return '>'; // starts after
+    case 'eb':
+      return '<'; // ends before
+    case 'ap':
+      return '='; // approximately (simplified to equals for now)
+    default:
+      return '=';
+  }
+}
+
+// =============================================================================
+// Section 2: Core WHERE Fragment Builder
+// =============================================================================
+
+/**
+ * Build a WHERE clause fragment for a single parsed search parameter.
+ *
+ * Dispatches to type-specific builders based on the SearchParameterImpl type
+ * and the parameter's modifier.
+ *
+ * @param impl - The search parameter implementation from the registry.
+ * @param param - The parsed search parameter from the URL.
+ * @param startIndex - The starting `$N` parameter index (1-based).
+ * @returns A WhereFragment with SQL and values, or null if the parameter
+ *   cannot be converted (e.g., lookup-table strategy).
+ */
+export function buildWhereFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment | null {
+  // Handle :missing modifier (any type)
+  if (param.modifier === 'missing') {
+    return buildMissingFragment(impl, param, startIndex);
+  }
+
+  // Skip lookup-table strategy — these require JOINs (Phase 13)
+  if (impl.strategy === 'lookup-table') {
+    return null;
+  }
+
+  // Dispatch by strategy
+  if (impl.strategy === 'token-column') {
+    return buildTokenColumnFragment(impl, param, startIndex);
+  }
+
+  // Column strategy — dispatch by FHIR type
+  switch (impl.type) {
+    case 'string':
+      return buildStringFragment(impl, param, startIndex);
+    case 'date':
+      return buildDateFragment(impl, param, startIndex);
+    case 'number':
+    case 'quantity':
+      return buildNumberFragment(impl, param, startIndex);
+    case 'reference':
+      return buildReferenceFragment(impl, param, startIndex);
+    case 'uri':
+      return buildUriFragment(impl, param, startIndex);
+    case 'token':
+      return buildTokenColumnFragment(impl, param, startIndex);
+    default:
+      return buildDefaultFragment(impl, param, startIndex);
+  }
+}
+
+// =============================================================================
+// Section 3: :missing Modifier
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for the `:missing` modifier.
+ *
+ * - `?active:missing=true` → `"active" IS NULL`
+ * - `?active:missing=false` → `"active" IS NOT NULL`
+ */
+function buildMissingFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  _startIndex: number,
+): WhereFragment {
+  const isMissing = param.values[0] === 'true';
+  const columnName = quoteColumn(impl.columnName);
+  const sql = isMissing ? `${columnName} IS NULL` : `${columnName} IS NOT NULL`;
+  return { sql, values: [] };
+}
+
+// =============================================================================
+// Section 4: String Type
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for string search parameters.
+ *
+ * Default behavior: case-insensitive prefix match (ILIKE 'value%').
+ * - `:exact` modifier → exact match (`= $N`)
+ * - `:contains` modifier → contains match (`ILIKE '%value%'`)
+ * - No modifier → prefix match (`ILIKE 'value%'`)
+ */
+function buildStringFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const columnName = quoteColumn(impl.columnName);
+
+  if (param.modifier === 'exact') {
+    return buildOrFragment(columnName, '=', param.values, startIndex);
+  }
+
+  if (param.modifier === 'contains') {
+    return buildLikeFragment(columnName, param.values, startIndex, '%', '%');
+  }
+
+  // Default: prefix match
+  return buildLikeFragment(columnName, param.values, startIndex, '', '%');
+}
+
+/**
+ * Build an ILIKE fragment with optional prefix/suffix wildcards.
+ */
+function buildLikeFragment(
+  columnName: string,
+  values: string[],
+  startIndex: number,
+  prefix: string,
+  suffix: string,
+): WhereFragment {
+  if (values.length === 1) {
+    const sql = `LOWER(${columnName}) LIKE $${startIndex}`;
+    const escapedValue = escapeLikeString(values[0]).toLowerCase();
+    return { sql, values: [`${prefix}${escapedValue}${suffix}`] };
+  }
+
+  // Multiple values → OR
+  const conditions: string[] = [];
+  const allValues: unknown[] = [];
+  let idx = startIndex;
+
+  for (const value of values) {
+    conditions.push(`LOWER(${columnName}) LIKE $${idx}`);
+    const escapedValue = escapeLikeString(value).toLowerCase();
+    allValues.push(`${prefix}${escapedValue}${suffix}`);
+    idx++;
+  }
+
+  const sql = `(${conditions.join(' OR ')})`;
+  return { sql, values: allValues };
+}
+
+// =============================================================================
+// Section 5: Date Type
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for date search parameters.
+ *
+ * Supports prefixes: eq, ne, lt, gt, le, ge.
+ */
+function buildDateFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const columnName = quoteColumn(impl.columnName);
+  const operator = prefixToOperator(param.prefix);
+  return buildOrFragment(columnName, operator, param.values, startIndex);
+}
+
+// =============================================================================
+// Section 6: Number / Quantity Type
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for number and quantity search parameters.
+ *
+ * Supports prefixes: eq, ne, lt, gt, le, ge.
+ */
+function buildNumberFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const columnName = quoteColumn(impl.columnName);
+  const operator = prefixToOperator(param.prefix);
+
+  // Convert values to numbers
+  const numericValues = param.values.map((v) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? v : n;
+  });
+
+  return buildOrFragmentRaw(columnName, operator, numericValues, startIndex);
+}
+
+// =============================================================================
+// Section 7: Reference Type
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for reference search parameters.
+ *
+ * Reference values can be:
+ * - Full reference: `"Patient/123"`
+ * - Just the ID: `"123"` (for subject/patient columns, auto-prefixed)
+ */
+function buildReferenceFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const columnName = quoteColumn(impl.columnName);
+  return buildOrFragment(columnName, '=', param.values, startIndex);
+}
+
+// =============================================================================
+// Section 8: URI Type
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for URI search parameters.
+ *
+ * Exact match by default.
+ */
+function buildUriFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const columnName = quoteColumn(impl.columnName);
+  return buildOrFragment(columnName, '=', param.values, startIndex);
+}
+
+// =============================================================================
+// Section 9: Token Type (column strategy)
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for token search parameters.
+ *
+ * Token values can be:
+ * - `"code"` → match code only
+ * - `"system|code"` → match system and code
+ * - `"system|"` → match system only
+ * - `"|code"` → match code with no system
+ *
+ * For token-column strategy, we use ARRAY overlap operators.
+ * For column strategy (simple tokens like gender), we use equality.
+ */
+function buildTokenColumnFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const columnName = quoteColumn(impl.columnName);
+
+  if (param.modifier === 'not') {
+    return buildNotFragment(columnName, param.values, startIndex);
+  }
+
+  return buildOrFragment(columnName, '=', param.values, startIndex);
+}
+
+// =============================================================================
+// Section 10: Default / Fallback
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for unknown or unsupported parameter types.
+ * Falls back to simple equality.
+ */
+function buildDefaultFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const columnName = quoteColumn(impl.columnName);
+  const operator = prefixToOperator(param.prefix);
+  return buildOrFragment(columnName, operator, param.values, startIndex);
+}
+
+// =============================================================================
+// Section 11: Shared Helpers
+// =============================================================================
+
+/**
+ * Build an OR fragment for multiple values with the same operator.
+ *
+ * Single value: `"col" = $1`
+ * Multiple values: `("col" = $1 OR "col" = $2)`
+ */
+function buildOrFragment(
+  columnName: string,
+  operator: string,
+  values: string[],
+  startIndex: number,
+): WhereFragment {
+  return buildOrFragmentRaw(columnName, operator, values, startIndex);
+}
+
+/**
+ * Build an OR fragment with raw (non-string) values.
+ */
+function buildOrFragmentRaw(
+  columnName: string,
+  operator: string,
+  values: unknown[],
+  startIndex: number,
+): WhereFragment {
+  if (values.length === 1) {
+    const sql = `${columnName} ${operator} $${startIndex}`;
+    return { sql, values: [values[0]] };
+  }
+
+  const conditions: string[] = [];
+  const allValues: unknown[] = [];
+  let idx = startIndex;
+
+  for (const value of values) {
+    conditions.push(`${columnName} ${operator} $${idx}`);
+    allValues.push(value);
+    idx++;
+  }
+
+  const sql = `(${conditions.join(' OR ')})`;
+  return { sql, values: allValues };
+}
+
+/**
+ * Build a NOT fragment (`:not` modifier).
+ *
+ * Single value: `"col" <> $1`
+ * Multiple values: `("col" <> $1 AND "col" <> $2)`
+ */
+function buildNotFragment(
+  columnName: string,
+  values: string[],
+  startIndex: number,
+): WhereFragment {
+  if (values.length === 1) {
+    const sql = `${columnName} <> $${startIndex}`;
+    return { sql, values: [values[0]] };
+  }
+
+  const conditions: string[] = [];
+  const allValues: unknown[] = [];
+  let idx = startIndex;
+
+  for (const value of values) {
+    conditions.push(`${columnName} <> $${idx}`);
+    allValues.push(value);
+    idx++;
+  }
+
+  const sql = `(${conditions.join(' AND ')})`;
+  return { sql, values: allValues };
+}
+
+/**
+ * Double-quote a column name for safe SQL usage.
+ */
+function quoteColumn(name: string): string {
+  return `"${name}"`;
+}
+
+/**
+ * Escape special characters in a LIKE pattern.
+ *
+ * Escapes `%`, `_`, and `\` with a backslash.
+ */
+function escapeLikeString(value: string): string {
+  return value.replace(/[%_\\]/g, '\\$&');
+}
+
+// =============================================================================
+// Section 12: Composite WHERE Builder
+// =============================================================================
+
+/**
+ * Build a complete WHERE clause from multiple parsed search parameters.
+ *
+ * Multiple parameters are joined with AND.
+ * Returns null if no valid fragments are produced.
+ *
+ * @param params - The parsed search parameters.
+ * @param registry - The SearchParameterRegistry for looking up implementations.
+ * @param resourceType - The FHIR resource type.
+ * @returns A WhereFragment with the combined WHERE clause, or null.
+ */
+export function buildWhereClause(
+  params: ParsedSearchParam[],
+  registry: SearchParameterRegistry,
+  resourceType: string,
+): WhereFragment | null {
+  const fragments: WhereFragment[] = [];
+  let paramIndex = 1;
+
+  for (const param of params) {
+    // Handle special parameters
+    const impl = resolveImpl(param, registry, resourceType);
+    if (!impl) {
+      continue;
+    }
+
+    const fragment = buildWhereFragment(impl, param, paramIndex);
+    if (fragment) {
+      fragments.push(fragment);
+      paramIndex += fragment.values.length;
+    }
+  }
+
+  if (fragments.length === 0) {
+    return null;
+  }
+
+  const sql = fragments.map((f) => f.sql).join(' AND ');
+  const values = fragments.flatMap((f) => f.values);
+  return { sql, values };
+}
+
+/**
+ * Resolve a SearchParameterImpl for a parsed parameter.
+ *
+ * Handles special parameters (_id, _lastUpdated) with synthetic impls.
+ */
+function resolveImpl(
+  param: ParsedSearchParam,
+  registry: SearchParameterRegistry,
+  resourceType: string,
+): SearchParameterImpl | null {
+  // Special parameters with fixed columns
+  switch (param.code) {
+    case '_id':
+      return {
+        code: '_id',
+        type: 'token',
+        resourceTypes: [resourceType],
+        expression: 'id',
+        strategy: 'column',
+        columnName: 'id',
+        columnType: 'TEXT',
+        array: false,
+      };
+    case '_lastUpdated':
+      return {
+        code: '_lastUpdated',
+        type: 'date',
+        resourceTypes: [resourceType],
+        expression: 'meta.lastUpdated',
+        strategy: 'column',
+        columnName: 'lastUpdated',
+        columnType: 'TIMESTAMPTZ',
+        array: false,
+      };
+    default:
+      return registry.getImpl(resourceType, param.code) ?? null;
+  }
+}

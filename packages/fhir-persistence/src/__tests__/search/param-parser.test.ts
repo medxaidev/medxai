@@ -1,0 +1,247 @@
+/**
+ * Search Parameter Parser — Unit Tests
+ */
+
+import { describe, it, expect } from 'vitest';
+import {
+  parseSearchRequest,
+  parseParamKey,
+  splitSearchValues,
+  extractPrefix,
+  parseSortParam,
+} from '../../search/param-parser.js';
+
+// =============================================================================
+// parseParamKey
+// =============================================================================
+
+describe('parseParamKey', () => {
+  it('parses simple code', () => {
+    expect(parseParamKey('gender')).toEqual({ code: 'gender' });
+  });
+
+  it('parses code with :exact modifier', () => {
+    expect(parseParamKey('name:exact')).toEqual({ code: 'name', modifier: 'exact' });
+  });
+
+  it('parses code with :contains modifier', () => {
+    expect(parseParamKey('name:contains')).toEqual({ code: 'name', modifier: 'contains' });
+  });
+
+  it('parses code with :missing modifier', () => {
+    expect(parseParamKey('active:missing')).toEqual({ code: 'active', modifier: 'missing' });
+  });
+
+  it('parses code with :not modifier', () => {
+    expect(parseParamKey('code:not')).toEqual({ code: 'code', modifier: 'not' });
+  });
+
+  it('parses hyphenated code', () => {
+    expect(parseParamKey('birth-date')).toEqual({ code: 'birth-date' });
+  });
+});
+
+// =============================================================================
+// splitSearchValues
+// =============================================================================
+
+describe('splitSearchValues', () => {
+  it('returns single value', () => {
+    expect(splitSearchValues('male')).toEqual(['male']);
+  });
+
+  it('splits comma-separated values', () => {
+    expect(splitSearchValues('male,female')).toEqual(['male', 'female']);
+  });
+
+  it('splits three values', () => {
+    expect(splitSearchValues('a,b,c')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('handles escaped commas', () => {
+    expect(splitSearchValues('a\\,b,c')).toEqual(['a,b', 'c']);
+  });
+
+  it('filters empty values', () => {
+    expect(splitSearchValues('a,,b')).toEqual(['a', 'b']);
+  });
+
+  it('handles empty string', () => {
+    expect(splitSearchValues('')).toEqual([]);
+  });
+});
+
+// =============================================================================
+// extractPrefix
+// =============================================================================
+
+describe('extractPrefix', () => {
+  it('extracts ge prefix from date value', () => {
+    const result = extractPrefix(['ge1990-01-01'], 'date');
+    expect(result.prefix).toBe('ge');
+    expect(result.cleanValues).toEqual(['1990-01-01']);
+  });
+
+  it('extracts lt prefix', () => {
+    const result = extractPrefix(['lt2026-12-31'], 'date');
+    expect(result.prefix).toBe('lt');
+    expect(result.cleanValues).toEqual(['2026-12-31']);
+  });
+
+  it('extracts ne prefix from number', () => {
+    const result = extractPrefix(['ne100'], 'number');
+    expect(result.prefix).toBe('ne');
+    expect(result.cleanValues).toEqual(['100']);
+  });
+
+  it('returns no prefix for string type', () => {
+    const result = extractPrefix(['geSmith'], 'string');
+    expect(result.prefix).toBeUndefined();
+    expect(result.cleanValues).toEqual(['geSmith']);
+  });
+
+  it('returns no prefix when type is undefined', () => {
+    const result = extractPrefix(['ge1990'], undefined);
+    expect(result.prefix).toBeUndefined();
+    expect(result.cleanValues).toEqual(['ge1990']);
+  });
+
+  it('returns no prefix for short values', () => {
+    const result = extractPrefix(['ge'], 'date');
+    expect(result.prefix).toBeUndefined();
+    expect(result.cleanValues).toEqual(['ge']);
+  });
+
+  it('handles multiple values with prefix', () => {
+    const result = extractPrefix(['ge1990-01-01', 'le2026-12-31'], 'date');
+    expect(result.prefix).toBe('ge');
+    expect(result.cleanValues).toEqual(['1990-01-01', '2026-12-31']);
+  });
+});
+
+// =============================================================================
+// parseSortParam
+// =============================================================================
+
+describe('parseSortParam', () => {
+  it('parses single ascending sort', () => {
+    expect(parseSortParam('birthdate')).toEqual([
+      { code: 'birthdate', descending: false },
+    ]);
+  });
+
+  it('parses single descending sort', () => {
+    expect(parseSortParam('-birthdate')).toEqual([
+      { code: 'birthdate', descending: true },
+    ]);
+  });
+
+  it('parses multiple sort rules', () => {
+    expect(parseSortParam('family,-birthdate')).toEqual([
+      { code: 'family', descending: false },
+      { code: 'birthdate', descending: true },
+    ]);
+  });
+
+  it('filters empty segments', () => {
+    expect(parseSortParam('family,,birthdate')).toEqual([
+      { code: 'family', descending: false },
+      { code: 'birthdate', descending: false },
+    ]);
+  });
+});
+
+// =============================================================================
+// parseSearchRequest
+// =============================================================================
+
+describe('parseSearchRequest', () => {
+  it('parses empty query', () => {
+    const result = parseSearchRequest('Patient', {});
+    expect(result.resourceType).toBe('Patient');
+    expect(result.params).toEqual([]);
+  });
+
+  it('parses single parameter', () => {
+    const result = parseSearchRequest('Patient', { gender: 'male' });
+    expect(result.params).toHaveLength(1);
+    expect(result.params[0]).toEqual({
+      code: 'gender',
+      values: ['male'],
+    });
+  });
+
+  it('parses comma-separated OR values', () => {
+    const result = parseSearchRequest('Patient', { gender: 'male,female' });
+    expect(result.params[0].values).toEqual(['male', 'female']);
+  });
+
+  it('parses multiple AND parameters', () => {
+    const result = parseSearchRequest('Patient', {
+      gender: 'male',
+      active: 'true',
+    });
+    expect(result.params).toHaveLength(2);
+  });
+
+  it('parses _count parameter', () => {
+    const result = parseSearchRequest('Patient', { _count: '50' });
+    expect(result.count).toBe(50);
+    expect(result.params).toHaveLength(0);
+  });
+
+  it('caps _count at MAX_SEARCH_COUNT', () => {
+    const result = parseSearchRequest('Patient', { _count: '9999' });
+    expect(result.count).toBe(1000);
+  });
+
+  it('parses _offset parameter', () => {
+    const result = parseSearchRequest('Patient', { _offset: '20' });
+    expect(result.offset).toBe(20);
+  });
+
+  it('parses _sort parameter', () => {
+    const result = parseSearchRequest('Patient', { _sort: '-birthdate' });
+    expect(result.sort).toEqual([{ code: 'birthdate', descending: true }]);
+  });
+
+  it('parses _total parameter', () => {
+    const result = parseSearchRequest('Patient', { _total: 'accurate' });
+    expect(result.total).toBe('accurate');
+  });
+
+  it('ignores unknown _total values', () => {
+    const result = parseSearchRequest('Patient', { _total: 'invalid' });
+    expect(result.total).toBeUndefined();
+  });
+
+  it('parses modifier in key', () => {
+    const result = parseSearchRequest('Patient', { 'name:exact': 'Smith' });
+    expect(result.params[0].code).toBe('name');
+    expect(result.params[0].modifier).toBe('exact');
+  });
+
+  it('parses date prefix', () => {
+    const result = parseSearchRequest('Patient', { _lastUpdated: 'ge2026-01-01' });
+    expect(result.params[0].code).toBe('_lastUpdated');
+    expect(result.params[0].prefix).toBe('ge');
+    expect(result.params[0].values).toEqual(['2026-01-01']);
+  });
+
+  it('skips result parameters like _include', () => {
+    const result = parseSearchRequest('Patient', {
+      _include: 'Patient:organization',
+      gender: 'male',
+    });
+    expect(result.params).toHaveLength(1);
+    expect(result.params[0].code).toBe('gender');
+  });
+
+  it('skips undefined and empty values', () => {
+    const result = parseSearchRequest('Patient', {
+      gender: undefined,
+      active: '',
+    });
+    expect(result.params).toHaveLength(0);
+  });
+});

@@ -79,3 +79,31 @@ export {
 } from './repo/index.js';
 export { FhirRepository } from './repo/index.js';
 export { buildHistoryBundle } from './repo/index.js';
+
+// ─── Search ─────────────────────────────────────────────────────────────────
+export type {
+  SearchPrefix,
+  SearchModifier,
+  ParsedSearchParam,
+  SortRule,
+  SearchRequest,
+  WhereFragment,
+  SearchSQL,
+  CountSQL,
+} from './search/index.js';
+export {
+  SEARCH_PREFIXES,
+  PREFIX_TYPES,
+  DEFAULT_SEARCH_COUNT,
+  MAX_SEARCH_COUNT,
+  parseSearchRequest,
+  parseParamKey,
+  splitSearchValues,
+  extractPrefix,
+  parseSortParam,
+  prefixToOperator,
+  buildWhereFragment,
+  buildWhereClause,
+  buildSearchSQL,
+  buildCountSQL,
+} from './search/index.js';

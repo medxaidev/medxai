@@ -1,12 +1,16 @@
 # Phase 12: SearchParameter Index Layer — Detailed Plan
 
 ```yaml
-status: Pending
-duration: 3-4 days (revised down from 6-8; Phase 8 completed most infrastructure)
+status: Completed ✅
+completed: 2026-02-23
+duration: <1 day (actual; estimated 3-4 days)
 complexity: Medium (revised down from High)
 risk: Low
-depends_on: Phase 8 ✅, Phase 11
+depends_on: Phase 8 ✅, Phase 11 ✅
 package: packages/fhir-persistence (extends existing)
+tests: 91/91 passing (3 test files)
+tsc: clean (0 errors)
+regression: 392/392 fhir-persistence tests passing (0 regressions)
 ```
 
 ---
@@ -18,25 +22,25 @@ This is the bridge between the SearchParameter registry (Phase 8) and search exe
 
 ### What's Already Done (Phase 8)
 
-| Component | File | Status |
-|-----------|------|--------|
-| `SearchParameterRegistry` | `registry/search-parameter-registry.ts` | ✅ 460 lines |
-| `SearchParameterImpl` type | `registry/search-parameter-registry.ts` | ✅ code, type, strategy, columnName, columnType |
-| Strategy resolution | `registry/search-parameter-registry.ts` | ✅ column / token-column / lookup-table |
-| Column type mapping | `registry/search-parameter-registry.ts` | ✅ 6 FHIR types → PostgreSQL types |
-| Column name mapping | `registry/search-parameter-registry.ts` | ✅ hyphen → camelCase |
-| DDL generation | `schema/table-schema-builder.ts` | ✅ ADD COLUMN IF NOT EXISTS |
-| Index DDL generation | `schema/ddl-generator.ts` | ✅ CREATE INDEX IF NOT EXISTS |
-| Registry tests | `__tests__/registry/search-parameter-registry.test.ts` | ✅ 18 tests |
+| Component                  | File                                                   | Status                                          |
+| -------------------------- | ------------------------------------------------------ | ----------------------------------------------- |
+| `SearchParameterRegistry`  | `registry/search-parameter-registry.ts`                | ✅ 460 lines                                    |
+| `SearchParameterImpl` type | `registry/search-parameter-registry.ts`                | ✅ code, type, strategy, columnName, columnType |
+| Strategy resolution        | `registry/search-parameter-registry.ts`                | ✅ column / token-column / lookup-table         |
+| Column type mapping        | `registry/search-parameter-registry.ts`                | ✅ 6 FHIR types → PostgreSQL types              |
+| Column name mapping        | `registry/search-parameter-registry.ts`                | ✅ hyphen → camelCase                           |
+| DDL generation             | `schema/table-schema-builder.ts`                       | ✅ ADD COLUMN IF NOT EXISTS                     |
+| Index DDL generation       | `schema/ddl-generator.ts`                              | ✅ CREATE INDEX IF NOT EXISTS                   |
+| Registry tests             | `__tests__/registry/search-parameter-registry.test.ts` | ✅ 18 tests                                     |
 
 ### What Phase 12 Adds
 
-| Component | File | Description |
-|-----------|------|-------------|
-| `SearchRequest` type | `search/types.ts` | Parsed search request with parameters |
-| `parseSearchParams()` | `search/param-parser.ts` | Parse FHIR search URL query → structured params |
-| `buildWhereClause()` | `search/where-builder.ts` | SearchParameter + value → SQL WHERE fragment |
-| `buildSearchSQL()` | `search/search-sql-builder.ts` | Full SELECT with WHERE, ORDER BY, LIMIT |
+| Component             | File                           | Description                                     |
+| --------------------- | ------------------------------ | ----------------------------------------------- |
+| `SearchRequest` type  | `search/types.ts`              | Parsed search request with parameters           |
+| `parseSearchParams()` | `search/param-parser.ts`       | Parse FHIR search URL query → structured params |
+| `buildWhereClause()`  | `search/where-builder.ts`      | SearchParameter + value → SQL WHERE fragment    |
+| `buildSearchSQL()`    | `search/search-sql-builder.ts` | Full SELECT with WHERE, ORDER BY, LIMIT         |
 
 > **Note:** Phase 12 does NOT implement search execution or HTTP endpoints.
 > It only builds the SQL generation layer. Phase 13 adds the executor and routes.
@@ -51,21 +55,30 @@ This is the bridge between the SearchParameter registry (Phase 8) and search exe
 
 ```typescript
 interface SearchParameter {
-  code: string;           // e.g., "gender"
-  modifier?: string;      // e.g., "exact", "contains", "missing", "not"
-  prefix?: SearchPrefix;  // e.g., "eq", "ne", "lt", "gt", "ge", "le"
-  values: string[];       // e.g., ["male", "female"] (OR semantics)
+  code: string; // e.g., "gender"
+  modifier?: string; // e.g., "exact", "contains", "missing", "not"
+  prefix?: SearchPrefix; // e.g., "eq", "ne", "lt", "gt", "ge", "le"
+  values: string[]; // e.g., ["male", "female"] (OR semantics)
 }
 
-type SearchPrefix = 'eq' | 'ne' | 'lt' | 'gt' | 'le' | 'ge' | 'sa' | 'eb' | 'ap';
+type SearchPrefix =
+  | "eq"
+  | "ne"
+  | "lt"
+  | "gt"
+  | "le"
+  | "ge"
+  | "sa"
+  | "eb"
+  | "ap";
 
 interface SearchRequest {
   resourceType: string;
   params: SearchParameter[];
-  count?: number;         // _count
-  offset?: number;        // _offset (or cursor)
-  sort?: SortRule[];      // _sort
-  total?: 'none' | 'estimate' | 'accurate';  // _total
+  count?: number; // _count
+  offset?: number; // _offset (or cursor)
+  sort?: SortRule[]; // _sort
+  total?: "none" | "estimate" | "accurate"; // _total
 }
 
 interface SortRule {
@@ -74,8 +87,8 @@ interface SortRule {
 }
 
 interface WhereFragment {
-  sql: string;            // e.g., '"gender" = $1'
-  values: unknown[];      // e.g., ['male']
+  sql: string; // e.g., '"gender" = $1'
+  values: unknown[]; // e.g., ['male']
 }
 ```
 
@@ -103,34 +116,36 @@ Core function: `buildWhereFragment(impl, param, startIndex) → WhereFragment`
 
 **By SearchParameter type:**
 
-| Type | Default Operator | Example SQL |
-|------|-----------------|-------------|
-| token | `= $N` | `"gender" = $1` |
-| string | `ILIKE $N` | `"family" ILIKE $1` (value: `%Smith%`) |
-| string:exact | `= $N` | `"family" = $1` |
-| date | `= $N` (or prefix) | `"birthdate" >= $1` |
-| reference | `= $N` | `"subject" = $1` |
-| number | `= $N` (or prefix) | `"valueQuantity" >= $1` |
-| uri | `= $N` | `"url" = $1` |
+| Type         | Default Operator   | Example SQL                            |
+| ------------ | ------------------ | -------------------------------------- |
+| token        | `= $N`             | `"gender" = $1`                        |
+| string       | `ILIKE $N`         | `"family" ILIKE $1` (value: `%Smith%`) |
+| string:exact | `= $N`             | `"family" = $1`                        |
+| date         | `= $N` (or prefix) | `"birthdate" >= $1`                    |
+| reference    | `= $N`             | `"subject" = $1`                       |
+| number       | `= $N` (or prefix) | `"valueQuantity" >= $1`                |
+| uri          | `= $N`             | `"url" = $1`                           |
 
 **Prefix handling:**
 
-| Prefix | SQL Operator |
-|--------|-------------|
-| `eq` (default) | `=` |
-| `ne` | `<>` |
-| `lt` | `<` |
-| `gt` | `>` |
-| `le` | `<=` |
-| `ge` | `>=` |
+| Prefix         | SQL Operator |
+| -------------- | ------------ |
+| `eq` (default) | `=`          |
+| `ne`           | `<>`         |
+| `lt`           | `<`          |
+| `gt`           | `>`          |
+| `le`           | `<=`         |
+| `ge`           | `>=`         |
 
 **Multiple values (OR):**
+
 ```sql
 -- ?gender=male,female
 ("gender" = $1 OR "gender" = $2)
 ```
 
 **Multiple parameters (AND):**
+
 ```sql
 -- ?gender=male&active=true
 "gender" = $1 AND "active" = $2
@@ -147,10 +162,11 @@ function buildSearchSQL(
   resourceType: string,
   request: SearchRequest,
   registry: SearchParameterRegistry,
-): { sql: string; values: unknown[] }
+): { sql: string; values: unknown[] };
 ```
 
 Output:
+
 ```sql
 SELECT "id", "content", "lastUpdated", "deleted"
 FROM "Patient"
@@ -163,12 +179,12 @@ LIMIT $3
 
 ### Task 12.5: Tests (40+)
 
-| File | Tests | Coverage |
-|------|-------|---------|
-| `search/types.test.ts` | 5 | Type validation |
-| `search/param-parser.test.ts` | 12 | Query string parsing, prefixes, modifiers, OR values |
-| `search/where-builder.test.ts` | 15 | All 6 types, prefixes, modifiers, OR/AND |
-| `search/search-sql-builder.test.ts` | 10 | Full SQL generation, ORDER BY, LIMIT |
+| File                                | Tests | Coverage                                             |
+| ----------------------------------- | ----- | ---------------------------------------------------- |
+| `search/types.test.ts`              | 5     | Type validation                                      |
+| `search/param-parser.test.ts`       | 12    | Query string parsing, prefixes, modifiers, OR values |
+| `search/where-builder.test.ts`      | 15    | All 6 types, prefixes, modifiers, OR/AND             |
+| `search/search-sql-builder.test.ts` | 10    | Full SQL generation, ORDER BY, LIMIT                 |
 
 ---
 
