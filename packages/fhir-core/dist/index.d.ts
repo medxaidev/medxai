@@ -174,6 +174,63 @@ export declare function buildSlicingDefinition(slicing: ElementDefinitionSlicing
 export declare function buildTypeConstraints(types: readonly ElementDefinitionType[] | undefined): TypeConstraint[];
 
 /**
+ * Describes a single error encountered while loading a StructureDefinition.
+ */
+export declare interface BundleLoadError {
+    /** The name of the StructureDefinition that failed. */
+    name: string;
+    /** The canonical URL of the StructureDefinition that failed. */
+    url: string;
+    /** The error that occurred. */
+    error: Error;
+    /** Parse issues, if the failure was during parsing. */
+    parseIssues?: readonly ParseIssue[];
+}
+
+/**
+ * Options for filtering which StructureDefinitions to load from a bundle.
+ */
+export declare interface BundleLoadOptions {
+    /** Only include entries where kind matches. Default: all kinds. */
+    filterKind?: StructureDefinitionKind | StructureDefinitionKind[];
+    /** Exclude abstract definitions. Default: false (include abstract). */
+    excludeAbstract?: boolean;
+    /** Only include entries where type matches one of these. */
+    filterTypes?: string[];
+}
+
+/**
+ * Result of loading one or more bundles.
+ */
+export declare interface BundleLoadResult {
+    /** Successfully loaded CanonicalProfiles. */
+    profiles: CanonicalProfile[];
+    /** Errors encountered during loading (partial failures). */
+    errors: BundleLoadError[];
+    /** Summary statistics. */
+    stats: {
+        /** Total StructureDefinition entries found in bundle(s). */
+        total: number;
+        /** Successfully parsed and converted to CanonicalProfile. */
+        loaded: number;
+        /** Filtered out by options (kind, abstract, type). */
+        skipped: number;
+        /** Failed to parse or convert. */
+        failed: number;
+    };
+}
+
+/**
+ * Minimal Bundle shape for type-safe access.
+ */
+declare interface BundleShape {
+    resourceType: string;
+    entry?: Array<{
+        resource?: Record<string, unknown>;
+    }>;
+}
+
+/**
  * A single resolved element within a CanonicalProfile.
  *
  * This is the internal, pre-resolved representation of an
@@ -1992,6 +2049,51 @@ export declare interface FhirContext {
                         * @returns Map of canonical URL → StructureDefinition
                         */
                        export declare function loadAllCoreDefinitions(specDirectory?: string): Promise<Map<string, StructureDefinition>>;
+
+                       /**
+                        * Load CanonicalProfiles from a FHIR Bundle JSON file.
+                        *
+                        * Reads the file synchronously (spec files are loaded once at startup),
+                        * parses the JSON, and delegates to `loadBundleFromObject`.
+                        *
+                        * @param filePath - Absolute path to a FHIR Bundle JSON file.
+                        * @param options - Optional filters to control which entries are loaded.
+                        * @returns BundleLoadResult with profiles, errors, and statistics.
+                        * @throws Error if the file cannot be read or is not valid JSON.
+                        */
+                       export declare function loadBundleFromFile(filePath: string, options?: BundleLoadOptions): BundleLoadResult;
+
+                       /**
+                        * Load CanonicalProfiles from an already-parsed Bundle object.
+                        *
+                        * This is the core loading function. It:
+                        * 1. Extracts all StructureDefinition entries from the bundle
+                        * 2. Applies filter options (kind, abstract, type)
+                        * 3. Parses each SD through `parseStructureDefinition`
+                        * 4. Converts each parsed SD to `CanonicalProfile` via `buildCanonicalProfile`
+                        * 5. Collects errors without aborting (partial failure tolerance)
+                        *
+                        * @param bundle - A parsed FHIR Bundle object containing StructureDefinition entries.
+                        * @param options - Optional filters to control which entries are loaded.
+                        * @returns BundleLoadResult with profiles, errors, and statistics.
+                        */
+                       export declare function loadBundleFromObject(bundle: BundleShape, options?: BundleLoadOptions): BundleLoadResult;
+
+                       /**
+                        * Load and merge multiple bundle files in order.
+                        *
+                        * Later bundles override earlier ones for the same canonical URL.
+                        * This supports the standard loading order:
+                        *   1. profiles-types.json    — type system (no tables)
+                        *   2. profiles-resources.json — clinical resources
+                        *   3. profiles-others.json   — conformance resources
+                        *   4. profiles-platform.json — platform resources (Phase 9)
+                        *
+                        * @param filePaths - Array of absolute paths to FHIR Bundle JSON files.
+                        * @param options - Optional filters applied to each bundle.
+                        * @returns Merged BundleLoadResult with deduplicated profiles.
+                        */
+                       export declare function loadBundlesFromFiles(filePaths: string[], options?: BundleLoadOptions): BundleLoadResult;
 
                        /**
                         * Load a single core StructureDefinition by name (async).

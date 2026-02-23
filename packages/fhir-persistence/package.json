@@ -40,11 +40,18 @@
   "scripts": {
     "clean": "rimraf dist",
     "build": "npm run clean && tsc && node ./scripts/esbuild.mjs",
-    "test": "vitest"
+    "test": "vitest",
+    "schema:generate": "tsx src/cli/generate-schema.ts --spec-dir ../../spec/fhir/r4 --output schema.sql",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:reset": "tsx scripts/init-db.ts --reset",
+    "db:sql": "tsx scripts/init-db.ts --sql-only"
   },
   "dependencies": {
-    "@medxai/fhir-core": "0.0.1"
+    "@medxai/fhir-core": "0.0.1",
+    "pg": "8.18.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@types/pg": "8.16.0"
+  },
   "peerDependencies": {}
 }
