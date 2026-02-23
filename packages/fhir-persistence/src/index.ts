@@ -66,6 +66,8 @@ export type {
   UpdateResourceOptions,
   HistoryOptions,
   HistoryEntry,
+  SearchOptions,
+  SearchResult,
   HistoryBundle,
   HistoryBundleEntry,
   BuildHistoryBundleOptions,
@@ -90,6 +92,10 @@ export type {
   WhereFragment,
   SearchSQL,
   CountSQL,
+  SearchBundle,
+  SearchBundleEntry,
+  BuildSearchBundleOptions,
+  PaginationContext,
 } from './search/index.js';
 export {
   SEARCH_PREFIXES,
@@ -106,4 +112,11 @@ export {
   buildWhereClause,
   buildSearchSQL,
   buildCountSQL,
+  buildSearchBundle,
+  buildSelfLink,
+  buildNextLink,
+  hasNextPage,
+  buildPaginationContext,
+  executeSearch,
+  mapRowsToResources,
 } from './search/index.js';

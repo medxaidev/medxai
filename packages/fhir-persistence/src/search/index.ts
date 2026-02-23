@@ -43,3 +43,24 @@ export {
   buildSearchSQL,
   buildCountSQL,
 } from './search-sql-builder.js';
+
+// Search Bundle Builder
+export type {
+  SearchBundle,
+  SearchBundleEntry,
+  BuildSearchBundleOptions,
+} from './search-bundle.js';
+export { buildSearchBundle } from './search-bundle.js';
+
+// Pagination
+export type { PaginationContext } from './pagination.js';
+export {
+  buildSelfLink,
+  buildNextLink,
+  hasNextPage,
+  buildPaginationContext,
+} from './pagination.js';
+
+// Search Executor
+export type { SearchOptions, SearchResult } from './search-executor.js';
+export { executeSearch, mapRowsToResources } from './search-executor.js';

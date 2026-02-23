@@ -1,8 +1,9 @@
 # Phase 13: Search Execution Layer — Detailed Plan
 
 ```yaml
-status: Planning
+status: COMPLETED ✅ (2026-02-23)
 estimated_duration: 5-8 days
+actual_duration: 1 day
 complexity: High
 risk: Medium
 depends_on: Phase 12 ✅ (SearchParameter Index Layer)
@@ -87,9 +88,9 @@ Build a FHIR R4 Bundle of type `searchset` from search results.
 
 ```typescript
 export interface SearchBundle {
-  resourceType: 'Bundle';
+  resourceType: "Bundle";
   id: string;
-  type: 'searchset';
+  type: "searchset";
   total?: number;
   link?: BundleLink[];
   entry?: SearchBundleEntry[];
@@ -99,7 +100,7 @@ export interface SearchBundleEntry {
   fullUrl?: string;
   resource: Record<string, unknown>;
   search?: {
-    mode: 'match' | 'include' | 'outcome';
+    mode: "match" | "include" | "outcome";
   };
 }
 
@@ -117,6 +118,7 @@ export function buildSearchBundle(
 ```
 
 **Key Points:**
+
 - Pattern mirrors `buildHistoryBundle()` from Phase 10
 - Each entry has `search.mode = 'match'`
 - `fullUrl` = `{baseUrl}/{resourceType}/{id}`
@@ -125,6 +127,7 @@ export function buildSearchBundle(
 - `link` includes `self` and optionally `next` for pagination
 
 **Tests (15+):**
+
 - Empty results → Bundle with no entry
 - Single resource → correct entry structure
 - Multiple resources → correct count
@@ -147,6 +150,7 @@ export function buildSearchBundle(
 
 **Package:** `packages/fhir-persistence`  
 **Files:**
+
 - `src/repo/types.ts` — extend `ResourceRepository` interface
 - `src/repo/fhir-repo.ts` — implement `searchResources()`
 - `src/search/search-executor.ts` — pure search execution logic
@@ -195,10 +199,10 @@ export async function executeSearch(
 
   // 3. Optionally get total count
   let total: number | undefined;
-  if (options?.total === 'accurate') {
+  if (options?.total === "accurate") {
     const countSQL = buildCountSQL(request, registry);
     const countResult = await db.query(countSQL.sql, countSQL.values);
-    total = parseInt(countResult.rows[0]?.count ?? '0', 10);
+    total = parseInt(countResult.rows[0]?.count ?? "0", 10);
   }
 
   return { resources, total };
@@ -206,6 +210,7 @@ export async function executeSearch(
 ```
 
 **Key Points:**
+
 - `executeSearch()` is a pure function (takes `DatabaseClient`, returns `SearchResult`)
 - `FhirRepository.searchResources()` delegates to `executeSearch()`
 - Row mapping: `JSON.parse(row.content)` → `PersistedResource`
@@ -213,6 +218,7 @@ export async function executeSearch(
 - Count query only executed when `_total=accurate`
 
 **Tests (15+):**
+
 - Unit tests with mock DatabaseClient
 - Basic search returns resources
 - Empty result set
@@ -222,9 +228,9 @@ export async function executeSearch(
 - Deleted row filtering
 - Multiple resources returned
 - Search with params produces correct SQL call
-- Search with _count limits results
-- Search with _offset skips results
-- Search with _sort orders results
+- Search with \_count limits results
+- Search with \_offset skips results
+- Search with \_sort orders results
 - Error propagation from DB
 - Registry parameter resolution
 - Unknown params gracefully handled
@@ -255,23 +261,25 @@ export function hasNextPage(ctx: PaginationContext): boolean;
 ```
 
 **Key Points:**
+
 - Self link preserves all original query parameters
 - Next link increments `_offset` by `_count`
 - No next link if current page has fewer results than `_count`
 - URL encoding for parameter values
 
 **Tests (15+):**
+
 - Self link with no params
 - Self link with search params
-- Self link with _count and _offset
+- Self link with \_count and \_offset
 - Next link when more results exist
 - No next link on last page
 - No next link when results < count
 - hasNextPage true/false cases
 - URL encoding of special characters
 - Multiple parameter values
-- _sort preserved in links
-- _total preserved in links
+- \_sort preserved in links
+- \_total preserved in links
 - Offset calculation correctness
 - Edge case: offset = 0
 - Edge case: count = 0
@@ -331,41 +339,45 @@ export async function searchRoutes(fastify: FastifyInstance): Promise<void> {
 ```
 
 **Key Points:**
+
 - GET search uses query string parameters
-- POST _search uses form-encoded body parameters
+- POST \_search uses form-encoded body parameters
 - Both delegate to same search logic
 - `SearchParameterRegistry` must be decorated on Fastify instance
 - Unknown parameters return OperationOutcome (400)
-- Empty search returns all resources (with default _count=20)
+- Empty search returns all resources (with default \_count=20)
 
 **Route Registration in app.ts:**
+
 - `app.decorate('searchRegistry', registry)` alongside existing `repo` decoration
 - Register `searchRoutes` after `resourceRoutes`
 - Search route `GET /:resourceType` must be registered BEFORE the CRUD `GET /:resourceType/:id` to avoid conflicts — OR use a route prefix strategy
 
 **Route Conflict Resolution:**
+
 - Fastify parametric routes: `GET /:resourceType` (search) vs `GET /:resourceType/:id` (read)
 - These don't conflict because Fastify distinguishes by segment count
 - `GET /Patient` → search route (1 segment)
 - `GET /Patient/123` → read route (2 segments)
 
 **Tests (20+):**
+
 - GET search with no params → returns Bundle
 - GET search with gender=male → filtered results
 - GET search with multiple params (AND)
 - GET search with multiple values (OR)
-- GET search with _count → limited results
-- GET search with _sort → ordered results
-- GET search with _total=accurate → includes total
+- GET search with \_count → limited results
+- GET search with \_sort → ordered results
+- GET search with \_total=accurate → includes total
 - GET search with unknown param → 400 OperationOutcome
-- POST _search with form body
-- POST _search mirrors GET behavior
+- POST \_search with form body
+- POST \_search mirrors GET behavior
 - Empty result → Bundle with no entries
 - Response content-type is application/fhir+json
 - Bundle type is searchset
 - Bundle has self link
 - Bundle has next link when paginated
-- _offset pagination works
+- \_offset pagination works
 - String search with :exact modifier
 - Date search with ge prefix
 - Token search with :not modifier
@@ -384,17 +396,18 @@ Wire the `SearchParameterRegistry` into the Fastify app.
 ```typescript
 export interface AppOptions {
   repo: ResourceRepository;
-  searchRegistry?: SearchParameterRegistry;  // NEW
+  searchRegistry?: SearchParameterRegistry; // NEW
   logger?: boolean;
   baseUrl?: string;
 }
 ```
 
 **Key Points:**
+
 - `SearchParameterRegistry` is optional (search disabled if not provided)
 - Decorated on Fastify instance as `searchRegistry`
 - Search routes only registered when registry is provided
-- Content-type parser for `application/x-www-form-urlencoded` (for POST _search)
+- Content-type parser for `application/x-www-form-urlencoded` (for POST \_search)
 
 ---
 
@@ -418,13 +431,13 @@ export interface AppOptions {
 
 ## Test Summary
 
-| Task | File | Target Tests |
-|------|------|-------------|
-| 13.1 | `search-bundle.test.ts` | 15+ |
-| 13.2 | `search-executor.test.ts` | 15+ |
-| 13.3 | `pagination.test.ts` | 15+ |
-| 13.4 | `search.test.ts` | 20+ |
-| **Total** | | **65+** |
+| Task      | File                      | Target Tests |
+| --------- | ------------------------- | ------------ |
+| 13.1      | `search-bundle.test.ts`   | 15+          |
+| 13.2      | `search-executor.test.ts` | 15+          |
+| 13.3      | `pagination.test.ts`      | 15+          |
+| 13.4      | `search.test.ts`          | 20+          |
+| **Total** |                           | **65+**      |
 
 ---
 
@@ -432,26 +445,26 @@ export interface AppOptions {
 
 ### New Files
 
-| File | Package | Purpose |
-|------|---------|---------|
-| `src/search/search-bundle.ts` | fhir-persistence | SearchSet Bundle builder |
-| `src/search/pagination.ts` | fhir-persistence | Pagination URL helpers |
-| `src/search/search-executor.ts` | fhir-persistence | SQL execution + row mapping |
-| `src/routes/search-routes.ts` | fhir-server | HTTP search endpoints |
-| `src/__tests__/search/search-bundle.test.ts` | fhir-persistence | Bundle builder tests |
-| `src/__tests__/search/pagination.test.ts` | fhir-persistence | Pagination tests |
-| `src/__tests__/search/search-executor.test.ts` | fhir-persistence | Executor tests |
-| `src/__tests__/search.test.ts` | fhir-server | HTTP search tests |
+| File                                           | Package          | Purpose                     |
+| ---------------------------------------------- | ---------------- | --------------------------- |
+| `src/search/search-bundle.ts`                  | fhir-persistence | SearchSet Bundle builder    |
+| `src/search/pagination.ts`                     | fhir-persistence | Pagination URL helpers      |
+| `src/search/search-executor.ts`                | fhir-persistence | SQL execution + row mapping |
+| `src/routes/search-routes.ts`                  | fhir-server      | HTTP search endpoints       |
+| `src/__tests__/search/search-bundle.test.ts`   | fhir-persistence | Bundle builder tests        |
+| `src/__tests__/search/pagination.test.ts`      | fhir-persistence | Pagination tests            |
+| `src/__tests__/search/search-executor.test.ts` | fhir-persistence | Executor tests              |
+| `src/__tests__/search.test.ts`                 | fhir-server      | HTTP search tests           |
 
 ### Modified Files
 
-| File | Package | Changes |
-|------|---------|---------|
-| `src/repo/types.ts` | fhir-persistence | Add `searchResources()` to `ResourceRepository` |
-| `src/repo/fhir-repo.ts` | fhir-persistence | Implement `searchResources()` |
-| `src/search/index.ts` | fhir-persistence | Export new modules |
-| `src/index.ts` | fhir-persistence | Export new types and functions |
-| `src/app.ts` | fhir-server | Wire `SearchParameterRegistry`, register search routes |
+| File                    | Package          | Changes                                                |
+| ----------------------- | ---------------- | ------------------------------------------------------ |
+| `src/repo/types.ts`     | fhir-persistence | Add `searchResources()` to `ResourceRepository`        |
+| `src/repo/fhir-repo.ts` | fhir-persistence | Implement `searchResources()`                          |
+| `src/search/index.ts`   | fhir-persistence | Export new modules                                     |
+| `src/index.ts`          | fhir-persistence | Export new types and functions                         |
+| `src/app.ts`            | fhir-server      | Wire `SearchParameterRegistry`, register search routes |
 
 ---
 
@@ -471,29 +484,29 @@ Tasks 13.1 and 13.3 can be done in parallel (both pure functions).
 
 ## Dependencies from Phase 12
 
-| Component | Status | Used By |
-|-----------|--------|---------|
-| `parseSearchRequest()` | ✅ | Task 13.4 (routes) |
-| `buildSearchSQL()` | ✅ | Task 13.2 (executor) |
-| `buildCountSQL()` | ✅ | Task 13.2 (executor) |
-| `SearchParameterRegistry` | ✅ | Task 13.2, 13.4, 13.5 |
-| `SearchRequest` type | ✅ | All tasks |
-| `DEFAULT_SEARCH_COUNT` | ✅ | Task 13.3 (pagination) |
-| `MAX_SEARCH_COUNT` | ✅ | Task 13.3 (pagination) |
+| Component                 | Status | Used By                |
+| ------------------------- | ------ | ---------------------- |
+| `parseSearchRequest()`    | ✅     | Task 13.4 (routes)     |
+| `buildSearchSQL()`        | ✅     | Task 13.2 (executor)   |
+| `buildCountSQL()`         | ✅     | Task 13.2 (executor)   |
+| `SearchParameterRegistry` | ✅     | Task 13.2, 13.4, 13.5  |
+| `SearchRequest` type      | ✅     | All tasks              |
+| `DEFAULT_SEARCH_COUNT`    | ✅     | Task 13.3 (pagination) |
+| `MAX_SEARCH_COUNT`        | ✅     | Task 13.3 (pagination) |
 
 ---
 
 ## Deferred to Phase 14+
 
-| Feature | Reason |
-|---------|--------|
-| Chained search (`subject.name=Smith`) | Requires multi-table JOIN infrastructure |
-| `_include` / `_revinclude` | Requires secondary queries + Bundle assembly |
-| Composite parameters | Complex multi-column matching |
-| `_has` reverse chaining | Requires subquery generation |
-| `_filter` expression | Requires expression parser |
-| `_summary` / `_elements` | Requires response projection |
-| lookup-table JOIN strategy | Requires JOIN clause generation in SQL builder |
+| Feature                               | Reason                                         |
+| ------------------------------------- | ---------------------------------------------- |
+| Chained search (`subject.name=Smith`) | Requires multi-table JOIN infrastructure       |
+| `_include` / `_revinclude`            | Requires secondary queries + Bundle assembly   |
+| Composite parameters                  | Complex multi-column matching                  |
+| `_has` reverse chaining               | Requires subquery generation                   |
+| `_filter` expression                  | Requires expression parser                     |
+| `_summary` / `_elements`              | Requires response projection                   |
+| lookup-table JOIN strategy            | Requires JOIN clause generation in SQL builder |
 
 ---
 
@@ -503,3 +516,66 @@ Tasks 13.1 and 13.3 can be done in parallel (both pure functions).
 2. **SQL injection** — All queries use `$N` parameterized placeholders (inherited from Phase 12).
 3. **Performance** — Default `_count=20`, `MAX_SEARCH_COUNT=1000`. No unbounded queries.
 4. **Registry availability** — Search routes only registered when `SearchParameterRegistry` is provided. Graceful degradation.
+
+---
+
+## Completion Results (2026-02-23)
+
+### Test Results
+
+| Task               | File                      | Tests        |
+| ------------------ | ------------------------- | ------------ |
+| 13.1               | `search-bundle.test.ts`   | 22/22 ✅     |
+| 13.2               | `search-executor.test.ts` | 18/18 ✅     |
+| 13.3               | `pagination.test.ts`      | 25/25 ✅     |
+| 13.4               | `search.test.ts`          | 25/25 ✅     |
+| **Total Phase 13** | **4 new test files**      | **90/90 ✅** |
+
+### Regression
+
+| Package                      | Tests   | Status           |
+| ---------------------------- | ------- | ---------------- |
+| `fhir-persistence`           | 484/484 | ✅ 0 regressions |
+| `fhir-server`                | 90/90   | ✅ 0 regressions |
+| `tsc --noEmit` (persistence) | clean   | ✅               |
+| `tsc --noEmit` (server)      | clean   | ✅               |
+
+### Acceptance Criteria
+
+- [x] `GET /:resourceType` returns searchset Bundle
+- [x] `POST /:resourceType/_search` returns searchset Bundle
+- [x] All 6 parameter types work (string, date, number, reference, uri, token)
+- [x] Multiple values (OR) and multiple parameters (AND) work
+- [x] `_count` limits results
+- [x] `_offset` pagination works
+- [x] `_sort` orders results
+- [x] `_total=accurate` returns total count
+- [x] Pagination links (self, next) are correct
+- [x] 90 new tests passing (target was 65+)
+- [x] 0 TypeScript errors
+- [x] 0 regressions in existing tests
+
+### New Files (8)
+
+| File                                           | Package          |
+| ---------------------------------------------- | ---------------- |
+| `src/search/search-bundle.ts`                  | fhir-persistence |
+| `src/search/pagination.ts`                     | fhir-persistence |
+| `src/search/search-executor.ts`                | fhir-persistence |
+| `src/routes/search-routes.ts`                  | fhir-server      |
+| `src/__tests__/search/search-bundle.test.ts`   | fhir-persistence |
+| `src/__tests__/search/pagination.test.ts`      | fhir-persistence |
+| `src/__tests__/search/search-executor.test.ts` | fhir-persistence |
+| `src/__tests__/search.test.ts`                 | fhir-server      |
+
+### Modified Files (7)
+
+| File                       | Package          | Changes                                                                                   |
+| -------------------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| `src/repo/types.ts`        | fhir-persistence | Added `SearchOptions`, `SearchResult`, `searchResources()` to `ResourceRepository`        |
+| `src/repo/fhir-repo.ts`    | fhir-persistence | Implemented `searchResources()`, added optional `SearchParameterRegistry` to constructor  |
+| `src/repo/index.ts`        | fhir-persistence | Exported `SearchOptions`, `SearchResult`                                                  |
+| `src/search/index.ts`      | fhir-persistence | Exported search-bundle, pagination, search-executor modules                               |
+| `src/index.ts`             | fhir-persistence | Exported all new Phase 13 types and functions                                             |
+| `src/app.ts`               | fhir-server      | Added `searchRegistry` to `AppOptions`, form-urlencoded parser, search route registration |
+| `src/__tests__/helpers.ts` | fhir-server      | Added `searchResources` to mock repo, `searchRegistry` option to `createTestApp`          |

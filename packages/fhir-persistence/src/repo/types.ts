@@ -126,7 +126,29 @@ export interface HistoryEntry {
 }
 
 // =============================================================================
-// Section 3: Repository Interface
+// Section 3: Search Options
+// =============================================================================
+
+/**
+ * Options for search execution.
+ */
+export interface SearchOptions {
+  /** Whether to include total count. */
+  total?: 'none' | 'estimate' | 'accurate';
+}
+
+/**
+ * Result of a search execution.
+ */
+export interface SearchResult {
+  /** Matched resources. */
+  resources: PersistedResource[];
+  /** Total count (only when `total=accurate`). */
+  total?: number;
+}
+
+// =============================================================================
+// Section 4: Repository Interface
 // =============================================================================
 
 /**
@@ -215,6 +237,21 @@ export interface ResourceRepository {
     id: string,
     versionId: string,
   ): Promise<PersistedResource>;
+
+  /**
+   * Search for resources matching the given search request.
+   *
+   * - Executes parameterized SQL built from the search request
+   * - Optionally returns total count when `options.total === 'accurate'`
+   *
+   * @param request - Parsed FHIR search request.
+   * @param options - Search options (e.g., total mode).
+   * @returns Search result with matched resources and optional total.
+   */
+  searchResources(
+    request: import('../search/types.js').SearchRequest,
+    options?: SearchOptions,
+  ): Promise<SearchResult>;
 }
 
 // =============================================================================

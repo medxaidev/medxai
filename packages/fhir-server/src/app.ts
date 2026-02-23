@@ -10,7 +10,9 @@
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
 import type { ResourceRepository } from "@medxai/fhir-persistence";
+import type { SearchParameterRegistry } from "@medxai/fhir-persistence";
 import { resourceRoutes } from "./routes/resource-routes.js";
+import { searchRoutes } from "./routes/search-routes.js";
 import { metadataRoute } from "./routes/metadata-route.js";
 import { FHIR_JSON } from "./fhir/response.js";
 import { errorToOutcome } from "./fhir/outcomes.js";
@@ -25,6 +27,8 @@ import { errorToOutcome } from "./fhir/outcomes.js";
 export interface AppOptions {
   /** The FhirRepository instance for persistence operations. */
   repo: ResourceRepository;
+  /** SearchParameterRegistry for search operations. Optional — search disabled if not provided. */
+  searchRegistry?: SearchParameterRegistry;
   /** Enable Fastify/pino logging. Default: false. */
   logger?: boolean;
   /** Base URL for the server (used in Location headers, Bundle links). */
@@ -68,14 +72,16 @@ function isFastifyValidationError(error: unknown): error is FastifyValidationErr
  * ```
  */
 export async function createApp(options: AppOptions): Promise<FastifyInstance> {
-  const { repo, logger = false, baseUrl } = options;
+  const { repo, searchRegistry, logger = false, baseUrl } = options;
 
   const app = Fastify({
     logger,
   });
 
-  // ── Decorate with repository ──────────────────────────────────────────────
+  // ── Decorate with repository and search registry ──────────────────────────
   app.decorate("repo", repo);
+  app.decorate("searchRegistry", searchRegistry ?? null);
+  app.decorate("baseUrl", baseUrl ?? "");
 
   // ── Content-Type parsing ──────────────────────────────────────────────────
   // Accept application/fhir+json as JSON
@@ -117,8 +123,30 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     reply.status(status).header("content-type", FHIR_JSON).send(outcome);
   });
 
+  // ── Content-Type parsing for form-encoded search ──────────────────────────
+  app.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    (_req, body, done) => {
+      try {
+        const params: Record<string, string> = {};
+        const pairs = (body as string).split("&");
+        for (const pair of pairs) {
+          const [key, value] = pair.split("=").map(decodeURIComponent);
+          if (key) params[key] = value ?? "";
+        }
+        done(null, params);
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
+
   // ── Register routes ───────────────────────────────────────────────────────
   await app.register(metadataRoute, { baseUrl });
+  if (searchRegistry) {
+    await app.register(searchRoutes);
+  }
   await app.register(resourceRoutes);
 
   return app;

@@ -6,7 +6,7 @@
  */
 
 import { vi } from "vitest";
-import type { ResourceRepository, PersistedResource, HistoryEntry } from "@medxai/fhir-persistence";
+import type { ResourceRepository, PersistedResource, HistoryEntry, SearchParameterRegistry } from "@medxai/fhir-persistence";
 import { createApp } from "../app.js";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
@@ -31,15 +31,24 @@ export function createMockRepo(): MockRepo {
     readHistory: vi.fn(),
     readTypeHistory: vi.fn(),
     readVersion: vi.fn(),
+    searchResources: vi.fn(),
   } as unknown as MockRepo;
 }
 
 /**
  * Create a test Fastify app with a mock repo.
  */
-export async function createTestApp(repo?: ResourceRepository): Promise<FastifyInstance> {
+export async function createTestApp(
+  repo?: ResourceRepository,
+  options?: { searchRegistry?: SearchParameterRegistry; baseUrl?: string },
+): Promise<FastifyInstance> {
   const mockRepo = repo ?? createMockRepo();
-  return createApp({ repo: mockRepo, logger: false });
+  return createApp({
+    repo: mockRepo,
+    logger: false,
+    searchRegistry: options?.searchRegistry,
+    baseUrl: options?.baseUrl,
+  });
 }
 
 /**

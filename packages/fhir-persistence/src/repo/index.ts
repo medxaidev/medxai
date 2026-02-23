@@ -14,6 +14,8 @@ export type {
   UpdateResourceOptions,
   HistoryOptions,
   HistoryEntry,
+  SearchOptions,
+  SearchResult,
   ResourceRow,
   HistoryRow,
 } from './types.js';

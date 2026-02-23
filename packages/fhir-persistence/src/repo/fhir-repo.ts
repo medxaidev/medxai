@@ -24,7 +24,11 @@ import type {
   UpdateResourceOptions,
   HistoryOptions,
   HistoryEntry,
+  SearchOptions,
+  SearchResult,
 } from './types.js';
+import type { SearchRequest } from '../search/types.js';
+import { executeSearch } from '../search/search-executor.js';
 import {
   ResourceNotFoundError,
   ResourceGoneError,
@@ -39,9 +43,14 @@ import { buildUpsertSQL, buildInsertSQL, buildSelectByIdSQL, buildSelectVersionS
 
 export class FhirRepository implements ResourceRepository {
   private readonly db: DatabaseClient;
+  private readonly registry: import('../registry/search-parameter-registry.js').SearchParameterRegistry | undefined;
 
-  constructor(db: DatabaseClient) {
+  constructor(
+    db: DatabaseClient,
+    registry?: import('../registry/search-parameter-registry.js').SearchParameterRegistry,
+  ) {
     this.db = db;
+    this.registry = registry;
   }
 
   // ---------------------------------------------------------------------------
@@ -207,6 +216,24 @@ export class FhirRepository implements ResourceRepository {
     const result = await this.db.query<HistoryRawRow>(sql, values);
     return result.rows.map((row) => toHistoryEntry(row, resourceType));
   }
+
+  // ---------------------------------------------------------------------------
+  // Search
+  // ---------------------------------------------------------------------------
+
+  async searchResources(
+    request: SearchRequest,
+    options?: SearchOptions,
+  ): Promise<SearchResult> {
+    if (!this.registry) {
+      throw new Error('SearchParameterRegistry is required for search operations');
+    }
+    return executeSearch(this.db, request, this.registry, options);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Version Read
+  // ---------------------------------------------------------------------------
 
   async readVersion(
     resourceType: string,
