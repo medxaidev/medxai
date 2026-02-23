@@ -1,6 +1,7 @@
 # Phase 8: StructureDefinition → Table Generation — Detailed Plan
 
-> **Status:** Planning
+> **Status:** ✅ Completed
+> **Completed:** 2026-02-22
 > **Duration:** 5-8 days
 > **Complexity:** Medium-High
 > **Risk:** Medium
@@ -34,14 +35,14 @@ This phase establishes the `fhir-persistence` package. All code is **pure functi
 
 ## Confirmed Design Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Package location | New `fhir-persistence` package | Clean separation from semantic layer |
-| Phase 8 scope | DDL generation only, no execution | Fully unit-testable without PostgreSQL |
-| Registry input | `CanonicalProfile` (from Phase 7) | Reuse existing parser, avoid duplication |
-| `content` column type | `TEXT` | Faster writes; consistent with Medplum |
-| SchemaDiff | Not in Phase 8 | Only needed for schema evolution (future) |
-| Tables per resource | 3 (main + history + references) | FHIR versioning + `_revinclude` support |
+| Decision              | Choice                            | Rationale                                 |
+| --------------------- | --------------------------------- | ----------------------------------------- |
+| Package location      | New `fhir-persistence` package    | Clean separation from semantic layer      |
+| Phase 8 scope         | DDL generation only, no execution | Fully unit-testable without PostgreSQL    |
+| Registry input        | `CanonicalProfile` (from Phase 7) | Reuse existing parser, avoid duplication  |
+| `content` column type | `TEXT`                            | Faster writes; consistent with Medplum    |
+| SchemaDiff            | Not in Phase 8                    | Only needed for schema evolution (future) |
+| Tables per resource   | 3 (main + history + references)   | FHIR versioning + `_revinclude` support   |
 
 ---
 
@@ -124,6 +125,7 @@ stdout / file  (CLI)  OR  MigrationExecutor (Phase 9)
 Create the `fhir-persistence` package with correct build configuration, mirroring `fhir-core` structure.
 
 **Files to create:**
+
 - `packages/fhir-persistence/package.json`
 - `packages/fhir-persistence/tsconfig.json`
 - `packages/fhir-persistence/tsconfig.build.json`
@@ -131,6 +133,7 @@ Create the `fhir-persistence` package with correct build configuration, mirrorin
 - `packages/fhir-persistence/src/index.ts` (empty barrel)
 
 **Acceptance Criteria:**
+
 - [ ] `tsc --noEmit` passes on empty `src/index.ts`
 - [ ] `jest` runs (0 tests, no errors)
 - [ ] `@medxai/fhir-core` listed as dependency
@@ -145,38 +148,47 @@ Define the intermediate data model representing PostgreSQL table structure.
 
 ```typescript
 export type SqlColumnType =
-  | 'UUID' | 'TEXT' | 'TEXT[]' | 'BOOLEAN' | 'INTEGER' | 'BIGINT'
-  | 'TIMESTAMPTZ' | 'TIMESTAMPTZ[]' | 'DATE' | 'DATE[]'
-  | 'NUMERIC' | 'UUID[]';
+  | "UUID"
+  | "TEXT"
+  | "TEXT[]"
+  | "BOOLEAN"
+  | "INTEGER"
+  | "BIGINT"
+  | "TIMESTAMPTZ"
+  | "TIMESTAMPTZ[]"
+  | "DATE"
+  | "DATE[]"
+  | "NUMERIC"
+  | "UUID[]";
 
 export interface ColumnSchema {
   name: string;
   type: SqlColumnType;
   notNull: boolean;
   primaryKey: boolean;
-  defaultValue?: string;       // SQL expression, e.g. 'false'
-  fhirPath?: string;           // Source FHIRPath (documentation)
-  searchParamCode?: string;    // Source SearchParameter.code
+  defaultValue?: string; // SQL expression, e.g. 'false'
+  fhirPath?: string; // Source FHIRPath (documentation)
+  searchParamCode?: string; // Source SearchParameter.code
 }
 
 export interface IndexSchema {
   name: string;
   columns: string[];
-  indexType: 'btree' | 'gin' | 'gist';
+  indexType: "btree" | "gin" | "gist";
   unique: boolean;
-  where?: string;              // Partial index WHERE clause
-  include?: string[];          // INCLUDE columns (covering index)
+  where?: string; // Partial index WHERE clause
+  include?: string[]; // INCLUDE columns (covering index)
 }
 
 export interface ConstraintSchema {
   name: string;
-  type: 'primary_key' | 'unique' | 'check';
+  type: "primary_key" | "unique" | "check";
   columns?: string[];
   expression?: string;
 }
 
 export interface MainTableSchema {
-  tableName: string;           // e.g. 'Patient'
+  tableName: string; // e.g. 'Patient'
   resourceType: string;
   columns: ColumnSchema[];
   indexes: IndexSchema[];
@@ -184,14 +196,14 @@ export interface MainTableSchema {
 }
 
 export interface HistoryTableSchema {
-  tableName: string;           // e.g. 'Patient_History'
+  tableName: string; // e.g. 'Patient_History'
   resourceType: string;
   columns: ColumnSchema[];
   indexes: IndexSchema[];
 }
 
 export interface ReferencesTableSchema {
-  tableName: string;           // e.g. 'Patient_References'
+  tableName: string; // e.g. 'Patient_References'
   resourceType: string;
   columns: ColumnSchema[];
   indexes: IndexSchema[];
@@ -206,13 +218,14 @@ export interface ResourceTableSet {
 }
 
 export interface SchemaDefinition {
-  version: string;             // e.g. 'fhir-r4-v4.0.1'
-  generatedAt: string;         // ISO timestamp
+  version: string; // e.g. 'fhir-r4-v4.0.1'
+  generatedAt: string; // ISO timestamp
   tableSets: ResourceTableSet[];
 }
 ```
 
 **Acceptance Criteria:**
+
 - [ ] All types exported, `tsc --noEmit` clean
 
 ---
@@ -224,34 +237,38 @@ Index `CanonicalProfile[]` for fast lookup. medxai equivalent of Medplum's `inde
 **File:** `src/registry/structure-definition-registry.ts`
 
 **Key methods:**
+
 ```typescript
 class StructureDefinitionRegistry {
-  index(profile: CanonicalProfile): void
-  indexAll(profiles: CanonicalProfile[]): void
-  get(resourceType: string): CanonicalProfile | undefined
-  has(resourceType: string): boolean
+  index(profile: CanonicalProfile): void;
+  indexAll(profiles: CanonicalProfile[]): void;
+  get(resourceType: string): CanonicalProfile | undefined;
+  has(resourceType: string): boolean;
   // Returns kind='resource' AND abstract=false — the table-building list
-  getTableResourceTypes(): string[]
-  getAllTypes(): string[]
-  get size(): number
-  clear(): void
+  getTableResourceTypes(): string[];
+  getAllTypes(): string[];
+  get size(): number;
+  clear(): void;
 }
 ```
 
 **`getTableResourceTypes()` logic:**
+
 ```typescript
 return Array.from(this.profiles.values())
-  .filter(p => p.kind === 'resource' && p.abstract === false)
-  .map(p => p.type)
+  .filter((p) => p.kind === "resource" && p.abstract === false)
+  .map((p) => p.type)
   .sort();
 ```
 
 **Test cases (15+):**
+
 - indexes by type name, overwrites on duplicate
 - `getTableResourceTypes()` excludes abstract (Resource, DomainResource), complex types (HumanName), primitives (string)
 - integration: indexes all 148 resources from `profiles-resources.json`, returns ~140+ table types
 
 **Acceptance Criteria:**
+
 - [ ] 15+ unit tests passing
 - [ ] Integration test with real `profiles-resources.json`
 
@@ -265,23 +282,24 @@ Index `SearchParameter` definitions. Drives physical search column generation.
 
 **SearchParameter → Strategy mapping (from WF-MIG-003):**
 
-| SearchParam.type | Strategy | Column Type |
-|-----------------|----------|-------------|
-| `date` | `column` | `DATE` or `TIMESTAMPTZ` |
-| `string` | `column` | `TEXT` |
-| `reference` | `column` | `TEXT` |
-| `number` | `column` | `NUMERIC` |
-| `quantity` | `column` | `NUMERIC` |
-| `uri` | `column` | `TEXT` |
-| `boolean` | `column` | `BOOLEAN` |
-| `token` | `token-column` | `UUID[]` + `TEXT[]` + `TEXT` (3 cols) |
-| `special`/`composite` | skipped | — |
+| SearchParam.type      | Strategy       | Column Type                           |
+| --------------------- | -------------- | ------------------------------------- |
+| `date`                | `column`       | `DATE` or `TIMESTAMPTZ`               |
+| `string`              | `column`       | `TEXT`                                |
+| `reference`           | `column`       | `TEXT`                                |
+| `number`              | `column`       | `NUMERIC`                             |
+| `quantity`            | `column`       | `NUMERIC`                             |
+| `uri`                 | `column`       | `TEXT`                                |
+| `boolean`             | `column`       | `BOOLEAN`                             |
+| `token`               | `token-column` | `UUID[]` + `TEXT[]` + `TEXT` (3 cols) |
+| `special`/`composite` | skipped        | —                                     |
 
 **Lookup table strategy** (name/address/identifier): generates sort column only in main table; actual data written by Phase 9 Repository.
 
 **Key types:**
+
 ```typescript
-export type SearchStrategy = 'column' | 'token-column' | 'lookup-table';
+export type SearchStrategy = "column" | "token-column" | "lookup-table";
 
 export interface SearchParameterImpl {
   code: string;
@@ -296,11 +314,13 @@ export interface SearchParameterImpl {
 ```
 
 **Test cases (15+):**
+
 - date → column/DATE, string → column/TEXT, token → token-column
 - multi-resource params handled correctly
 - integration: indexes all params from `search-parameters.json`
 
 **Acceptance Criteria:**
+
 - [ ] 15+ unit tests passing
 - [ ] Integration test with real `search-parameters.json`
 
@@ -359,31 +379,33 @@ export function buildResourceTableSet(
   resourceType: string,
   sdRegistry: StructureDefinitionRegistry,
   spRegistry: SearchParameterRegistry,
-): ResourceTableSet
+): ResourceTableSet;
 
 export function buildAllResourceTableSets(
   sdRegistry: StructureDefinitionRegistry,
   spRegistry: SearchParameterRegistry,
-): ResourceTableSet[]
+): ResourceTableSet[];
 
 export function buildSchemaDefinition(
   sdRegistry: StructureDefinitionRegistry,
   spRegistry: SearchParameterRegistry,
   version?: string,
-): SchemaDefinition
+): SchemaDefinition;
 ```
 
 **Test cases (30+):**
+
 - Fixed columns present on all tables
 - Binary has no compartments column
-- Patient has birthdate DATE, gender TEXT, __name UUID[], __nameSort TEXT
-- Observation has date TIMESTAMPTZ, __code UUID[], subject TEXT
+- Patient has birthdate DATE, gender TEXT, **name UUID[], **nameSort TEXT
+- Observation has date TIMESTAMPTZ, \_\_code UUID[], subject TEXT
 - History table structure correct
 - References table structure correct
 - Unknown/abstract resource type throws error
 - `buildAllResourceTableSets` returns ~140+ sets
 
 **Acceptance Criteria:**
+
 - [ ] 30+ unit tests passing
 - [ ] `buildResourceTableSet('Patient', ...)` correct 3-table structure
 - [ ] `buildResourceTableSet('Binary', ...)` no compartments
@@ -399,20 +421,25 @@ Convert `ResourceTableSet` / `SchemaDefinition` to SQL DDL strings.
 **File:** `src/schema/ddl-generator.ts`
 
 **Public API:**
+
 ```typescript
 export function generateCreateTable(
   table: MainTableSchema | HistoryTableSchema | ReferencesTableSchema,
-): string
+): string;
 
-export function generateCreateIndex(index: IndexSchema, tableName: string): string
+export function generateCreateIndex(
+  index: IndexSchema,
+  tableName: string,
+): string;
 
-export function generateResourceDDL(tableSet: ResourceTableSet): string[]
+export function generateResourceDDL(tableSet: ResourceTableSet): string[];
 
 // Returns all CREATE TABLEs first, then all CREATE INDEXes
-export function generateSchemaDDL(schema: SchemaDefinition): string[]
+export function generateSchemaDDL(schema: SchemaDefinition): string[];
 ```
 
 **DDL format:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS "Patient" (
   "id"           UUID        NOT NULL,
@@ -440,6 +467,7 @@ CREATE INDEX IF NOT EXISTS "Patient_reindex_idx"
 ```
 
 **Test cases (20+):**
+
 - Correct `CREATE TABLE IF NOT EXISTS` syntax
 - All columns with correct types and constraints
 - Composite PK for References table
@@ -448,6 +476,7 @@ CREATE INDEX IF NOT EXISTS "Patient_reindex_idx"
 - Snapshot tests: Patient, Observation, Binary DDL
 
 **Acceptance Criteria:**
+
 - [ ] 20+ unit tests passing
 - [ ] Snapshot tests for Patient, Observation, Binary
 - [ ] Generated DDL is valid PostgreSQL (idempotent)
@@ -471,6 +500,7 @@ Options:
 ```
 
 **Acceptance Criteria:**
+
 - [ ] `npx medxai schema:generate` outputs valid DDL to stdout
 - [ ] `--output` writes to file
 - [ ] `--resource Patient` generates only Patient DDL
@@ -482,17 +512,18 @@ Options:
 End-to-end test of the complete pipeline using real spec files.
 
 ```typescript
-describe('Phase 8 Integration', () => {
-  it('full pipeline: profiles-resources.json → DDL for all resources')
-  it('Patient DDL contains expected columns and indexes')
-  it('Observation DDL contains expected columns and indexes')
-  it('Binary DDL has no compartments column or index')
-  it('generated DDL is syntactically valid PostgreSQL')
-  it('all resource types from profiles-resources.json have DDL')
-})
+describe("Phase 8 Integration", () => {
+  it("full pipeline: profiles-resources.json → DDL for all resources");
+  it("Patient DDL contains expected columns and indexes");
+  it("Observation DDL contains expected columns and indexes");
+  it("Binary DDL has no compartments column or index");
+  it("generated DDL is syntactically valid PostgreSQL");
+  it("all resource types from profiles-resources.json have DDL");
+});
 ```
 
 **Acceptance Criteria:**
+
 - [ ] Full pipeline integration test passing
 - [ ] DDL for all ~140+ resource types generated without errors
 
@@ -500,14 +531,14 @@ describe('Phase 8 Integration', () => {
 
 ## Test Summary
 
-| Test File | Type | Count |
-|-----------|------|-------|
-| `structure-definition-registry.test.ts` | Unit | 15+ |
-| `search-parameter-registry.test.ts` | Unit | 15+ |
-| `table-schema-builder.test.ts` | Unit | 30+ |
-| `ddl-generator.test.ts` | Unit | 20+ |
-| `ddl-generator.snapshot.test.ts` | Snapshot | 5+ |
-| Integration tests | Integration | 10+ |
+| Test File                               | Type        | Count |
+| --------------------------------------- | ----------- | ----- |
+| `structure-definition-registry.test.ts` | Unit        | 15+   |
+| `search-parameter-registry.test.ts`     | Unit        | 15+   |
+| `table-schema-builder.test.ts`          | Unit        | 30+   |
+| `ddl-generator.test.ts`                 | Unit        | 20+   |
+| `ddl-generator.snapshot.test.ts`        | Snapshot    | 5+    |
+| Integration tests                       | Integration | 10+   |
 
 **Total new tests: 95+**
 
@@ -521,21 +552,21 @@ describe('Phase 8 Integration', () => {
 
 ### Key Source Files
 
-| File | Purpose |
-|------|---------|
-| `src/registry/structure-definition-registry.ts` | Profile indexing |
-| `src/registry/search-parameter-registry.ts` | SearchParam indexing |
-| `src/schema/table-schema.ts` | Type definitions |
-| `src/schema/table-schema-builder.ts` | Core schema generation |
-| `src/schema/ddl-generator.ts` | SQL DDL generation |
-| `src/cli/generate-schema.ts` | CLI entry point |
+| File                                            | Purpose                |
+| ----------------------------------------------- | ---------------------- |
+| `src/registry/structure-definition-registry.ts` | Profile indexing       |
+| `src/registry/search-parameter-registry.ts`     | SearchParam indexing   |
+| `src/schema/table-schema.ts`                    | Type definitions       |
+| `src/schema/table-schema-builder.ts`            | Core schema generation |
+| `src/schema/ddl-generator.ts`                   | SQL DDL generation     |
+| `src/cli/generate-schema.ts`                    | CLI entry point        |
 
 ### No Changes To
 
-| Package | Reason |
-|---------|--------|
-| `fhir-core` | Phase 7 already added BundleLoader; no further changes |
-| `spec/fhir/r4/` | Read-only input |
+| Package         | Reason                                                 |
+| --------------- | ------------------------------------------------------ |
+| `fhir-core`     | Phase 7 already added BundleLoader; no further changes |
+| `spec/fhir/r4/` | Read-only input                                        |
 
 ---
 
@@ -556,4 +587,4 @@ describe('Phase 8 Integration', () => {
 
 ## Implementation Notes
 
-*(To be filled in during implementation)*
+_(To be filled in during implementation)_

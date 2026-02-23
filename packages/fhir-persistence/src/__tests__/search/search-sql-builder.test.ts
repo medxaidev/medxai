@@ -220,6 +220,49 @@ describe('buildSearchSQL', () => {
 
     expect(result.sql).toContain('FROM "Observation"');
   });
+
+  it('handles _id special parameter in search', () => {
+    const request: SearchRequest = {
+      resourceType: 'Patient',
+      params: [{ code: '_id', values: ['abc-123'] }],
+    };
+    const result = buildSearchSQL(request, registry);
+
+    expect(result.sql).toContain('"id" = $1');
+    expect(result.values[0]).toBe('abc-123');
+  });
+
+  it('handles _lastUpdated special parameter with prefix', () => {
+    const request: SearchRequest = {
+      resourceType: 'Patient',
+      params: [{ code: '_lastUpdated', prefix: 'ge', values: ['2026-01-01'] }],
+    };
+    const result = buildSearchSQL(request, registry);
+
+    expect(result.sql).toContain('"lastUpdated" >= $1');
+  });
+
+  it('skips unknown params gracefully', () => {
+    const request: SearchRequest = {
+      resourceType: 'Patient',
+      params: [{ code: 'nonexistent', values: ['val'] }],
+    };
+    const result = buildSearchSQL(request, registry);
+
+    expect(result.sql).toContain('"deleted" = false');
+    expect(result.sql).not.toContain('nonexistent');
+  });
+
+  it('handles string search param with default prefix match', () => {
+    const request: SearchRequest = {
+      resourceType: 'Patient',
+      params: [{ code: 'family', values: ['Smith'] }],
+    };
+    const result = buildSearchSQL(request, registry);
+
+    expect(result.sql).toContain('LOWER("family") LIKE $1');
+    expect(result.values[0]).toBe('smith%');
+  });
 });
 
 // =============================================================================

@@ -18,6 +18,26 @@ describe('RepositoryError', () => {
     expect(err.name).toBe('RepositoryError');
     expect(err.message).toBe('test');
   });
+
+  it('has a stack trace', () => {
+    const err = new RepositoryError('stack test');
+    expect(err.stack).toBeDefined();
+    expect(err.stack).toContain('stack test');
+  });
+
+  it('can be caught as Error', () => {
+    try {
+      throw new RepositoryError('catch me');
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toBe('catch me');
+    }
+  });
+
+  it('preserves prototype chain with Object.setPrototypeOf', () => {
+    const err = new RepositoryError('proto');
+    expect(Object.getPrototypeOf(err)).toBe(RepositoryError.prototype);
+  });
 });
 
 describe('ResourceNotFoundError', () => {
@@ -30,6 +50,21 @@ describe('ResourceNotFoundError', () => {
     expect(err.resourceType).toBe('Patient');
     expect(err.resourceId).toBe('abc-123');
   });
+
+  it('works with different resource types', () => {
+    const err = new ResourceNotFoundError('Observation', 'obs-1');
+    expect(err.message).toBe('Observation/obs-1 not found');
+    expect(err.resourceType).toBe('Observation');
+    expect(err.resourceId).toBe('obs-1');
+  });
+
+  it('is catchable as RepositoryError', () => {
+    try {
+      throw new ResourceNotFoundError('Patient', 'x');
+    } catch (e) {
+      expect(e).toBeInstanceOf(RepositoryError);
+    }
+  });
 });
 
 describe('ResourceGoneError', () => {
@@ -41,6 +76,20 @@ describe('ResourceGoneError', () => {
     expect(err.message).toBe('Observation/xyz-789 has been deleted');
     expect(err.resourceType).toBe('Observation');
     expect(err.resourceId).toBe('xyz-789');
+  });
+
+  it('works with different resource types', () => {
+    const err = new ResourceGoneError('Condition', 'c-1');
+    expect(err.message).toBe('Condition/c-1 has been deleted');
+    expect(err.resourceType).toBe('Condition');
+  });
+
+  it('is catchable as RepositoryError', () => {
+    try {
+      throw new ResourceGoneError('Patient', 'x');
+    } catch (e) {
+      expect(e).toBeInstanceOf(RepositoryError);
+    }
   });
 });
 
@@ -57,5 +106,28 @@ describe('ResourceVersionConflictError', () => {
     expect(err.resourceId).toBe('abc');
     expect(err.expectedVersion).toBe('v1');
     expect(err.actualVersion).toBe('v2');
+  });
+
+  it('includes resource reference in message', () => {
+    const err = new ResourceVersionConflictError('Observation', 'obs-1', 'a', 'b');
+    expect(err.message).toContain('Observation/obs-1');
+  });
+
+  it('is catchable as RepositoryError', () => {
+    try {
+      throw new ResourceVersionConflictError('Patient', 'x', 'v1', 'v2');
+    } catch (e) {
+      expect(e).toBeInstanceOf(RepositoryError);
+    }
+  });
+
+  it('stores UUID-format version IDs', () => {
+    const err = new ResourceVersionConflictError(
+      'Patient', 'p1',
+      '550e8400-e29b-41d4-a716-446655440000',
+      '660e8400-e29b-41d4-a716-446655440001',
+    );
+    expect(err.expectedVersion).toBe('550e8400-e29b-41d4-a716-446655440000');
+    expect(err.actualVersion).toBe('660e8400-e29b-41d4-a716-446655440001');
   });
 });

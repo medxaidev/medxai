@@ -2,11 +2,12 @@
 
 ## Status
 
-**Status:** Active  
+**Status:** ✅ Completed  
 **Phase:** Phase 1 of Stage-1  
 **Package:** `@medxai/fhir-core` → `src/model/`  
 **Duration:** 5-7 days  
-**Last Updated:** 2026-02-07
+**Completed:** 2026-02-08  
+**Last Updated:** 2026-02-23
 
 ---
 

@@ -1,6 +1,7 @@
 # Phase 9: Repository — Stable Write (with Transactions) — Detailed Plan
 
-> **Status:** In Progress
+> **Status:** ✅ Completed
+> **Completed:** 2026-02-23
 > **Duration:** 5-8 days
 > **Complexity:** High
 > **Risk:** Medium
@@ -38,20 +39,20 @@ This phase extends the `fhir-persistence` package with a `ResourceRepository` th
 
 ## Confirmed Design Decisions (from WF-E2E-001 Medplum Analysis)
 
-| Decision | Choice | Medplum Reference | Rationale |
-|----------|--------|-------------------|-----------|
-| UUID generation | **App-side** `crypto.randomUUID()` | repo.ts:398-400 `v4()` | No DB dependency for ID generation |
-| versionId type | **UUID** (not integer) | repo.ts:792-794 | Consistent with Medplum; globally unique |
-| versionId initial | Random UUID (no 0/1 concept) | — | Each write = new UUID |
-| `__version` column | Schema version constant (integer) | repo.ts:1636 `Repository.VERSION = 13` | Tracks schema migration version, not resource version |
-| History write content | **New version** (not old version) | repo.ts:1705-1718 | Each write appends current snapshot to history |
-| History write timing | After main UPSERT, same transaction | repo.ts:1118-1124 | ACID guarantee |
-| Soft delete strategy | `deleted=true`, `content=''`, `__version=-1` | repo.ts:1292-1323 | Preserves row for search exclusion |
-| Search column fill | **Synchronous**, in `buildResourceRow()` | repo.ts:1636-1674 | Part of INSERT, same transaction |
-| Main table write | **UPSERT** (`ON CONFLICT DO UPDATE`) | repo.ts:1683-1685 | Create and update share same SQL path |
-| Optimistic locking | **App-layer** versionId comparison | repo.ts:775-784 | Read existing → compare → write |
-| Locking trigger | Only when `If-Match` header present | repo.ts:715-717 | No overhead for normal writes |
-| Transaction isolation | `REPEATABLE READ` (default) | repo.ts:1118 | Sufficient for UPSERT pattern |
+| Decision              | Choice                                       | Medplum Reference                      | Rationale                                             |
+| --------------------- | -------------------------------------------- | -------------------------------------- | ----------------------------------------------------- |
+| UUID generation       | **App-side** `crypto.randomUUID()`           | repo.ts:398-400 `v4()`                 | No DB dependency for ID generation                    |
+| versionId type        | **UUID** (not integer)                       | repo.ts:792-794                        | Consistent with Medplum; globally unique              |
+| versionId initial     | Random UUID (no 0/1 concept)                 | —                                      | Each write = new UUID                                 |
+| `__version` column    | Schema version constant (integer)            | repo.ts:1636 `Repository.VERSION = 13` | Tracks schema migration version, not resource version |
+| History write content | **New version** (not old version)            | repo.ts:1705-1718                      | Each write appends current snapshot to history        |
+| History write timing  | After main UPSERT, same transaction          | repo.ts:1118-1124                      | ACID guarantee                                        |
+| Soft delete strategy  | `deleted=true`, `content=''`, `__version=-1` | repo.ts:1292-1323                      | Preserves row for search exclusion                    |
+| Search column fill    | **Synchronous**, in `buildResourceRow()`     | repo.ts:1636-1674                      | Part of INSERT, same transaction                      |
+| Main table write      | **UPSERT** (`ON CONFLICT DO UPDATE`)         | repo.ts:1683-1685                      | Create and update share same SQL path                 |
+| Optimistic locking    | **App-layer** versionId comparison           | repo.ts:775-784                        | Read existing → compare → write                       |
+| Locking trigger       | Only when `If-Match` header present          | repo.ts:715-717                        | No overhead for normal writes                         |
+| Transaction isolation | `REPEATABLE READ` (default)                  | repo.ts:1118                           | Sufficient for UPSERT pattern                         |
 
 ---
 
@@ -153,6 +154,7 @@ repo.delete('Patient', id)
 ### Task 9.0: Database Infrastructure ✅ COMPLETED
 
 **Files created:**
+
 - `src/db/config.ts` — `DatabaseConfig`, `loadDatabaseConfig()`
 - `src/db/client.ts` — `DatabaseClient` (pg.Pool wrapper, `withTransaction`, `executeStatements`, `ping`)
 - `scripts/init-db.ts` — Cross-platform DB init script
@@ -165,6 +167,7 @@ repo.delete('Patient', id)
 ### Task 9.1: Repository Types & Interfaces
 
 **Files:**
+
 - `src/repo/types.ts` — interfaces and option types
 - `src/repo/errors.ts` — error hierarchy
 
@@ -187,23 +190,31 @@ interface FhirResource {
 interface ResourceRepository {
   createResource<T extends FhirResource>(resource: T): Promise<T>;
   readResource(resourceType: string, id: string): Promise<FhirResource>;
-  updateResource<T extends FhirResource>(resource: T, options?: UpdateOptions): Promise<T>;
+  updateResource<T extends FhirResource>(
+    resource: T,
+    options?: UpdateOptions,
+  ): Promise<T>;
   deleteResource(resourceType: string, id: string): Promise<void>;
   readHistory(resourceType: string, id: string): Promise<FhirResource[]>;
-  readVersion(resourceType: string, id: string, versionId: string): Promise<FhirResource>;
+  readVersion(
+    resourceType: string,
+    id: string,
+    versionId: string,
+  ): Promise<FhirResource>;
 }
 
 // Options
 interface UpdateOptions {
-  ifMatch?: string;  // versionId for optimistic locking
+  ifMatch?: string; // versionId for optimistic locking
 }
 
 interface CreateOptions {
-  assignedId?: string;  // pre-assigned UUID (for batch/transaction)
+  assignedId?: string; // pre-assigned UUID (for batch/transaction)
 }
 ```
 
 **Errors:**
+
 - `RepositoryError` (base)
 - `ResourceNotFoundError` — 404
 - `ResourceGoneError` — 410 (deleted)
@@ -215,16 +226,19 @@ interface CreateOptions {
 ### Task 9.2: SQL Builder & Row Builder
 
 **Files:**
+
 - `src/repo/sql-builder.ts` — SQL query generation (parameterized)
 - `src/repo/row-builder.ts` — `buildResourceRow()` for search column population
 
 **SQL Builder responsibilities:**
+
 - `buildUpsertSQL(tableName, columns)` — generates `INSERT ... ON CONFLICT DO UPDATE`
 - `buildInsertSQL(tableName, columns)` — generates plain `INSERT`
 - `buildSelectByIdSQL(tableName)` — generates `SELECT "content" FROM ... WHERE "id" = $1`
 - All queries use parameterized `$1, $2, ...` placeholders (no SQL injection)
 
 **Row Builder responsibilities:**
+
 - Fixed columns: `id`, `content`, `lastUpdated`, `deleted`, `__version`, `_source`, `_profile`
 - Search columns: use `SearchParameterRegistry` + FHIRPath evaluation (Phase 6)
 - Compartments: extract Patient references from CompartmentDefinition
@@ -239,6 +253,7 @@ interface CreateOptions {
 **File:** `src/repo/fhir-repo.ts`
 
 **Create flow:**
+
 1. Generate `id` via `crypto.randomUUID()`
 2. Generate `versionId` via `crypto.randomUUID()`
 3. Set `meta.lastUpdated` to current ISO timestamp
@@ -249,16 +264,19 @@ interface CreateOptions {
 6. Return resource with populated `id` and `meta`
 
 **Read flow:**
+
 1. `SELECT "content", "deleted" FROM "{ResourceType}" WHERE "id" = $1`
 2. If not found → `ResourceNotFoundError`
 3. If `deleted = true` → `ResourceGoneError`
 4. `JSON.parse(content)` → return resource
 
 **ReadHistory flow:**
+
 1. `SELECT "content" FROM "{ResourceType}_History" WHERE "id" = $1 ORDER BY "lastUpdated" DESC`
 2. Parse each row → return array
 
 **ReadVersion flow:**
+
 1. `SELECT "content" FROM "{ResourceType}_History" WHERE "id" = $1 AND "versionId" = $2`
 2. If not found → `ResourceNotFoundError`
 3. Parse → return
@@ -268,6 +286,7 @@ interface CreateOptions {
 ### Task 9.4: FhirRepository — Update & Delete
 
 **Update flow:**
+
 1. Read existing resource (verify exists, not deleted)
 2. If `options.ifMatch` → compare with existing `meta.versionId`
    - Mismatch → `ResourceVersionConflictError` (HTTP 412)
@@ -280,6 +299,7 @@ interface CreateOptions {
 7. Return updated resource
 
 **Delete flow:**
+
 1. Read existing resource (verify exists, not deleted)
 2. Generate new `versionId` for the delete event
 3. Build delete row: `deleted=true`, `content=''`, `__version=-1`
@@ -302,11 +322,13 @@ interface CreateOptions {
 ### Task 9.6: Repository Tests
 
 **Unit tests (mock DB):** `src/__tests__/repo/`
+
 - `types.test.ts` — type guards, error construction (10+ tests)
 - `sql-builder.test.ts` — SQL generation correctness (15+ tests)
 - `row-builder.test.ts` — row building, fixed columns (10+ tests)
 
 **Integration tests (real PostgreSQL):** `src/__tests__/integration/`
+
 - `repo-integration.test.ts` — full CRUD against real DB (25+ tests)
   - Create Patient → verify in DB
   - Read by ID → correct content
@@ -342,25 +364,25 @@ interface CreateOptions {
 
 ## Key Differences from Medplum
 
-| Aspect | Medplum | MedXAI Phase 9 |
-|--------|---------|-----------------|
-| Package | `packages/server/src/fhir/repo.ts` | `packages/fhir-persistence/src/repo/fhir-repo.ts` |
-| Auth/ACL | Integrated in Repository | Separate (Phase 11) |
-| Redis cache | In handleStorage() | Not included (Phase 11) |
-| Lookup tables | 5 tables (Address, HumanName, ...) | Deferred (future phase) |
-| Search columns | Full FHIRPath evaluation | MVP: fixed columns only; incremental |
-| Subscriptions | postCommit triggers | Not included (future) |
-| Rate limiting | In createResource() | Not included (future) |
-| `__version` | Schema migration version (=13) | Schema version constant (=1) |
+| Aspect         | Medplum                            | MedXAI Phase 9                                    |
+| -------------- | ---------------------------------- | ------------------------------------------------- |
+| Package        | `packages/server/src/fhir/repo.ts` | `packages/fhir-persistence/src/repo/fhir-repo.ts` |
+| Auth/ACL       | Integrated in Repository           | Separate (Phase 11)                               |
+| Redis cache    | In handleStorage()                 | Not included (Phase 11)                           |
+| Lookup tables  | 5 tables (Address, HumanName, ...) | Deferred (future phase)                           |
+| Search columns | Full FHIRPath evaluation           | MVP: fixed columns only; incremental              |
+| Subscriptions  | postCommit triggers                | Not included (future)                             |
+| Rate limiting  | In createResource()                | Not included (future)                             |
+| `__version`    | Schema migration version (=13)     | Schema version constant (=1)                      |
 
 ---
 
 ## Dependencies
 
-| Dependency | Package | Status |
-|------------|---------|--------|
-| `DatabaseClient` | `fhir-persistence/db` | ✅ Phase 9.0 |
-| `SearchParameterRegistry` | `fhir-persistence/registry` | ✅ Phase 8 |
-| Schema tables | PostgreSQL `medxai_dev` | ✅ Phase 9.0 (3639 DDL) |
-| `pg` | npm | ✅ installed |
-| `crypto.randomUUID()` | Node.js built-in | ✅ Node 19+ |
+| Dependency                | Package                     | Status                  |
+| ------------------------- | --------------------------- | ----------------------- |
+| `DatabaseClient`          | `fhir-persistence/db`       | ✅ Phase 9.0            |
+| `SearchParameterRegistry` | `fhir-persistence/registry` | ✅ Phase 8              |
+| Schema tables             | PostgreSQL `medxai_dev`     | ✅ Phase 9.0 (3639 DDL) |
+| `pg`                      | npm                         | ✅ installed            |
+| `crypto.randomUUID()`     | Node.js built-in            | ✅ Node 19+             |

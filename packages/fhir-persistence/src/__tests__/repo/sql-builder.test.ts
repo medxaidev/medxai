@@ -147,6 +147,11 @@ describe('buildSelectHistorySQL', () => {
     expect(sql).toContain('WHERE "id" = $1');
     expect(sql).toContain('ORDER BY "lastUpdated" DESC');
   });
+
+  it('quotes table name correctly', () => {
+    const sql = buildSelectHistorySQL('Observation_History');
+    expect(sql).toContain('"Observation_History"');
+  });
 });
 
 // =============================================================================
@@ -157,5 +162,15 @@ describe('buildSelectVersionSQL', () => {
   it('generates SELECT by id and versionId', () => {
     const sql = buildSelectVersionSQL('Patient_History');
     expect(sql).toContain('WHERE "id" = $1 AND "versionId" = $2');
+  });
+
+  it('selects content column', () => {
+    const sql = buildSelectVersionSQL('Patient_History');
+    expect(sql).toContain('SELECT "content"');
+  });
+
+  it('quotes table name correctly', () => {
+    const sql = buildSelectVersionSQL('DiagnosticReport_History');
+    expect(sql).toContain('"DiagnosticReport_History"');
   });
 });

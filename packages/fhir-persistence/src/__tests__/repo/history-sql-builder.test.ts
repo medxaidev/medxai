@@ -69,6 +69,28 @@ describe('buildInstanceHistorySQL', () => {
     expect(sql).not.toContain('LIMIT');
     expect(values).toEqual(['p1']);
   });
+
+  it('quotes table name correctly for different resource types', () => {
+    const { sql } = buildInstanceHistorySQL('Observation_History', 'obs-1');
+    expect(sql).toContain('"Observation_History"');
+  });
+
+  it('uses $1 for id parameter', () => {
+    const { sql, values } = buildInstanceHistorySQL('Patient_History', 'uuid-123');
+    expect(sql).toContain('$1');
+    expect(values[0]).toBe('uuid-123');
+  });
+
+  it('handles _since + _count without cursor', () => {
+    const { sql, values } = buildInstanceHistorySQL('Patient_History', 'p1', {
+      since: '2024-01-01T00:00:00Z',
+      count: 10,
+    });
+    expect(sql).toContain('"lastUpdated" >= $2');
+    expect(sql).toContain('LIMIT $3');
+    expect(sql).not.toContain('"lastUpdated" <');
+    expect(values).toEqual(['p1', '2024-01-01T00:00:00Z', 10]);
+  });
 });
 
 // =============================================================================

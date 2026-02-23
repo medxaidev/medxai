@@ -174,4 +174,18 @@ describe('buildHistoryBundle', () => {
     const bundle = buildHistoryBundle([makeEntry({ versionId: 'abc-123' })]);
     expect(bundle.entry![0].response.etag).toBe('W/"abc-123"');
   });
+
+  // ---------------------------------------------------------------------------
+  // Request method inference
+  // ---------------------------------------------------------------------------
+
+  it('uses PUT method for non-delete entries', () => {
+    const bundle = buildHistoryBundle([makeEntry()]);
+    expect(bundle.entry![0].request.method).toBe('PUT');
+  });
+
+  it('sets total to 0 for empty entries', () => {
+    const bundle = buildHistoryBundle([]);
+    expect(bundle.total).toBe(0);
+  });
 });

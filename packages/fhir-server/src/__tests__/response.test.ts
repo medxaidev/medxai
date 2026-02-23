@@ -87,4 +87,41 @@ describe("buildResourceHeaders", () => {
     expect(headers.etag).toBe('W/"abc"');
     expect(headers["last-modified"]).toContain("GMT");
   });
+
+  it("uses versionId from resource meta for etag", () => {
+    const resource: PersistedResource = {
+      resourceType: "Observation",
+      id: "obs-1",
+      meta: {
+        versionId: "550e8400-e29b-41d4-a716-446655440000",
+        lastUpdated: "2026-01-15T08:30:00.000Z",
+      },
+    };
+    const headers = buildResourceHeaders(resource);
+    expect(headers.etag).toBe('W/"550e8400-e29b-41d4-a716-446655440000"');
+  });
+});
+
+describe("FHIR_JSON constant", () => {
+  it("has correct FHIR content type", () => {
+    expect(FHIR_JSON).toBe("application/fhir+json; charset=utf-8");
+  });
+});
+
+describe("parseETag edge cases", () => {
+  it("handles empty string", () => {
+    expect(parseETag("")).toBe("");
+  });
+
+  it("handles single character", () => {
+    expect(parseETag("x")).toBe("x");
+  });
+
+  it("handles W/ without closing quote", () => {
+    expect(parseETag('W/"abc')).toBe('W/"abc');
+  });
+
+  it("handles numeric versionId", () => {
+    expect(parseETag('W/"42"')).toBe("42");
+  });
 });

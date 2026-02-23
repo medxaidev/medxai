@@ -1,14 +1,16 @@
 # Phase 11: Server API — Basic CRUD — Detailed Plan
 
 ```yaml
-status: In Progress
-started: 2026-02-23
-duration: 5-7 days (estimated)
+status: Completed ✅
+completed: 2026-02-23
+duration: <1 day (actual; estimated 5-7 days)
 complexity: Medium
 risk: Low
 depends_on: Phase 9 ✅, Phase 10 ✅
 framework: Fastify v5.7.4
 package: packages/fhir-server
+tests: 59/59 passing (3 test files)
+tsc: clean (0 errors)
 ```
 
 ---
@@ -21,7 +23,7 @@ This is the first phase that introduces the `@medxai/fhir-server` package.
 ### FHIR REST Interactions (Phase 11 Scope)
 
 | Method | URL                                   | Interaction      | Status Code |
-|--------|---------------------------------------|------------------|-------------|
+| ------ | ------------------------------------- | ---------------- | ----------- |
 | POST   | `/{resourceType}`                     | create           | 201         |
 | GET    | `/{resourceType}/{id}`                | read             | 200         |
 | PUT    | `/{resourceType}/{id}`                | update           | 200         |
@@ -91,6 +93,7 @@ HTTP Request
 - Graceful shutdown hook (`onClose`)
 
 **Key Design:**
+
 ```typescript
 interface AppOptions {
   repo: FhirRepository;
@@ -107,22 +110,24 @@ function createApp(options: AppOptions): FastifyInstance;
 
 7 route handlers with FHIR-compliant response headers:
 
-| Route | Handler | Response Headers |
-|-------|---------|-----------------|
-| `POST /:resourceType` | `createHandler` | `201`, `Location`, `ETag`, `Last-Modified` |
-| `GET /:resourceType/:id` | `readHandler` | `200`, `ETag`, `Last-Modified` |
-| `PUT /:resourceType/:id` | `updateHandler` | `200`, `ETag`, `Last-Modified` |
-| `DELETE /:resourceType/:id` | `deleteHandler` | `200` + OperationOutcome body |
-| `GET /:resourceType/:id/_history` | `historyHandler` | `200`, Bundle body |
-| `GET /:resourceType/:id/_history/:vid` | `vreadHandler` | `200`, `ETag` |
+| Route                                  | Handler          | Response Headers                           |
+| -------------------------------------- | ---------------- | ------------------------------------------ |
+| `POST /:resourceType`                  | `createHandler`  | `201`, `Location`, `ETag`, `Last-Modified` |
+| `GET /:resourceType/:id`               | `readHandler`    | `200`, `ETag`, `Last-Modified`             |
+| `PUT /:resourceType/:id`               | `updateHandler`  | `200`, `ETag`, `Last-Modified`             |
+| `DELETE /:resourceType/:id`            | `deleteHandler`  | `200` + OperationOutcome body              |
+| `GET /:resourceType/:id/_history`      | `historyHandler` | `200`, Bundle body                         |
+| `GET /:resourceType/:id/_history/:vid` | `vreadHandler`   | `200`, `ETag`                              |
 
 **Response Header Format (per FHIR R4 spec):**
+
 - `ETag: W/"<versionId>"` — weak validator
 - `Location: <baseUrl>/<resourceType>/<id>/_history/<versionId>` — on create
 - `Last-Modified: <HTTP-date>` — UTC string format
 - `Content-Type: application/fhir+json; charset=utf-8`
 
 **If-Match Support:**
+
 - `PUT` reads `If-Match` header → extracts versionId → passes as `ifMatch` to repo
 - Format: `If-Match: W/"<versionId>"`
 
@@ -132,23 +137,26 @@ function createApp(options: AppOptions): FastifyInstance;
 
 Error mapping from repository errors to FHIR OperationOutcome:
 
-| Repository Error | HTTP Status | OperationOutcome.issue.code |
-|-----------------|-------------|---------------------------|
-| `ResourceNotFoundError` | 404 | `not-found` |
-| `ResourceGoneError` | 410 | `deleted` |
-| `ResourceVersionConflictError` | 409 | `conflict` |
-| Validation error | 400 | `invalid` |
-| Unknown error | 500 | `exception` |
+| Repository Error               | HTTP Status | OperationOutcome.issue.code |
+| ------------------------------ | ----------- | --------------------------- |
+| `ResourceNotFoundError`        | 404         | `not-found`                 |
+| `ResourceGoneError`            | 410         | `deleted`                   |
+| `ResourceVersionConflictError` | 409         | `conflict`                  |
+| Validation error               | 400         | `invalid`                   |
+| Unknown error                  | 500         | `exception`                 |
 
 **OperationOutcome structure:**
+
 ```json
 {
   "resourceType": "OperationOutcome",
-  "issue": [{
-    "severity": "error",
-    "code": "<issue-code>",
-    "diagnostics": "<human-readable message>"
-  }]
+  "issue": [
+    {
+      "severity": "error",
+      "code": "<issue-code>",
+      "diagnostics": "<human-readable message>"
+    }
+  ]
 }
 ```
 
@@ -157,6 +165,7 @@ Error mapping from repository errors to FHIR OperationOutcome:
 **Files:** `src/fhir/metadata.ts`, `src/routes/metadata-route.ts`
 
 Static CapabilityStatement declaring:
+
 - `fhirVersion: "4.0.1"`
 - `format: ["json"]`
 - `kind: "instance"`
@@ -172,21 +181,22 @@ Dynamic generation from `StructureDefinitionRegistry` can be added later.
 
 **Test Strategy:** Use Fastify's `inject()` method — no real HTTP server needed.
 
-| Test File | Tests | Coverage |
-|-----------|-------|---------|
-| `app.test.ts` | 5 | Server creation, content-type, error handling |
-| `create.test.ts` | 8 | POST create, 201 + headers, validation errors, duplicate id |
-| `read.test.ts` | 6 | GET read, 200 + headers, 404, 410 (gone) |
-| `update.test.ts` | 8 | PUT update, 200 + headers, If-Match, 409 conflict, 404 |
-| `delete.test.ts` | 6 | DELETE, 200, 404, already deleted |
-| `history.test.ts` | 8 | History bundle, _since, _count, delete entries |
-| `vread.test.ts` | 6 | Specific version, 404, 410 |
-| `metadata.test.ts` | 4 | CapabilityStatement structure, interactions |
-| `outcomes.test.ts` | 6 | OperationOutcome builders, error mapping |
+| Test File          | Tests | Coverage                                                    |
+| ------------------ | ----- | ----------------------------------------------------------- |
+| `app.test.ts`      | 5     | Server creation, content-type, error handling               |
+| `create.test.ts`   | 8     | POST create, 201 + headers, validation errors, duplicate id |
+| `read.test.ts`     | 6     | GET read, 200 + headers, 404, 410 (gone)                    |
+| `update.test.ts`   | 8     | PUT update, 200 + headers, If-Match, 409 conflict, 404      |
+| `delete.test.ts`   | 6     | DELETE, 200, 404, already deleted                           |
+| `history.test.ts`  | 8     | History bundle, \_since, \_count, delete entries            |
+| `vread.test.ts`    | 6     | Specific version, 404, 410                                  |
+| `metadata.test.ts` | 4     | CapabilityStatement structure, interactions                 |
+| `outcomes.test.ts` | 6     | OperationOutcome builders, error mapping                    |
 
 **Total: ~57 tests**
 
 **Test Setup:**
+
 - Mock `FhirRepository` for unit tests (no DB dependency)
 - `createApp({ repo: mockRepo })` → `app.inject()` for HTTP-level tests
 - Real DB integration tests can be added later
@@ -196,6 +206,7 @@ Dynamic generation from `StructureDefinitionRegistry` can be added later.
 ## FHIR Response Headers Reference
 
 ### Create (POST)
+
 ```http
 HTTP/1.1 201 Created
 Content-Type: application/fhir+json; charset=utf-8
@@ -205,6 +216,7 @@ Last-Modified: Sun, 23 Feb 2026 10:00:00 GMT
 ```
 
 ### Read (GET)
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/fhir+json; charset=utf-8
@@ -213,6 +225,7 @@ Last-Modified: Sun, 23 Feb 2026 10:00:00 GMT
 ```
 
 ### Update (PUT)
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/fhir+json; charset=utf-8
@@ -221,6 +234,7 @@ Last-Modified: Sun, 23 Feb 2026 10:05:00 GMT
 ```
 
 ### Delete (DELETE)
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/fhir+json; charset=utf-8
@@ -229,6 +243,7 @@ Content-Type: application/fhir+json; charset=utf-8
 ```
 
 ### History (GET)
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/fhir+json; charset=utf-8
@@ -240,12 +255,12 @@ Content-Type: application/fhir+json; charset=utf-8
 
 ## Medplum Reference Files
 
-| Medplum File | Our Equivalent | Notes |
-|---|---|---|
-| `server/src/fhir/outcomes.ts` | `src/fhir/outcomes.ts` | OperationOutcome construction pattern |
-| `server/src/fhir/metadata.ts` | `src/fhir/metadata.ts` | CapabilityStatement structure |
-| `server/src/fhir/response.ts` | `src/fhir/response.ts` | ETag/Location/Last-Modified header format |
-| `server/src/fhir/routes.ts` | `src/routes/resource-routes.ts` | Route structure (Express → Fastify adaptation) |
+| Medplum File                  | Our Equivalent                  | Notes                                          |
+| ----------------------------- | ------------------------------- | ---------------------------------------------- |
+| `server/src/fhir/outcomes.ts` | `src/fhir/outcomes.ts`          | OperationOutcome construction pattern          |
+| `server/src/fhir/metadata.ts` | `src/fhir/metadata.ts`          | CapabilityStatement structure                  |
+| `server/src/fhir/response.ts` | `src/fhir/response.ts`          | ETag/Location/Last-Modified header format      |
+| `server/src/fhir/routes.ts`   | `src/routes/resource-routes.ts` | Route structure (Express → Fastify adaptation) |
 
 **Key difference:** Medplum uses Express; we use Fastify v5. Route handler signatures are completely different. Only the FHIR response format patterns are reusable.
 
