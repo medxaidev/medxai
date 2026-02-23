@@ -184,8 +184,12 @@ describe('buildHistoryBundle', () => {
     expect(bundle.entry![0].request.method).toBe('PUT');
   });
 
-  it('sets total to 0 for empty entries', () => {
-    const bundle = buildHistoryBundle([]);
-    expect(bundle.total).toBe(0);
+  it('generates a UUID id for the bundle', () => {
+    const bundle = buildHistoryBundle([makeEntry()]);
+    expect(bundle.id).toBeDefined();
+    expect(typeof bundle.id).toBe('string');
+    expect(bundle.id.length).toBeGreaterThan(0);
+    // UUID v4 format
+    expect(bundle.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   });
 });

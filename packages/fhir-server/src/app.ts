@@ -32,7 +32,30 @@ export interface AppOptions {
 }
 
 // =============================================================================
-// Section 2: App Factory
+// Section 2: Type Guards
+// =============================================================================
+
+/**
+ * Fastify validation error shape (e.g., schema validation failures).
+ */
+interface FastifyValidationError extends Error {
+  validation: unknown[];
+  validationContext?: string;
+}
+
+/**
+ * Type guard for Fastify validation errors.
+ */
+function isFastifyValidationError(error: unknown): error is FastifyValidationError {
+  return (
+    error instanceof Error &&
+    "validation" in error &&
+    Array.isArray((error as FastifyValidationError).validation)
+  );
+}
+
+// =============================================================================
+// Section 3: App Factory
 // =============================================================================
 
 /**
@@ -72,9 +95,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   // ── Global error handler ──────────────────────────────────────────────────
   app.setErrorHandler((error: unknown, _request, reply) => {
     // Fastify validation errors (e.g., missing body, schema validation)
-    const err = error as Record<string, unknown>;
-    if (err && typeof err === "object" && "validation" in err) {
-      const message = err instanceof Error ? err.message : String(err);
+    if (isFastifyValidationError(error)) {
       reply
         .status(400)
         .header("content-type", FHIR_JSON)
@@ -84,7 +105,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
             {
               severity: "error",
               code: "invalid",
-              diagnostics: message,
+              diagnostics: error.message,
             },
           ],
         });

@@ -13,6 +13,7 @@
  * @module fhir-persistence/repo
  */
 
+import { randomUUID } from 'node:crypto';
 import type { HistoryEntry } from './types.js';
 
 // =============================================================================
@@ -24,6 +25,7 @@ import type { HistoryEntry } from './types.js';
  */
 export interface HistoryBundle {
   resourceType: 'Bundle';
+  id: string;
   type: 'history';
   total: number;
   link?: BundleLink[];
@@ -80,6 +82,7 @@ export function buildHistoryBundle(
 ): HistoryBundle {
   const bundle: HistoryBundle = {
     resourceType: 'Bundle',
+    id: randomUUID(),
     type: 'history',
     total: options?.total ?? entries.length,
   };

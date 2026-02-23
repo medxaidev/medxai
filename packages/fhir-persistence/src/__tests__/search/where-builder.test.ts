@@ -42,6 +42,7 @@ describe('prefixToOperator', () => {
   it('returns >= for ge', () => expect(prefixToOperator('ge')).toBe('>='));
   it('returns > for sa', () => expect(prefixToOperator('sa')).toBe('>'));
   it('returns < for eb', () => expect(prefixToOperator('eb')).toBe('<'));
+  it('returns ap for ap (handled by type-specific builders)', () => expect(prefixToOperator('ap')).toBe('ap'));
 });
 
 // =============================================================================
@@ -118,6 +119,24 @@ describe('buildWhereFragment — date', () => {
     const result = buildWhereFragment(impl, param, 1);
     expect(result!.sql).toBe('"birthdate" <> $1');
   });
+
+  it('ap prefix: BETWEEN ±1 day', () => {
+    const param: ParsedSearchParam = { code: 'birthdate', prefix: 'ap', values: ['2026-01-15T00:00:00.000Z'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('BETWEEN $1 AND $2');
+    expect(result!.values).toHaveLength(2);
+    // lo should be ~2026-01-14, hi should be ~2026-01-16
+    expect(new Date(result!.values[0] as string).getTime()).toBeLessThan(new Date('2026-01-15T00:00:00.000Z').getTime());
+    expect(new Date(result!.values[1] as string).getTime()).toBeGreaterThan(new Date('2026-01-15T00:00:00.000Z').getTime());
+  });
+
+  it('ap prefix with multiple values: OR of BETWEENs', () => {
+    const param: ParsedSearchParam = { code: 'birthdate', prefix: 'ap', values: ['2026-01-15T00:00:00.000Z', '2026-06-15T00:00:00.000Z'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toContain('OR');
+    expect(result!.values).toHaveLength(4);
+  });
 });
 
 // =============================================================================
@@ -139,6 +158,27 @@ describe('buildWhereFragment — number', () => {
     const result = buildWhereFragment(impl, param, 1);
     expect(result!.sql).toBe('"length" > $1');
     expect(result!.values).toEqual([50]);
+  });
+
+  it('ap prefix: BETWEEN ±10%', () => {
+    const param: ParsedSearchParam = { code: 'length', prefix: 'ap', values: ['100'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('BETWEEN $1 AND $2');
+    expect(result!.values).toHaveLength(2);
+    expect(result!.values[0]).toBeCloseTo(90, 5);
+    expect(result!.values[1]).toBeCloseTo(110, 5);
+  });
+
+  it('ap prefix with multiple values: OR of BETWEENs', () => {
+    const param: ParsedSearchParam = { code: 'length', prefix: 'ap', values: ['100', '200'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toContain('OR');
+    expect(result!.values).toHaveLength(4);
+    expect(result!.values[0]).toBeCloseTo(90, 5);
+    expect(result!.values[1]).toBeCloseTo(110, 5);
+    expect(result!.values[2]).toBeCloseTo(180, 5);
+    expect(result!.values[3]).toBeCloseTo(220, 5);
   });
 });
 

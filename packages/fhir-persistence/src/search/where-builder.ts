@@ -48,7 +48,7 @@ export function prefixToOperator(prefix?: SearchPrefix): string {
     case 'eb':
       return '<'; // ends before
     case 'ap':
-      return '='; // approximately (simplified to equals for now)
+      return 'ap'; // approximately — handled by type-specific builders
     default:
       return '=';
   }
@@ -201,7 +201,8 @@ function buildLikeFragment(
 /**
  * Build a WHERE fragment for date search parameters.
  *
- * Supports prefixes: eq, ne, lt, gt, le, ge.
+ * Supports prefixes: eq, ne, lt, gt, le, ge, ap.
+ * For `ap`, uses a ±1 day range around the target date.
  */
 function buildDateFragment(
   impl: SearchParameterImpl,
@@ -209,8 +210,44 @@ function buildDateFragment(
   startIndex: number,
 ): WhereFragment {
   const columnName = quoteColumn(impl.columnName);
+
+  // ap (approximately) → BETWEEN (date - 1 day) AND (date + 1 day)
+  if (param.prefix === 'ap') {
+    return buildApproximateDateFragment(columnName, param.values, startIndex);
+  }
+
   const operator = prefixToOperator(param.prefix);
   return buildOrFragment(columnName, operator, param.values, startIndex);
+}
+
+/**
+ * Build a BETWEEN fragment for approximate date matching.
+ * Uses ±1 day range for each value.
+ */
+function buildApproximateDateFragment(
+  columnName: string,
+  values: string[],
+  startIndex: number,
+): WhereFragment {
+  if (values.length === 1) {
+    const sql = `${columnName} BETWEEN $${startIndex} AND $${startIndex + 1}`;
+    const d = new Date(values[0]);
+    const lo = new Date(d.getTime() - 86_400_000).toISOString();
+    const hi = new Date(d.getTime() + 86_400_000).toISOString();
+    return { sql, values: [lo, hi] };
+  }
+
+  const conditions: string[] = [];
+  const allValues: unknown[] = [];
+  let idx = startIndex;
+  for (const value of values) {
+    conditions.push(`${columnName} BETWEEN $${idx} AND $${idx + 1}`);
+    const d = new Date(value);
+    allValues.push(new Date(d.getTime() - 86_400_000).toISOString());
+    allValues.push(new Date(d.getTime() + 86_400_000).toISOString());
+    idx += 2;
+  }
+  return { sql: `(${conditions.join(' OR ')})`, values: allValues };
 }
 
 // =============================================================================
@@ -220,7 +257,8 @@ function buildDateFragment(
 /**
  * Build a WHERE fragment for number and quantity search parameters.
  *
- * Supports prefixes: eq, ne, lt, gt, le, ge.
+ * Supports prefixes: eq, ne, lt, gt, le, ge, ap.
+ * For `ap`, uses a ±10% range around the target value.
  */
 function buildNumberFragment(
   impl: SearchParameterImpl,
@@ -228,6 +266,12 @@ function buildNumberFragment(
   startIndex: number,
 ): WhereFragment {
   const columnName = quoteColumn(impl.columnName);
+
+  // ap (approximately) → BETWEEN (value * 0.9) AND (value * 1.1)
+  if (param.prefix === 'ap') {
+    return buildApproximateNumberFragment(columnName, param.values, startIndex);
+  }
+
   const operator = prefixToOperator(param.prefix);
 
   // Convert values to numbers
@@ -237,6 +281,36 @@ function buildNumberFragment(
   });
 
   return buildOrFragmentRaw(columnName, operator, numericValues, startIndex);
+}
+
+/**
+ * Build a BETWEEN fragment for approximate number matching.
+ * Uses ±10% range for each value (FHIR spec).
+ */
+function buildApproximateNumberFragment(
+  columnName: string,
+  values: string[],
+  startIndex: number,
+): WhereFragment {
+  if (values.length === 1) {
+    const n = parseFloat(values[0]);
+    const lo = n * 0.9;
+    const hi = n * 1.1;
+    const sql = `${columnName} BETWEEN $${startIndex} AND $${startIndex + 1}`;
+    return { sql, values: [lo, hi] };
+  }
+
+  const conditions: string[] = [];
+  const allValues: unknown[] = [];
+  let idx = startIndex;
+  for (const value of values) {
+    const n = parseFloat(value);
+    conditions.push(`${columnName} BETWEEN $${idx} AND $${idx + 1}`);
+    allValues.push(n * 0.9);
+    allValues.push(n * 1.1);
+    idx += 2;
+  }
+  return { sql: `(${conditions.join(' OR ')})`, values: allValues };
 }
 
 // =============================================================================
