@@ -55,3 +55,27 @@ export {
 export type { DatabaseConfig } from './db/index.js';
 export { loadDatabaseConfig } from './db/index.js';
 export { DatabaseClient } from './db/index.js';
+
+// ─── Repository ─────────────────────────────────────────────────────────────
+export type {
+  FhirResource,
+  FhirMeta,
+  PersistedResource,
+  ResourceRepository,
+  CreateResourceOptions,
+  UpdateResourceOptions,
+  HistoryOptions,
+  HistoryEntry,
+  HistoryBundle,
+  HistoryBundleEntry,
+  BuildHistoryBundleOptions,
+} from './repo/index.js';
+export { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './repo/index.js';
+export {
+  RepositoryError,
+  ResourceNotFoundError,
+  ResourceGoneError,
+  ResourceVersionConflictError,
+} from './repo/index.js';
+export { FhirRepository } from './repo/index.js';
+export { buildHistoryBundle } from './repo/index.js';

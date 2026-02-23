@@ -54,7 +54,8 @@
 | WF-REPO-002   | Search Column Value Extraction          | Repository.buildResourceRow()          | ✅  | ⬜  |
 | WF-REPO-003   | Compartment & Access Control            | Repository.getCompartments()           | ✅  | ⬜  |
 | WF-REPO-004   | Read & Search Path                      | Repository.readResource() / search()   | ✅  | ⬜  |
-| WF-001        | Create Patient Resource                 | POST /fhir/R4/Patient                  | ⬜  | ⬜  |
+| WF-E2E-001    | POST /Patient 完整写路径端到端          | POST /fhir/R4/Patient                  | ✅  | ⬜  |
+| WF-001        | Create Patient Resource                 | POST /fhir/R4/Patient                  | ✅  | ⬜  |
 | WF-002        | Search Resources                        | GET /fhir/R4/{type}?...                | ⬜  | ⬜  |
 | WF-003        | FHIR Batch/Transaction                  | POST /fhir/R4/                         | ⬜  | ⬜  |
 | WF-004        | OAuth2 Login                            | POST /auth/login                       | ⬜  | ⬜  |
