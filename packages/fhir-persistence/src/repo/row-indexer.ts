@@ -381,8 +381,10 @@ function populateTokenColumnStrategy(
   const texts = allTokens.map((t) => (t.system ? `${t.system}|${t.code}` : t.code));
   columns[`__${impl.columnName}Text`] = texts;
 
-  // Sort column: __<name>Sort TEXT (first value)
-  columns[`__${impl.columnName}Sort`] = texts[0] ?? null;
+  // Sort column: __<name>Sort TEXT — stores display text for :text modifier search
+  // Falls back to system|code if no display is available
+  const sortValue = allTokens[0].display || texts[0] || null;
+  columns[`__${impl.columnName}Sort`] = sortValue;
 }
 
 /**
@@ -404,4 +406,55 @@ function populateLookupTableStrategy(
   if (sortStr) {
     columns[`__${impl.columnName}Sort`] = sortStr;
   }
+}
+
+// =============================================================================
+// Section 7: Metadata Column Population
+// =============================================================================
+
+/**
+ * Build metadata search column values from a FHIR resource's `meta` element.
+ *
+ * Extracts `meta.tag` and `meta.security` into the fixed metadata columns:
+ * - `__tag UUID[]`, `__tagText TEXT[]`, `__tagSort TEXT`
+ * - `__security UUID[]`, `__securityText TEXT[]`, `__securitySort TEXT`
+ *
+ * These columns exist on every main table and are independent of the
+ * SearchParameterRegistry (they apply to all resource types).
+ *
+ * @param resource - The FHIR resource to extract metadata from.
+ * @returns Column name → value map for metadata search columns.
+ */
+export function buildMetadataColumns(resource: FhirResource): SearchColumnValues {
+  const columns: SearchColumnValues = {};
+  const meta = (resource as Record<string, unknown>).meta as Record<string, unknown> | undefined;
+  if (!meta) return columns;
+
+  // _tag — meta.tag (array of Coding)
+  if (Array.isArray(meta.tag)) {
+    const tokens: Array<{ system: string; code: string; display: string }> = [];
+    for (const tag of meta.tag) {
+      tokens.push(...extractTokenValues(tag));
+    }
+    if (tokens.length > 0) {
+      columns['__tag'] = tokens.map((t) => hashToken(t.system, t.code));
+      columns['__tagText'] = tokens.map((t) => (t.system ? `${t.system}|${t.code}` : t.code));
+      columns['__tagSort'] = (columns['__tagText'] as string[])[0] ?? null;
+    }
+  }
+
+  // _security — meta.security (array of Coding)
+  if (Array.isArray(meta.security)) {
+    const tokens: Array<{ system: string; code: string; display: string }> = [];
+    for (const sec of meta.security) {
+      tokens.push(...extractTokenValues(sec));
+    }
+    if (tokens.length > 0) {
+      columns['__security'] = tokens.map((t) => hashToken(t.system, t.code));
+      columns['__securityText'] = tokens.map((t) => (t.system ? `${t.system}|${t.code}` : t.code));
+      columns['__securitySort'] = (columns['__securityText'] as string[])[0] ?? null;
+    }
+  }
+
+  return columns;
 }

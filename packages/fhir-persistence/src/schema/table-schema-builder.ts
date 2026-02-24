@@ -54,6 +54,14 @@ function buildFixedMainColumns(): ColumnSchema[] {
     { name: '__version', type: 'INTEGER', notNull: true, primaryKey: false },
     { name: '_source', type: 'TEXT', notNull: false, primaryKey: false },
     { name: '_profile', type: 'TEXT[]', notNull: false, primaryKey: false },
+    // Metadata token columns — _tag (meta.tag)
+    { name: '__tag', type: 'UUID[]', notNull: false, primaryKey: false },
+    { name: '__tagText', type: 'TEXT[]', notNull: false, primaryKey: false },
+    { name: '__tagSort', type: 'TEXT', notNull: false, primaryKey: false },
+    // Metadata token columns — _security (meta.security)
+    { name: '__security', type: 'UUID[]', notNull: false, primaryKey: false },
+    { name: '__securityText', type: 'TEXT[]', notNull: false, primaryKey: false },
+    { name: '__securitySort', type: 'TEXT', notNull: false, primaryKey: false },
   ];
 }
 

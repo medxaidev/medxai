@@ -92,6 +92,11 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     await db.query(
+      `DELETE FROM "Observation_History" WHERE "id" IN (SELECT "id" FROM "Observation" WHERE "content"::text LIKE $1)`,
+      [`%${RUN_ID}%`],
+    );
+    await db.query(`DELETE FROM "Observation" WHERE "content"::text LIKE $1`, [`%${RUN_ID}%`]);
+    await db.query(
       `DELETE FROM "Patient_History" WHERE "id" IN (SELECT "id" FROM "Patient" WHERE "content"::text LIKE $1)`,
       [`%${RUN_ID}%`],
     );
@@ -271,5 +276,98 @@ describe('HTTP Search E2E — POST _search', () => {
     expect(body.type).toBe('searchset');
     expect(body.entry).toHaveLength(1);
     expect(body.entry[0].resource.id).toBe(patientId);
+  });
+});
+
+// =============================================================================
+// Section 3: Phase 15 — Metadata Search HTTP E2E
+// =============================================================================
+
+describe('HTTP Search E2E — Phase 15 metadata params', () => {
+  let taggedPatientId: string;
+  let profiledPatientId: string;
+  let sourcedPatientId: string;
+  let securedPatientId: string;
+
+  beforeAll(async () => {
+    const tagged = await repo.createResource({
+      resourceType: 'Patient',
+      name: [{ family: `E2E-Tag-${RUN_ID}` }],
+      meta: {
+        tag: [{ system: 'http://example.com/tags', code: `e2e-${RUN_ID}` }],
+      },
+    });
+    taggedPatientId = tagged.id!;
+
+    const profiled = await repo.createResource({
+      resourceType: 'Patient',
+      name: [{ family: `E2E-Profile-${RUN_ID}` }],
+      meta: {
+        profile: [`http://example.com/fhir/StructureDefinition/e2e-${RUN_ID}`],
+      },
+    });
+    profiledPatientId = profiled.id!;
+
+    const sourced = await repo.createResource({
+      resourceType: 'Patient',
+      name: [{ family: `E2E-Source-${RUN_ID}` }],
+      meta: {
+        source: `http://example.com/source-${RUN_ID}`,
+      },
+    });
+    sourcedPatientId = sourced.id!;
+
+    const secured = await repo.createResource({
+      resourceType: 'Patient',
+      name: [{ family: `E2E-Security-${RUN_ID}` }],
+      meta: {
+        security: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-Confidentiality', code: 'R' }],
+      },
+    });
+    securedPatientId = secured.id!;
+  });
+
+  it('GET /Patient?_tag=system|code finds tagged resource', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?_tag=${encodeURIComponent(`http://example.com/tags|e2e-${RUN_ID}`)}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const ids = (body.entry ?? []).map((e: any) => e.resource.id);
+    expect(ids).toContain(taggedPatientId);
+  });
+
+  it('GET /Patient?_profile=url finds profiled resource', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?_profile=${encodeURIComponent(`http://example.com/fhir/StructureDefinition/e2e-${RUN_ID}`)}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const ids = (body.entry ?? []).map((e: any) => e.resource.id);
+    expect(ids).toContain(profiledPatientId);
+  });
+
+  it('GET /Patient?_source=url finds sourced resource', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?_source=${encodeURIComponent(`http://example.com/source-${RUN_ID}`)}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const ids = (body.entry ?? []).map((e: any) => e.resource.id);
+    expect(ids).toContain(sourcedPatientId);
+  });
+
+  it('GET /Patient?_security=system|code finds secured resource', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?_id=${securedPatientId}&_security=${encodeURIComponent('http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R')}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.entry).toHaveLength(1);
+    expect(body.entry[0].resource.id).toBe(securedPatientId);
   });
 });

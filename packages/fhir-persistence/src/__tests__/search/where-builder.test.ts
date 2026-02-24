@@ -372,3 +372,173 @@ describe('buildWhereClause', () => {
     expect(result!.values).toEqual(['abc', 'male', '1990-01-01']);
   });
 });
+
+// =============================================================================
+// buildWhereClause — metadata search parameters
+// =============================================================================
+
+describe('buildWhereClause — metadata params', () => {
+  const registry = new SearchParameterRegistry();
+
+  it('_tag generates token-column array overlap on __tagText', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_tag', values: ['http://example.com|urgent'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('"__tagText" && ARRAY[$1]::text[]');
+    expect(result!.values).toEqual(['http://example.com|urgent']);
+  });
+
+  it('_tag:not generates NOT array overlap', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_tag', modifier: 'not', values: ['http://example.com|urgent'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('NOT ("__tagText" && ARRAY[$1]::text[])');
+  });
+
+  it('_tag with multiple values', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_tag', values: ['http://a.com|x', 'http://b.com|y'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('"__tagText" && ARRAY[$1, $2]::text[]');
+    expect(result!.values).toEqual(['http://a.com|x', 'http://b.com|y']);
+  });
+
+  it('_security generates token-column array overlap on __securityText', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_security', values: ['http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('"__securityText" && ARRAY[$1]::text[]');
+  });
+
+  it('_profile generates array overlap on _profile TEXT[]', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_profile', values: ['http://hl7.org/fhir/StructureDefinition/Patient'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('"_profile" && ARRAY[$1]::text[]');
+    expect(result!.values).toEqual(['http://hl7.org/fhir/StructureDefinition/Patient']);
+  });
+
+  it('_profile with multiple values', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_profile', values: ['http://a.com/P1', 'http://b.com/P2'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('"_profile" && ARRAY[$1, $2]::text[]');
+  });
+
+  it('_source generates equality on _source TEXT', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_source', values: ['http://example.com'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('"_source" = $1');
+    expect(result!.values).toEqual(['http://example.com']);
+  });
+
+  it('_source with multiple values produces OR', () => {
+    const params: ParsedSearchParam[] = [
+      { code: '_source', values: ['http://a.com', 'http://b.com'] },
+    ];
+    const result = buildWhereClause(params, registry, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('OR');
+    expect(result!.values).toEqual(['http://a.com', 'http://b.com']);
+  });
+
+  it('mixed _tag + _id + gender', () => {
+    const registry2 = new SearchParameterRegistry();
+    registry2.indexImpl('Patient', makeImpl({ code: 'gender', type: 'token', columnName: 'gender', strategy: 'token-column' }));
+
+    const params: ParsedSearchParam[] = [
+      { code: '_tag', values: ['http://example.com|urgent'] },
+      { code: '_id', values: ['abc'] },
+      { code: 'gender', values: ['male'] },
+    ];
+    const result = buildWhereClause(params, registry2, 'Patient');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('"__tagText" && ARRAY[$1]::text[]');
+    expect(result!.sql).toContain('"id" = $2');
+    expect(result!.sql).toContain('"__genderText" && ARRAY[$3]::text[]');
+    expect(result!.values).toEqual(['http://example.com|urgent', 'abc', 'male']);
+  });
+});
+
+// =============================================================================
+// buildWhereFragment — token system|code enhancement
+// =============================================================================
+
+describe('buildWhereFragment — token system|code', () => {
+  const impl = makeImpl({ code: 'identifier', type: 'token', columnName: 'identifier', strategy: 'token-column' });
+
+  it('plain code value → array overlap as-is', () => {
+    const param: ParsedSearchParam = { code: 'identifier', values: ['12345'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toBe('"__identifierText" && ARRAY[$1]::text[]');
+    expect(result!.values).toEqual(['12345']);
+  });
+
+  it('system|code value → array overlap as-is', () => {
+    const param: ParsedSearchParam = { code: 'identifier', values: ['http://example.com|12345'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toBe('"__identifierText" && ARRAY[$1]::text[]');
+    expect(result!.values).toEqual(['http://example.com|12345']);
+  });
+
+  it('system| value → EXISTS + unnest + LIKE', () => {
+    const param: ParsedSearchParam = { code: 'identifier', values: ['http://example.com|'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toContain('EXISTS');
+    expect(result!.sql).toContain('unnest');
+    expect(result!.sql).toContain('LIKE');
+    expect(result!.values).toEqual(['http://example.com|%']);
+  });
+
+  it('|code value → searches for plain code (strips leading pipe)', () => {
+    const param: ParsedSearchParam = { code: 'identifier', values: ['|12345'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toBe('"__identifierText" && ARRAY[$1]::text[]');
+    expect(result!.values).toEqual(['12345']);
+  });
+
+  it(':not with system|code', () => {
+    const param: ParsedSearchParam = { code: 'identifier', modifier: 'not', values: ['http://example.com|12345'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toBe('NOT ("__identifierText" && ARRAY[$1]::text[])');
+    expect(result!.values).toEqual(['http://example.com|12345']);
+  });
+
+  it(':text modifier → LIKE on sort column', () => {
+    const param: ParsedSearchParam = { code: 'identifier', modifier: 'text', values: ['body weight'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toBe('LOWER("__identifierSort") LIKE $1');
+    expect(result!.values).toEqual(['body weight%']);
+  });
+
+  it(':text modifier with multiple values → OR of LIKEs', () => {
+    const param: ParsedSearchParam = { code: 'identifier', modifier: 'text', values: ['body', 'weight'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toContain('OR');
+    expect(result!.sql).toContain('LOWER("__identifierSort") LIKE $1');
+    expect(result!.sql).toContain('LOWER("__identifierSort") LIKE $2');
+    expect(result!.values).toEqual(['body%', 'weight%']);
+  });
+
+  it('mixed values (some with pipe, some without)', () => {
+    const param: ParsedSearchParam = { code: 'identifier', values: ['12345', 'http://example.com|67890'] };
+    const result = buildWhereFragment(impl, param, 1);
+    expect(result!.sql).toBe('"__identifierText" && ARRAY[$1, $2]::text[]');
+    expect(result!.values).toEqual(['12345', 'http://example.com|67890']);
+  });
+});

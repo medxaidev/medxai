@@ -17,7 +17,7 @@ import type {
 } from './types.js';
 import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './types.js';
 import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
-import { buildSearchColumns } from './row-indexer.js';
+import { buildSearchColumns, buildMetadataColumns } from './row-indexer.js';
 
 // =============================================================================
 // Section 1: Main Table Row
@@ -53,7 +53,7 @@ export function buildResourceRow(resource: PersistedResource): ResourceRow {
   }
 
   if (resource.meta.profile && resource.meta.profile.length > 0) {
-    row._profile = resource.meta.profile[0];
+    row._profile = resource.meta.profile;
   }
 
   return row;
@@ -75,7 +75,8 @@ export function buildResourceRowWithSearch(
 ): ResourceRow {
   const fixedRow = buildResourceRow(resource);
   const searchCols = buildSearchColumns(resource, searchImpls);
-  return { ...fixedRow, ...searchCols };
+  const metadataCols = buildMetadataColumns(resource);
+  return { ...fixedRow, ...searchCols, ...metadataCols };
 }
 
 // =============================================================================

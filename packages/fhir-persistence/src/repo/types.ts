@@ -272,7 +272,7 @@ export interface ResourceRow {
   projectId: string;
   __version: number;
   _source?: string;
-  _profile?: string;
+  _profile?: string[];
   compartments?: string[];
 }
 

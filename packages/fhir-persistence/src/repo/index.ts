@@ -45,6 +45,7 @@ export {
 export type { SearchColumnValues } from './row-indexer.js';
 export {
   buildSearchColumns,
+  buildMetadataColumns,
   hashToken,
   extractPropertyPath,
   getNestedValues,

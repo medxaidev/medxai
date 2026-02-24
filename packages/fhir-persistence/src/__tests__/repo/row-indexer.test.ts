@@ -15,6 +15,7 @@ import {
   extractPropertyPath,
   getNestedValues,
   buildSearchColumns,
+  buildMetadataColumns,
 } from '../../repo/row-indexer.js';
 import type { SearchParameterImpl } from '../../registry/search-parameter-registry.js';
 
@@ -348,7 +349,7 @@ describe('Row Indexer — buildSearchColumns (token-column strategy)', () => {
       'http://loinc.org|12345-6',
       'http://snomed.info|789',
     ]);
-    expect(cols.__codeSort).toBe('http://loinc.org|12345-6');
+    expect(cols.__codeSort).toBe('Test');
   });
 
   it('extracts token from boolean', () => {
@@ -519,6 +520,91 @@ describe('Row Indexer — buildSearchColumns (multiple impls)', () => {
   it('returns empty object for empty impls', () => {
     const resource = { resourceType: 'Patient', birthDate: '1990-01-01' };
     const cols = buildSearchColumns(resource, []);
+    expect(cols).toEqual({});
+  });
+});
+
+// =============================================================================
+// buildMetadataColumns — Task 15.4
+// =============================================================================
+
+describe('buildMetadataColumns', () => {
+  it('extracts meta.tag → __tag, __tagText, __tagSort', () => {
+    const resource = {
+      resourceType: 'Patient',
+      meta: {
+        tag: [{ system: 'http://example.com', code: 'urgent', display: 'Urgent' }],
+      },
+    };
+    const cols = buildMetadataColumns(resource);
+    expect(cols.__tag).toHaveLength(1);
+    expect(cols.__tagText).toEqual(['http://example.com|urgent']);
+    expect(cols.__tagSort).toBe('http://example.com|urgent');
+  });
+
+  it('extracts meta.security → __security, __securityText, __securitySort', () => {
+    const resource = {
+      resourceType: 'Patient',
+      meta: {
+        security: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-Confidentiality', code: 'R' }],
+      },
+    };
+    const cols = buildMetadataColumns(resource);
+    expect(cols.__security).toHaveLength(1);
+    expect(cols.__securityText).toEqual(['http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R']);
+    expect(cols.__securitySort).toBe('http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R');
+  });
+
+  it('no meta.tag → no __tag columns', () => {
+    const resource = { resourceType: 'Patient', meta: { lastUpdated: '2026-01-01' } };
+    const cols = buildMetadataColumns(resource);
+    expect(cols.__tag).toBeUndefined();
+    expect(cols.__tagText).toBeUndefined();
+  });
+
+  it('multiple tags → arrays with all values', () => {
+    const resource = {
+      resourceType: 'Patient',
+      meta: {
+        tag: [
+          { system: 'http://a.com', code: 'x' },
+          { system: 'http://b.com', code: 'y' },
+        ],
+      },
+    };
+    const cols = buildMetadataColumns(resource);
+    expect(cols.__tag).toHaveLength(2);
+    expect(cols.__tagText).toEqual(['http://a.com|x', 'http://b.com|y']);
+    expect(cols.__tagSort).toBe('http://a.com|x');
+  });
+
+  it('tag with system|code → correct text format', () => {
+    const resource = {
+      resourceType: 'Patient',
+      meta: { tag: [{ system: 'http://example.com', code: 'urgent' }] },
+    };
+    const cols = buildMetadataColumns(resource);
+    expect(cols.__tagText).toEqual(['http://example.com|urgent']);
+  });
+
+  it('tag with code only (no system) → no system prefix', () => {
+    const resource = {
+      resourceType: 'Patient',
+      meta: { tag: [{ code: 'local-tag' }] },
+    };
+    const cols = buildMetadataColumns(resource);
+    expect(cols.__tagText).toEqual(['local-tag']);
+  });
+
+  it('empty meta → empty result', () => {
+    const resource = { resourceType: 'Patient' };
+    const cols = buildMetadataColumns(resource);
+    expect(cols).toEqual({});
+  });
+
+  it('meta with no tag or security → empty result', () => {
+    const resource = { resourceType: 'Patient', meta: { lastUpdated: '2026-01-01' } };
+    const cols = buildMetadataColumns(resource);
     expect(cols).toEqual({});
   });
 });

@@ -78,7 +78,7 @@ describe('buildResourceRow', () => {
       },
     });
     const row = buildResourceRow(patient);
-    expect(row._profile).toBe('http://hl7.org/fhir/StructureDefinition/Patient');
+    expect(row._profile).toEqual(['http://hl7.org/fhir/StructureDefinition/Patient']);
   });
 
   it('omits _source and _profile when not in meta', () => {

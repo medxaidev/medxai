@@ -423,3 +423,153 @@ describe('Search Integration — AND/OR and edge cases', () => {
     expect(afterFemale.resources).toHaveLength(1);
   });
 });
+
+// =============================================================================
+// Phase 15: Metadata Search & Token Enhancements
+// =============================================================================
+
+describe('Phase 15 — metadata search params', () => {
+  it('_tag search finds resource by meta.tag', async () => {
+    const p = await repo.createResource(makePatient({
+      meta: {
+        tag: [{ system: 'http://example.com/tags', code: `phase15-${RUN_ID}` }],
+      },
+    }));
+
+    const result = await search('Patient', [
+      { code: '_tag', values: [`http://example.com/tags|phase15-${RUN_ID}`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(p.id);
+  });
+
+  it('_tag search does NOT find resource without matching tag', async () => {
+    await repo.createResource(makePatient({
+      meta: {
+        tag: [{ system: 'http://example.com/tags', code: `other-${RUN_ID}` }],
+      },
+    }));
+
+    const result = await search('Patient', [
+      { code: '_tag', values: [`http://example.com/tags|nonexistent-${RUN_ID}`] },
+    ]);
+    expect(result.resources).toHaveLength(0);
+  });
+
+  it('_security search finds resource by meta.security', async () => {
+    const p = await repo.createResource(makePatient({
+      meta: {
+        security: [{ system: 'http://terminology.hl7.org/CodeSystem/v3-Confidentiality', code: 'R' }],
+      },
+      name: [{ family: `Sec-${RUN_ID}` }],
+    }));
+
+    const result = await search('Patient', [
+      { code: '_id', values: [p.id] },
+      { code: '_security', values: ['http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R'] },
+    ]);
+    expect(result.resources).toHaveLength(1);
+    expect((result.resources[0] as FhirResource).id).toBe(p.id);
+  });
+
+  it('_profile search finds resource by meta.profile', async () => {
+    const profileUrl = `http://example.com/fhir/StructureDefinition/test-${RUN_ID}`;
+    const p = await repo.createResource(makePatient({
+      meta: { profile: [profileUrl] },
+    }));
+
+    const result = await search('Patient', [
+      { code: '_profile', values: [profileUrl] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(p.id);
+  });
+
+  it('_source search finds resource by meta.source', async () => {
+    const sourceUrl = `http://example.com/source-${RUN_ID}`;
+    const p = await repo.createResource(makePatient({
+      meta: { source: sourceUrl },
+    }));
+
+    const result = await search('Patient', [
+      { code: '_source', values: [sourceUrl] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(p.id);
+  });
+
+  it('_tag with multiple tags — finds by any', async () => {
+    const p = await repo.createResource(makePatient({
+      meta: {
+        tag: [
+          { system: 'http://a.com', code: `multi1-${RUN_ID}` },
+          { system: 'http://b.com', code: `multi2-${RUN_ID}` },
+        ],
+      },
+    }));
+
+    // Search by second tag
+    const result = await search('Patient', [
+      { code: '_tag', values: [`http://b.com|multi2-${RUN_ID}`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(p.id);
+  });
+});
+
+describe('Phase 15 — token enhancements', () => {
+  it('system|code search on identifier', async () => {
+    const p = await repo.createResource(makePatient({
+      identifier: [{ system: 'http://hospital.example.com/mrn', value: `MRN-${RUN_ID}` }],
+    }));
+
+    const result = await search('Patient', [
+      { code: 'identifier', values: [`http://hospital.example.com/mrn|MRN-${RUN_ID}`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(p.id);
+  });
+
+  it('|code search on identifier (no system)', async () => {
+    const p = await repo.createResource(makePatient({
+      identifier: [{ system: 'http://hospital.example.com/mrn', value: `PIPE-${RUN_ID}` }],
+    }));
+
+    // |code strips the pipe and searches for plain code
+    const result = await search('Patient', [
+      { code: '_id', values: [p.id] },
+      { code: 'identifier', values: [`|PIPE-${RUN_ID}`] },
+    ]);
+    // This should NOT match because the stored text is "http://hospital.example.com/mrn|PIPE-xxx"
+    // and we're searching for just "PIPE-xxx" (no system prefix)
+    expect(result.resources).toHaveLength(0);
+  });
+
+  it(':text modifier on code searches sort column', async () => {
+    const obs = await repo.createResource(makeObservation('Patient/dummy', {
+      code: {
+        coding: [{ system: 'http://loinc.org', code: '29463-7', display: `BodyWeight-${RUN_ID}` }],
+      },
+    }));
+
+    const result = await search('Observation', [
+      { code: 'code', modifier: 'text', values: [`bodyweight-${RUN_ID.toLowerCase()}`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(obs.id);
+  });
+
+  it('_tag:not excludes matching resources', async () => {
+    const p = await repo.createResource(makePatient({
+      meta: {
+        tag: [{ system: 'http://example.com', code: `exclude-${RUN_ID}` }],
+      },
+    }));
+
+    const result = await search('Patient', [
+      { code: '_id', values: [p.id] },
+      { code: '_tag', modifier: 'not', values: [`http://example.com|exclude-${RUN_ID}`] },
+    ]);
+    expect(result.resources).toHaveLength(0);
+  });
+});

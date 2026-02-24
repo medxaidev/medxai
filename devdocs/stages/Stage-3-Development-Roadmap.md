@@ -98,7 +98,7 @@ This is the **most critical missing piece** from Stage-2. Without it, search col
 
 **File:** `packages/fhir-server/src/__tests__/search-e2e.test.ts`
 
-- 10+ tests covering: GET search, POST _search, pagination links, empty results
+- 10+ tests covering: GET search, POST \_search, pagination links, empty results
 
 ### Acceptance Criteria
 
@@ -155,7 +155,7 @@ Add support for FHIR metadata search parameters (`_tag`, `_security`, `_profile`
 
 ---
 
-## Phase 16: Chained Search & _include/_revinclude
+## Phase 16: Chained Search & \_include/\_revinclude
 
 **Duration:** 6-8 days  
 **Complexity:** Very High  
@@ -174,13 +174,13 @@ Implement chained search parameters and resource inclusion, the two most complex
 - Translate to SQL JOIN on `{ResourceType}_References` table
 - Support single-level chaining (multi-level deferred)
 
-#### Task 16.2: _include
+#### Task 16.2: \_include
 
 - `GET /MedicationRequest?_include=MedicationRequest:patient`
 - After primary search, load referenced resources
 - Add to Bundle with `search.mode = 'include'`
 
-#### Task 16.3: _revinclude
+#### Task 16.3: \_revinclude
 
 - `GET /Patient?_revinclude=Observation:subject`
 - After primary search, find resources that reference the results
@@ -252,25 +252,25 @@ Optimize search performance for production workloads. Add trigram indexes for fu
 
 ## Success Metrics
 
-| Metric                          | Target             |
-| ------------------------------- | ------------------ |
-| New implementation files        | 10-15              |
-| New test files                  | 8-12               |
-| New tests (Stage-3)             | 130-200            |
-| Search parameter types working  | 6 (all end-to-end) |
-| Chained search depth            | 1 level            |
-| _include/_revinclude            | ✅                 |
-| Metadata params (_tag, _security)| ✅                |
-| Simple search latency (p99)     | < 50ms             |
-| Complex search latency (p99)    | < 200ms            |
+| Metric                              | Target             |
+| ----------------------------------- | ------------------ |
+| New implementation files            | 10-15              |
+| New test files                      | 8-12               |
+| New tests (Stage-3)                 | 130-200            |
+| Search parameter types working      | 6 (all end-to-end) |
+| Chained search depth                | 1 level            |
+| \_include/\_revinclude              | ✅                 |
+| Metadata params (\_tag, \_security) | ✅                 |
+| Simple search latency (p99)         | < 50ms             |
+| Complex search latency (p99)        | < 200ms            |
 
 ---
 
 ## Stage-3 Completion Checklist
 
-- [ ] Phase 14: Row indexer & search integration
-- [ ] Phase 15: Metadata params & token enhancement
-- [ ] Phase 16: Chained search & _include/_revinclude
+- [x] Phase 14: Row indexer & search integration ✅ 2026-02-24
+- [x] Phase 15: Metadata params & token enhancement ✅ 2026-02-24
+- [ ] Phase 16: Chained search & \_include/\_revinclude
 - [ ] Phase 17: Search performance & optimization
 - [ ] All tests passing (130+ new tests)
 - [ ] Zero TypeScript errors
@@ -295,7 +295,7 @@ Optimize search performance for production workloads. Add trigram indexes for fu
 ### Contingency Plans
 
 - If row indexer is too slow: Defer to async background indexing
-- If chained search is too complex: Defer to Stage-4, focus on _include first
+- If chained search is too complex: Defer to Stage-4, focus on \_include first
 - If trigram indexes cause write slowdown: Make optional per deployment
 
 ---
