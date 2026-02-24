@@ -588,3 +588,202 @@ describe('TableSchemaBuilder — Integration', () => {
     expect(schema.generatedAt).toBeTruthy();
   });
 });
+
+// =============================================================================
+// Section 11: Schema Correctness Verification (reference array + lookup-table)
+// =============================================================================
+
+describe('TableSchemaBuilder — Schema Correctness (reference array & lookup-table)', () => {
+  let sdRegistry: StructureDefinitionRegistry;
+  let spRegistry: SearchParameterRegistry;
+
+  beforeEach(() => {
+    sdRegistry = new StructureDefinitionRegistry();
+    spRegistry = new SearchParameterRegistry();
+
+    const profiles = loadBundleFromFile(specPath('profiles-resources.json'));
+    sdRegistry.indexAll(profiles.profiles);
+
+    const spBundle = JSON.parse(
+      readFileSync(specPath('search-parameters.json'), 'utf8'),
+    ) as SearchParameterBundle;
+    spRegistry.indexBundle(spBundle);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Account: plain-string name vs HumanName name
+  // ---------------------------------------------------------------------------
+
+  it('Account: name uses lookup-table (expression contains .name suffix)', () => {
+    const impl = spRegistry.getImpl('Account', 'name');
+    expect(impl).toBeDefined();
+    // Account.name expression is "Account.name" — contains .name → lookup-table
+    expect(impl!.strategy).toBe('lookup-table');
+    const tableSet = buildResourceTableSet('Account', sdRegistry, spRegistry);
+    const colNames = tableSet.main.columns.map((c) => c.name);
+    expect(colNames).toContain('__nameSort');
+    expect(colNames).not.toContain('name'); // no direct column
+  });
+
+  it('Account: patient is TEXT[] (multi-target via .where() expression)', () => {
+    const impl = spRegistry.getImpl('Account', 'patient');
+    expect(impl).toBeDefined();
+    expect(impl!.strategy).toBe('column');
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
+    const tableSet = buildResourceTableSet('Account', sdRegistry, spRegistry);
+    const col = tableSet.main.columns.find((c) => c.name === 'patient');
+    expect(col).toBeDefined();
+    expect(col!.type).toBe('TEXT[]');
+    const idx = tableSet.main.indexes.find((i) => i.name === 'Account_patient_idx');
+    expect(idx!.indexType).toBe('gin');
+  });
+
+  it('Account: subject is TEXT[] (multi-target reference)', () => {
+    const impl = spRegistry.getImpl('Account', 'subject');
+    expect(impl).toBeDefined();
+    expect(impl!.strategy).toBe('column');
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
+    const tableSet = buildResourceTableSet('Account', sdRegistry, spRegistry);
+    const col = tableSet.main.columns.find((c) => c.name === 'subject');
+    expect(col).toBeDefined();
+    expect(col!.type).toBe('TEXT[]');
+    const idx = tableSet.main.indexes.find((i) => i.name === 'Account_subject_idx');
+    expect(idx!.indexType).toBe('gin');
+  });
+
+  it('Account: owner is TEXT (single-target reference, no .where())', () => {
+    const impl = spRegistry.getImpl('Account', 'owner');
+    expect(impl).toBeDefined();
+    expect(impl!.strategy).toBe('column');
+    expect(impl!.columnType).toBe('TEXT');
+    expect(impl!.array).toBe(false);
+    const tableSet = buildResourceTableSet('Account', sdRegistry, spRegistry);
+    const col = tableSet.main.columns.find((c) => c.name === 'owner');
+    expect(col!.type).toBe('TEXT');
+    const idx = tableSet.main.indexes.find((i) => i.name === 'Account_owner_idx');
+    expect(idx!.indexType).toBe('btree');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Patient: HumanName name → lookup-table (correct)
+  // ---------------------------------------------------------------------------
+
+  it('Patient: name uses lookup-table (expression Patient.name targets HumanName)', () => {
+    const impl = spRegistry.getImpl('Patient', 'name');
+    expect(impl).toBeDefined();
+    expect(impl!.strategy).toBe('lookup-table');
+    const tableSet = buildResourceTableSet('Patient', sdRegistry, spRegistry);
+    const colNames = tableSet.main.columns.map((c) => c.name);
+    expect(colNames).toContain('__nameSort');
+    expect(colNames).not.toContain('name');
+  });
+
+  it('Patient: general-practitioner is TEXT[] (3 targets: Practitioner/Organization/PractitionerRole)', () => {
+    const impl = spRegistry.getImpl('Patient', 'general-practitioner');
+    expect(impl).toBeDefined();
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
+    const tableSet = buildResourceTableSet('Patient', sdRegistry, spRegistry);
+    const col = tableSet.main.columns.find((c) => c.name === 'generalPractitioner');
+    expect(col!.type).toBe('TEXT[]');
+    const idx = tableSet.main.indexes.find((i) => i.name === 'Patient_generalPractitioner_idx');
+    expect(idx!.indexType).toBe('gin');
+  });
+
+  it('Patient: link is TEXT[] (2 targets: Patient/RelatedPerson)', () => {
+    const impl = spRegistry.getImpl('Patient', 'link');
+    expect(impl).toBeDefined();
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
+    const tableSet = buildResourceTableSet('Patient', sdRegistry, spRegistry);
+    const col = tableSet.main.columns.find((c) => c.name === 'link');
+    expect(col!.type).toBe('TEXT[]');
+  });
+
+  it('Patient: organization is TEXT (single-target reference)', () => {
+    const impl = spRegistry.getImpl('Patient', 'organization');
+    expect(impl).toBeDefined();
+    expect(impl!.columnType).toBe('TEXT');
+    expect(impl!.array).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Observation: multi-target references
+  // ---------------------------------------------------------------------------
+
+  it('Observation: subject is TEXT[] (multi-target: Patient/Group/Device/Location)', () => {
+    const impl = spRegistry.getImpl('Observation', 'subject');
+    expect(impl).toBeDefined();
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
+    const tableSet = buildResourceTableSet('Observation', sdRegistry, spRegistry);
+    const col = tableSet.main.columns.find((c) => c.name === 'subject');
+    expect(col!.type).toBe('TEXT[]');
+    const idx = tableSet.main.indexes.find((i) => i.name === 'Observation_subject_idx');
+    expect(idx!.indexType).toBe('gin');
+  });
+
+  it('Observation: specimen is TEXT (single-target: Specimen)', () => {
+    const impl = spRegistry.getImpl('Observation', 'specimen');
+    expect(impl).toBeDefined();
+    expect(impl!.columnType).toBe('TEXT');
+    expect(impl!.array).toBe(false);
+    const tableSet = buildResourceTableSet('Observation', sdRegistry, spRegistry);
+    const col = tableSet.main.columns.find((c) => c.name === 'specimen');
+    expect(col!.type).toBe('TEXT');
+    const idx = tableSet.main.indexes.find((i) => i.name === 'Observation_specimen_idx');
+    expect(idx!.indexType).toBe('btree');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Practitioner: address → lookup-table (expression contains .address)
+  // ---------------------------------------------------------------------------
+
+  it('Practitioner: address uses lookup-table (expression contains .address)', () => {
+    const impl = spRegistry.getImpl('Practitioner', 'address');
+    expect(impl).toBeDefined();
+    expect(impl!.strategy).toBe('lookup-table');
+    const tableSet = buildResourceTableSet('Practitioner', sdRegistry, spRegistry);
+    const colNames = tableSet.main.columns.map((c) => c.name);
+    expect(colNames).toContain('__addressSort');
+    expect(colNames).not.toContain('address');
+  });
+
+  it('Practitioner: name uses lookup-table (expression contains .name)', () => {
+    const impl = spRegistry.getImpl('Practitioner', 'name');
+    expect(impl).toBeDefined();
+    expect(impl!.strategy).toBe('lookup-table');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Organization: name is column (expression Organization.name, no HumanName)
+  // ---------------------------------------------------------------------------
+
+  it('Organization: name uses lookup-table (expression contains .name suffix)', () => {
+    const impl = spRegistry.getImpl('Organization', 'name');
+    expect(impl).toBeDefined();
+    // Organization.name expression is "Organization.name | Organization.alias"
+    // contains .name → lookup-table (same as Account.name — acceptable conservative behavior)
+    expect(impl!.strategy).toBe('lookup-table');
+  });
+
+  // ---------------------------------------------------------------------------
+  // DiagnosticReport: multi-target references
+  // ---------------------------------------------------------------------------
+
+  it('DiagnosticReport: subject is TEXT[] (multi-target reference)', () => {
+    const impl = spRegistry.getImpl('DiagnosticReport', 'subject');
+    expect(impl).toBeDefined();
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
+  });
+
+  it('DiagnosticReport: encounter is TEXT[] (2 targets: Encounter/EpisodeOfCare)', () => {
+    const impl = spRegistry.getImpl('DiagnosticReport', 'encounter');
+    expect(impl).toBeDefined();
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
+  });
+});

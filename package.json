@@ -24,7 +24,8 @@
     "@vitest/ui": "4.0.18",
     "rimraf": "6.1.2",
     "esbuild": "0.27.2",
-    "@microsoft/api-extractor": "7.56.1"
+    "@microsoft/api-extractor": "7.56.1",
+    "tsx": "4.21.0"
   },
   "engines": {
     "node": ">=18.0.0",

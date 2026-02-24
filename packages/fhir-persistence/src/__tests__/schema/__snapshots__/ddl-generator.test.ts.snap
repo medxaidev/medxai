@@ -72,7 +72,7 @@ exports[`DDLGenerator — Snapshot Tests > Observation DDL snapshot 1`] = `
   "_source" TEXT,
   "_profile" TEXT[],
   "compartments" UUID[] NOT NULL,
-  "basedOn" TEXT,
+  "basedOn" TEXT[],
   "__category" UUID[],
   "__categoryText" TEXT[],
   "__categorySort" TEXT,
@@ -103,25 +103,25 @@ exports[`DDLGenerator — Snapshot Tests > Observation DDL snapshot 1`] = `
   "__dataAbsentReasonText" TEXT[],
   "__dataAbsentReasonSort" TEXT,
   "date" TIMESTAMPTZ,
-  "derivedFrom" TEXT,
-  "device" TEXT,
-  "encounter" TEXT,
-  "focus" TEXT,
-  "hasMember" TEXT,
+  "derivedFrom" TEXT[],
+  "device" TEXT[],
+  "encounter" TEXT[],
+  "focus" TEXT[],
+  "hasMember" TEXT[],
   "__identifier" UUID[],
   "__identifierText" TEXT[],
   "__identifierSort" TEXT,
   "__method" UUID[],
   "__methodText" TEXT[],
   "__methodSort" TEXT,
-  "partOf" TEXT,
-  "patient" TEXT,
-  "performer" TEXT,
+  "partOf" TEXT[],
+  "patient" TEXT[],
+  "performer" TEXT[],
   "specimen" TEXT,
   "__status" UUID[],
   "__statusText" TEXT[],
   "__statusSort" TEXT,
-  "subject" TEXT,
+  "subject" TEXT[],
   "__valueConcept" UUID[],
   "__valueConceptText" TEXT[],
   "__valueConceptSort" TEXT,
@@ -172,7 +172,7 @@ CREATE INDEX IF NOT EXISTS "Observation_compartments_idx"
   ON "Observation" USING gin ("compartments");
 
 CREATE INDEX IF NOT EXISTS "Observation_basedOn_idx"
-  ON "Observation" USING btree ("basedOn");
+  ON "Observation" USING gin ("basedOn");
 
 CREATE INDEX IF NOT EXISTS "Observation___category_idx"
   ON "Observation" USING gin ("__category");
@@ -211,19 +211,19 @@ CREATE INDEX IF NOT EXISTS "Observation_date_idx"
   ON "Observation" USING btree ("date");
 
 CREATE INDEX IF NOT EXISTS "Observation_derivedFrom_idx"
-  ON "Observation" USING btree ("derivedFrom");
+  ON "Observation" USING gin ("derivedFrom");
 
 CREATE INDEX IF NOT EXISTS "Observation_device_idx"
-  ON "Observation" USING btree ("device");
+  ON "Observation" USING gin ("device");
 
 CREATE INDEX IF NOT EXISTS "Observation_encounter_idx"
-  ON "Observation" USING btree ("encounter");
+  ON "Observation" USING gin ("encounter");
 
 CREATE INDEX IF NOT EXISTS "Observation_focus_idx"
-  ON "Observation" USING btree ("focus");
+  ON "Observation" USING gin ("focus");
 
 CREATE INDEX IF NOT EXISTS "Observation_hasMember_idx"
-  ON "Observation" USING btree ("hasMember");
+  ON "Observation" USING gin ("hasMember");
 
 CREATE INDEX IF NOT EXISTS "Observation___identifier_idx"
   ON "Observation" USING gin ("__identifier");
@@ -232,13 +232,13 @@ CREATE INDEX IF NOT EXISTS "Observation___method_idx"
   ON "Observation" USING gin ("__method");
 
 CREATE INDEX IF NOT EXISTS "Observation_partOf_idx"
-  ON "Observation" USING btree ("partOf");
+  ON "Observation" USING gin ("partOf");
 
 CREATE INDEX IF NOT EXISTS "Observation_patient_idx"
-  ON "Observation" USING btree ("patient");
+  ON "Observation" USING gin ("patient");
 
 CREATE INDEX IF NOT EXISTS "Observation_performer_idx"
-  ON "Observation" USING btree ("performer");
+  ON "Observation" USING gin ("performer");
 
 CREATE INDEX IF NOT EXISTS "Observation_specimen_idx"
   ON "Observation" USING btree ("specimen");
@@ -247,7 +247,7 @@ CREATE INDEX IF NOT EXISTS "Observation___status_idx"
   ON "Observation" USING gin ("__status");
 
 CREATE INDEX IF NOT EXISTS "Observation_subject_idx"
-  ON "Observation" USING btree ("subject");
+  ON "Observation" USING gin ("subject");
 
 CREATE INDEX IF NOT EXISTS "Observation___valueConcept_idx"
   ON "Observation" USING gin ("__valueConcept");
@@ -302,7 +302,7 @@ exports[`DDLGenerator — Snapshot Tests > Patient DDL snapshot 1`] = `
   "__gender" UUID[],
   "__genderText" TEXT[],
   "__genderSort" TEXT,
-  "generalPractitioner" TEXT,
+  "generalPractitioner" TEXT[],
   "__givenSort" TEXT,
   "__identifier" UUID[],
   "__identifierText" TEXT[],
@@ -310,7 +310,7 @@ exports[`DDLGenerator — Snapshot Tests > Patient DDL snapshot 1`] = `
   "__language" UUID[],
   "__languageText" TEXT[],
   "__languageSort" TEXT,
-  "link" TEXT,
+  "link" TEXT[],
   "__nameSort" TEXT,
   "organization" TEXT,
   "__phoneSort" TEXT,
@@ -399,7 +399,7 @@ CREATE INDEX IF NOT EXISTS "Patient___gender_idx"
   ON "Patient" USING gin ("__gender");
 
 CREATE INDEX IF NOT EXISTS "Patient_generalPractitioner_idx"
-  ON "Patient" USING btree ("generalPractitioner");
+  ON "Patient" USING gin ("generalPractitioner");
 
 CREATE INDEX IF NOT EXISTS "Patient___givenSort_idx"
   ON "Patient" USING btree ("__givenSort");
@@ -411,7 +411,7 @@ CREATE INDEX IF NOT EXISTS "Patient___language_idx"
   ON "Patient" USING gin ("__language");
 
 CREATE INDEX IF NOT EXISTS "Patient_link_idx"
-  ON "Patient" USING btree ("link");
+  ON "Patient" USING gin ("link");
 
 CREATE INDEX IF NOT EXISTS "Patient___nameSort_idx"
   ON "Patient" USING btree ("__nameSort");

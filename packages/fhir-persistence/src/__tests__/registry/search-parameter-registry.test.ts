@@ -416,6 +416,8 @@ describe('SearchParameterRegistry — Integration', () => {
     const subject = registry.getImpl('Observation', 'subject');
     expect(subject).toBeDefined();
     expect(subject!.strategy).toBe('column');
-    expect(subject!.columnType).toBe('TEXT');
+    // Observation.subject has multiple targets → TEXT[] (array reference)
+    expect(subject!.columnType).toBe('TEXT[]');
+    expect(subject!.array).toBe(true);
   });
 });

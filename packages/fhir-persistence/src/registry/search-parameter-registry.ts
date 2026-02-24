@@ -102,6 +102,7 @@ export interface SearchParameterResource {
   expression?: string;
   url?: string;
   name?: string;
+  target?: string[];
 }
 
 /**
@@ -143,6 +144,9 @@ const SKIPPED_TYPES = new Set<SearchParamType>(['composite', 'special']);
  * These parameters target complex FHIR types (HumanName, Address, etc.)
  * that require multi-column storage in separate lookup tables.
  * Only a sort column is generated in the main table.
+ *
+ * NOTE: Matching is done by code AND expression pattern to avoid false
+ * positives (e.g. Account.name is a plain string, not HumanName).
  */
 const LOOKUP_TABLE_PARAMS = new Set([
   // HumanName-related
@@ -163,16 +167,45 @@ const LOOKUP_TABLE_PARAMS = new Set([
   'telecom',
 ]);
 
+/**
+ * FHIRPath expression suffixes that indicate a complex lookup-table type.
+ *
+ * A search parameter uses lookup-table strategy only when its code is in
+ * LOOKUP_TABLE_PARAMS AND its expression ends with one of these suffixes
+ * (i.e. it actually targets a HumanName, Address, or ContactPoint element).
+ */
+const LOOKUP_TABLE_EXPRESSION_SUFFIXES = [
+  '.name',
+  '.given',
+  '.family',
+  '.address',
+  '.telecom',
+];
+
 // =============================================================================
 // Section 3: Strategy Resolution
 // =============================================================================
 
 /**
  * Determine the search strategy for a given search parameter.
+ *
+ * Lookup-table strategy requires BOTH:
+ * 1. The param code is in LOOKUP_TABLE_PARAMS
+ * 2. The expression targets a known complex type path (HumanName, Address, ContactPoint)
+ *
+ * This prevents plain-string fields named 'name' (e.g. Account.name) from
+ * incorrectly using the lookup-table strategy.
  */
-function resolveStrategy(code: string, type: SearchParamType): SearchStrategy {
+function resolveStrategy(code: string, type: SearchParamType, expression: string): SearchStrategy {
   if (LOOKUP_TABLE_PARAMS.has(code)) {
-    return 'lookup-table';
+    // Only use lookup-table if the expression actually targets a complex type
+    const exprLower = expression.toLowerCase();
+    const targetsComplexType = LOOKUP_TABLE_EXPRESSION_SUFFIXES.some(
+      (suffix) => exprLower.includes(suffix),
+    );
+    if (targetsComplexType) {
+      return 'lookup-table';
+    }
   }
   if (type === 'token') {
     return 'token-column';
@@ -222,24 +255,30 @@ function resolveColumnType(type: SearchParamType, array: boolean): SearchColumnT
 /**
  * Determine whether a search parameter produces an array column.
  *
- * A parameter is considered array if its expression can match
- * multiple values (e.g., `Patient.address` is repeating).
- *
- * Heuristic: if the expression contains `|` (union) or the
- * parameter targets a repeating element, it's likely an array.
- * For simplicity, we default to `false` for column strategy
- * and `true` for token-column strategy (tokens are always arrays).
+ * Rules:
+ * - token-column: always array (UUID[] hash column)
+ * - reference with union expression (contains `|`): array (TEXT[])
+ * - reference with multiple targets (>1 resource types): array (TEXT[])
+ * - all others: scalar
  */
-function resolveIsArray(type: SearchParamType, strategy: SearchStrategy): boolean {
+function resolveIsArray(
+  type: SearchParamType,
+  strategy: SearchStrategy,
+  expression: string,
+  targets: string[],
+): boolean {
   if (strategy === 'token-column') {
     return true; // Token columns are always arrays
   }
-  // For column strategy, most params are scalar.
-  // Array detection would require StructureDefinition analysis;
-  // for now, we use a conservative default.
-  // Reference params that target multiple paths are arrays.
   if (type === 'reference') {
-    return false; // Default scalar; overridden per-param if needed
+    // Array if:
+    // - expression contains a union (multiple paths): e.g. "A.x | B.y"
+    // - multiple target resource types
+    // - expression uses .where() filter on a collection: e.g. "Account.subject.where(...)"
+    if (expression.includes('|') || targets.length > 1 || expression.includes('.where(')) {
+      return true;
+    }
+    return false;
   }
   return false;
 }
@@ -440,9 +479,11 @@ export class SearchParameterRegistry {
       return null;
     }
 
-    const strategy = resolveStrategy(code, type);
+    const expr = expression ?? '';
+    const targets = resource.target ?? [];
+    const strategy = resolveStrategy(code, type, expr);
     const columnName = codeToColumnName(code);
-    const array = resolveIsArray(type, strategy);
+    const array = resolveIsArray(type, strategy, expr, targets);
     const columnType = resolveColumnType(type, array);
 
     return {
