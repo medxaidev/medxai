@@ -10,14 +10,16 @@
  * @module fhir-persistence/repo
  */
 
-import type {
-  PersistedResource,
-  ResourceRow,
-  HistoryRow,
-} from './types.js';
-import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './types.js';
-import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
-import { buildSearchColumns, buildMetadataColumns, buildSharedTokenColumns, extractPropertyPath, getNestedValues } from './row-indexer.js';
+import type { PersistedResource, ResourceRow, HistoryRow } from "./types.js";
+import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from "./types.js";
+import type { SearchParameterImpl } from "../registry/search-parameter-registry.js";
+import {
+  buildSearchColumns,
+  buildMetadataColumns,
+  buildSharedTokenColumns,
+  extractPropertyPath,
+  getNestedValues,
+} from "./row-indexer.js";
 
 // =============================================================================
 // Section 1: Main Table Row
@@ -40,11 +42,14 @@ export function buildResourceRow(resource: PersistedResource): ResourceRow {
     content: JSON.stringify(resource),
     lastUpdated: resource.meta.lastUpdated,
     deleted: false,
-    projectId: (resource.meta as Record<string, unknown>)['project'] as string ?? '00000000-0000-0000-0000-000000000000',
+    projectId:
+      ((resource.meta as Record<string, unknown>)["project"] as string) ??
+      "00000000-0000-0000-0000-000000000000",
     __version: SCHEMA_VERSION,
-    compartments: resource.resourceType === 'Binary'
-      ? undefined
-      : buildCompartments(resource),
+    compartments:
+      resource.resourceType === "Binary"
+        ? undefined
+        : buildCompartments(resource),
   };
 
   // Optional meta columns
@@ -79,11 +84,18 @@ export function buildResourceRowWithSearch(
   const sharedTokenCols = buildSharedTokenColumns(searchCols, metadataCols);
 
   // Override compartments with full extraction (using search impls)
-  const compartments = resource.resourceType === 'Binary'
-    ? undefined
-    : buildCompartments(resource, searchImpls);
+  const compartments =
+    resource.resourceType === "Binary"
+      ? undefined
+      : buildCompartments(resource, searchImpls);
 
-  return { ...fixedRow, ...searchCols, ...metadataCols, ...sharedTokenCols, compartments };
+  return {
+    ...fixedRow,
+    ...searchCols,
+    ...metadataCols,
+    ...sharedTokenCols,
+    compartments,
+  };
 }
 
 // =============================================================================
@@ -107,7 +119,7 @@ export function buildCompartments(
   searchImpls?: SearchParameterImpl[],
 ): string[] {
   // Patient resources belong to their own compartment
-  if (resource.resourceType === 'Patient') {
+  if (resource.resourceType === "Patient") {
     return [resource.id];
   }
 
@@ -120,7 +132,7 @@ export function buildCompartments(
   const resourceType = resource.resourceType;
 
   for (const impl of searchImpls) {
-    if (impl.type !== 'reference') continue;
+    if (impl.type !== "reference") continue;
 
     const path = extractPropertyPath(impl.expression, resourceType);
     if (!path) continue;
@@ -138,7 +150,8 @@ export function buildCompartments(
   return [...patientIds].filter(isValidUuid);
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isValidUuid(value: string): boolean {
   return UUID_REGEX.test(value);
@@ -154,11 +167,11 @@ function isValidUuid(value: string): boolean {
 function extractPatientReferenceId(value: unknown): string | null {
   let refString: string | null = null;
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     refString = value;
-  } else if (typeof value === 'object' && value !== null) {
+  } else if (typeof value === "object" && value !== null) {
     const ref = (value as Record<string, unknown>).reference;
-    if (typeof ref === 'string') {
+    if (typeof ref === "string") {
       refString = ref;
     }
   }
@@ -166,17 +179,17 @@ function extractPatientReferenceId(value: unknown): string | null {
   if (!refString) return null;
 
   // Skip contained and URN references
-  if (refString.startsWith('#') || refString.startsWith('urn:')) return null;
+  if (refString.startsWith("#") || refString.startsWith("urn:")) return null;
 
   // Check if this is a Patient reference
   // Handle both "Patient/id" and "http://example.com/fhir/Patient/id"
-  const segments = refString.split('/');
+  const segments = refString.split("/");
   if (segments.length < 2) return null;
 
   const id = segments[segments.length - 1];
   const type = segments[segments.length - 2];
 
-  if (type === 'Patient' && id) {
+  if (type === "Patient" && id) {
     return id;
   }
 
@@ -205,12 +218,12 @@ export function buildDeleteRow(
 ): ResourceRow {
   return {
     id,
-    content: '',
+    content: "",
     lastUpdated,
     deleted: true,
-    projectId: '00000000-0000-0000-0000-000000000000',
+    projectId: "00000000-0000-0000-0000-000000000000",
     __version: DELETED_SCHEMA_VERSION,
-    compartments: resourceType === 'Binary' ? undefined : [],
+    compartments: resourceType === "Binary" ? undefined : [],
   };
 }
 
@@ -250,6 +263,6 @@ export function buildDeleteHistoryRow(
     id,
     versionId,
     lastUpdated,
-    content: '',
+    content: "",
   };
 }

@@ -9,8 +9,8 @@
  * @module fhir-persistence/db
  */
 
-import pg from 'pg';
-import type { DatabaseConfig } from './config.js';
+import pg from "pg";
+import type { DatabaseConfig } from "./config.js";
 
 const { Pool } = pg;
 type PoolClient = pg.PoolClient;
@@ -51,21 +51,19 @@ export class DatabaseClient {
    * - Auto-retries on PostgreSQL serialization_failure (40001) with
    *   exponential backoff (max 3 retries).
    */
-  async withTransaction<T>(
-    fn: (client: PoolClient) => Promise<T>,
-  ): Promise<T> {
+  async withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
     const maxRetries = 3;
     let attempt = 0;
 
     while (true) {
       const client = await this.pool.connect();
       try {
-        await client.query('BEGIN');
+        await client.query("BEGIN");
         const result = await fn(client);
-        await client.query('COMMIT');
+        await client.query("COMMIT");
         return result;
       } catch (err) {
-        await client.query('ROLLBACK');
+        await client.query("ROLLBACK");
         // Retry on serialization_failure (40001)
         if (isSerializationFailure(err) && attempt < maxRetries) {
           attempt++;
@@ -89,7 +87,10 @@ export class DatabaseClient {
   async executeStatements(
     statements: string[],
     options?: { stopOnError?: boolean },
-  ): Promise<{ executed: number; errors: Array<{ index: number; sql: string; error: string }> }> {
+  ): Promise<{
+    executed: number;
+    errors: Array<{ index: number; sql: string; error: string }>;
+  }> {
     const errors: Array<{ index: number; sql: string; error: string }> = [];
     let executed = 0;
 
@@ -99,7 +100,11 @@ export class DatabaseClient {
         executed++;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        errors.push({ index: i, sql: statements[i].slice(0, 200), error: message });
+        errors.push({
+          index: i,
+          sql: statements[i].slice(0, 200),
+          error: message,
+        });
         if (options?.stopOnError) {
           break;
         }
@@ -115,15 +120,12 @@ export class DatabaseClient {
    * Useful for development-mode query optimization.
    * Only call when MEDXAI_EXPLAIN=1 or in dev mode.
    */
-  async explain(
-    text: string,
-    values?: unknown[],
-  ): Promise<string[]> {
-    const result = await this.pool.query<{ 'QUERY PLAN': string }>(
+  async explain(text: string, values?: unknown[]): Promise<string[]> {
+    const result = await this.pool.query<{ "QUERY PLAN": string }>(
       `EXPLAIN ANALYZE ${text}`,
       values,
     );
-    return result.rows.map((r) => r['QUERY PLAN']);
+    return result.rows.map((r) => r["QUERY PLAN"]);
   }
 
   /**
@@ -131,7 +133,7 @@ export class DatabaseClient {
    */
   async ping(): Promise<boolean> {
     try {
-      await this.pool.query('SELECT 1');
+      await this.pool.query("SELECT 1");
       return true;
     } catch {
       return false;
@@ -161,8 +163,8 @@ export class DatabaseClient {
  * Check if a PostgreSQL error is a serialization_failure (40001).
  */
 function isSerializationFailure(err: unknown): boolean {
-  if (typeof err === 'object' && err !== null && 'code' in err) {
-    return (err as { code: string }).code === '40001';
+  if (typeof err === "object" && err !== null && "code" in err) {
+    return (err as { code: string }).code === "40001";
   }
   return false;
 }

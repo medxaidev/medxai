@@ -13,9 +13,9 @@
  * @module fhir-persistence/repo
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from "node:crypto";
 
-import type { DatabaseClient } from '../db/client.js';
+import type { DatabaseClient } from "../db/client.js";
 import type {
   FhirResource,
   PersistedResource,
@@ -26,18 +26,33 @@ import type {
   HistoryEntry,
   SearchOptions,
   SearchResult,
-} from './types.js';
-import type { SearchRequest } from '../search/types.js';
-import { executeSearch } from '../search/search-executor.js';
+} from "./types.js";
+import type { SearchRequest } from "../search/types.js";
+import { executeSearch } from "../search/search-executor.js";
 import {
   ResourceNotFoundError,
   ResourceGoneError,
   ResourceVersionConflictError,
   PreconditionFailedError,
-} from './errors.js';
-import { buildResourceRow, buildResourceRowWithSearch, buildDeleteRow, buildHistoryRow, buildDeleteHistoryRow } from './row-builder.js';
-import { buildUpsertSQL, buildInsertSQL, buildSelectByIdSQL, buildSelectVersionSQL, buildInstanceHistorySQL, buildTypeHistorySQL } from './sql-builder.js';
-import { extractReferences } from './reference-indexer.js';
+} from "./errors.js";
+import {
+  buildResourceRow,
+  buildResourceRowWithSearch,
+  buildDeleteRow,
+  buildHistoryRow,
+  buildDeleteHistoryRow,
+} from "./row-builder.js";
+import {
+  buildUpsertSQL,
+  buildInsertSQL,
+  buildSelectByIdSQL,
+  buildSelectVersionSQL,
+  buildInstanceHistorySQL,
+  buildTypeHistorySQL,
+} from "./sql-builder.js";
+import { extractReferences } from "./reference-indexer.js";
+import { ResourceCache } from "../cache/resource-cache.js";
+import type { ResourceCacheConfig } from "../cache/resource-cache.js";
 
 // =============================================================================
 // Section 1: FhirRepository Class
@@ -45,14 +60,33 @@ import { extractReferences } from './reference-indexer.js';
 
 export class FhirRepository implements ResourceRepository {
   private readonly db: DatabaseClient;
-  private readonly registry: import('../registry/search-parameter-registry.js').SearchParameterRegistry | undefined;
+  private readonly registry:
+    | import("../registry/search-parameter-registry.js").SearchParameterRegistry
+    | undefined;
+  private readonly cache: ResourceCache;
 
   constructor(
     db: DatabaseClient,
-    registry?: import('../registry/search-parameter-registry.js').SearchParameterRegistry,
+    registry?: import("../registry/search-parameter-registry.js").SearchParameterRegistry,
+    cacheConfig?: ResourceCacheConfig,
   ) {
     this.db = db;
     this.registry = registry;
+    this.cache = new ResourceCache(cacheConfig);
+  }
+
+  /**
+   * Get cache statistics (hits, misses, size, hitRate).
+   */
+  get cacheStats() {
+    return this.cache.stats;
+  }
+
+  /**
+   * Clear the resource cache.
+   */
+  clearCache(): void {
+    this.cache.clear();
   }
 
   // ---------------------------------------------------------------------------
@@ -62,7 +96,9 @@ export class FhirRepository implements ResourceRepository {
   /**
    * Build a main table row, including search columns when registry is available.
    */
-  private buildRow(resource: PersistedResource): import('./types.js').ResourceRow {
+  private buildRow(
+    resource: PersistedResource,
+  ): import("./types.js").ResourceRow {
     if (this.registry) {
       const impls = this.registry.getForResource(resource.resourceType);
       return buildResourceRowWithSearch(resource, impls);
@@ -109,7 +145,9 @@ export class FhirRepository implements ResourceRepository {
   ): Promise<void> {
     const refTable = `${resourceType}_References`;
     try {
-      await client.query(`DELETE FROM "${refTable}" WHERE "resourceId" = $1`, [id]);
+      await client.query(`DELETE FROM "${refTable}" WHERE "resourceId" = $1`, [
+        id,
+      ]);
     } catch {
       // Table may not exist — skip silently
     }
@@ -144,7 +182,10 @@ export class FhirRepository implements ResourceRepository {
       const upsert = buildUpsertSQL(resource.resourceType, mainRow);
       await client.query(upsert.sql, upsert.values);
 
-      const histInsert = buildInsertSQL(`${resource.resourceType}_History`, historyRow);
+      const histInsert = buildInsertSQL(
+        `${resource.resourceType}_History`,
+        historyRow,
+      );
       await client.query(histInsert.sql, histInsert.values);
 
       // Write reference rows
@@ -158,9 +199,19 @@ export class FhirRepository implements ResourceRepository {
   // Read
   // ---------------------------------------------------------------------------
 
-  async readResource(resourceType: string, id: string): Promise<PersistedResource> {
+  async readResource(
+    resourceType: string,
+    id: string,
+  ): Promise<PersistedResource> {
+    // Check cache first
+    const cached = this.cache.get(resourceType, id);
+    if (cached) return cached;
+
     const sql = buildSelectByIdSQL(resourceType);
-    const result = await this.db.query<{ content: string; deleted: boolean }>(sql, [id]);
+    const result = await this.db.query<{ content: string; deleted: boolean }>(
+      sql,
+      [id],
+    );
 
     if (result.rows.length === 0) {
       throw new ResourceNotFoundError(resourceType, id);
@@ -171,7 +222,9 @@ export class FhirRepository implements ResourceRepository {
       throw new ResourceGoneError(resourceType, id);
     }
 
-    return JSON.parse(row.content) as PersistedResource;
+    const resource = JSON.parse(row.content) as PersistedResource;
+    this.cache.set(resourceType, id, resource);
+    return resource;
   }
 
   // ---------------------------------------------------------------------------
@@ -186,7 +239,7 @@ export class FhirRepository implements ResourceRepository {
     const id = resource.id;
 
     if (!id) {
-      throw new Error('Resource must have an id for update');
+      throw new Error("Resource must have an id for update");
     }
 
     const now = new Date().toISOString();
@@ -216,7 +269,10 @@ export class FhirRepository implements ResourceRepository {
         throw new ResourceNotFoundError(resourceType, id);
       }
 
-      const existingRow = lockResult.rows[0] as { content: string; deleted: boolean };
+      const existingRow = lockResult.rows[0] as {
+        content: string;
+        deleted: boolean;
+      };
       if (existingRow.deleted) {
         throw new ResourceGoneError(resourceType, id);
       }
@@ -243,6 +299,9 @@ export class FhirRepository implements ResourceRepository {
       // Update reference rows (delete old, write new)
       await this.writeReferences(client, persisted);
     });
+
+    // Invalidate cache after successful update
+    this.cache.invalidate(resourceType, id);
 
     return persisted;
   }
@@ -283,6 +342,9 @@ export class FhirRepository implements ResourceRepository {
       // Delete reference rows for deleted resource
       await this.deleteReferences(client, resourceType, id);
     });
+
+    // Invalidate cache after successful delete
+    this.cache.invalidate(resourceType, id);
   }
 
   // ---------------------------------------------------------------------------
@@ -324,7 +386,9 @@ export class FhirRepository implements ResourceRepository {
     options?: SearchOptions,
   ): Promise<SearchResult> {
     if (!this.registry) {
-      throw new Error('SearchParameterRegistry is required for search operations');
+      throw new Error(
+        "SearchParameterRegistry is required for search operations",
+      );
     }
     return executeSearch(this.db, request, this.registry, options);
   }
@@ -345,14 +409,19 @@ export class FhirRepository implements ResourceRepository {
     searchRequest: SearchRequest,
   ): Promise<{ resource: T & PersistedResource; created: boolean }> {
     if (!this.registry) {
-      throw new Error('SearchParameterRegistry is required for conditional operations');
+      throw new Error(
+        "SearchParameterRegistry is required for conditional operations",
+      );
     }
 
     // Search for existing match
     const result = await executeSearch(this.db, searchRequest, this.registry);
     if (result.resources.length > 0) {
       // Resource already exists — return it without creating
-      return { resource: result.resources[0] as T & PersistedResource, created: false };
+      return {
+        resource: result.resources[0] as T & PersistedResource,
+        created: false,
+      };
     }
 
     // No match — create normally
@@ -376,13 +445,18 @@ export class FhirRepository implements ResourceRepository {
     searchRequest: SearchRequest,
   ): Promise<{ resource: T & PersistedResource; created: boolean }> {
     if (!this.registry) {
-      throw new Error('SearchParameterRegistry is required for conditional operations');
+      throw new Error(
+        "SearchParameterRegistry is required for conditional operations",
+      );
     }
 
     const result = await executeSearch(this.db, searchRequest, this.registry);
 
     if (result.resources.length > 1) {
-      throw new PreconditionFailedError(resource.resourceType, result.resources.length);
+      throw new PreconditionFailedError(
+        resource.resourceType,
+        result.resources.length,
+      );
     }
 
     if (result.resources.length === 1) {
@@ -412,7 +486,9 @@ export class FhirRepository implements ResourceRepository {
     searchRequest: SearchRequest,
   ): Promise<number> {
     if (!this.registry) {
-      throw new Error('SearchParameterRegistry is required for conditional operations');
+      throw new Error(
+        "SearchParameterRegistry is required for conditional operations",
+      );
     }
 
     const result = await executeSearch(this.db, searchRequest, this.registry);
@@ -451,7 +527,10 @@ export class FhirRepository implements ResourceRepository {
     // Search each compartment resource type
     for (const rt of compartmentResourceTypes) {
       try {
-        const { rows } = await this.db.query<{ content: string; deleted: boolean }>(
+        const { rows } = await this.db.query<{
+          content: string;
+          deleted: boolean;
+        }>(
           `SELECT "content", "deleted" FROM "${rt}" WHERE "deleted" = false AND "compartments" @> ARRAY[$1]::uuid[]`,
           [id],
         );
@@ -482,14 +561,20 @@ export class FhirRepository implements ResourceRepository {
     versionId: string,
   ): Promise<PersistedResource> {
     const sql = buildSelectVersionSQL(`${resourceType}_History`);
-    const result = await this.db.query<{ content: string }>(sql, [id, versionId]);
+    const result = await this.db.query<{ content: string }>(sql, [
+      id,
+      versionId,
+    ]);
 
     if (result.rows.length === 0) {
-      throw new ResourceNotFoundError(resourceType, `${id}/_history/${versionId}`);
+      throw new ResourceNotFoundError(
+        resourceType,
+        `${id}/_history/${versionId}`,
+      );
     }
 
     const content = result.rows[0].content;
-    if (content === '') {
+    if (content === "") {
       throw new ResourceGoneError(resourceType, id);
     }
 
@@ -508,20 +593,25 @@ interface HistoryRawRow {
   content: string;
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isValidUuid(value: string): boolean {
   return UUID_REGEX.test(value);
 }
 
-function toHistoryEntry(row: HistoryRawRow, resourceType: string): HistoryEntry {
-  const isDeleted = row.content === '';
+function toHistoryEntry(
+  row: HistoryRawRow,
+  resourceType: string,
+): HistoryEntry {
+  const isDeleted = row.content === "";
   return {
     resource: isDeleted ? null : (JSON.parse(row.content) as PersistedResource),
     versionId: row.versionId,
-    lastUpdated: typeof row.lastUpdated === 'string'
-      ? row.lastUpdated
-      : new Date(row.lastUpdated as unknown as number).toISOString(),
+    lastUpdated:
+      typeof row.lastUpdated === "string"
+        ? row.lastUpdated
+        : new Date(row.lastUpdated as unknown as number).toISOString(),
     deleted: isDeleted,
     resourceType,
     id: row.id,

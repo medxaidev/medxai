@@ -1,0 +1,911 @@
+﻿
+=== TABLE COUNT ===
+MedXAI:  548 tables
+Medplum: 497 tables
+
+=== ONLY IN MEDPLUM (59) ===
+  - AccessPolicy
+  - AccessPolicy_History
+  - AccessPolicy_References
+  - Address
+  - Agent
+  - Agent_History
+  - Agent_References
+  - AsyncJob
+  - AsyncJob_History
+  - AsyncJob_References
+  - Bot
+  - Bot_History
+  - Bot_References
+  - BulkDataExport
+  - BulkDataExport_History
+  - BulkDataExport_References
+  - ClientApplication
+  - ClientApplication_History
+  - ClientApplication_References
+  - CodeSystem_Property
+  - Coding
+  - CodingSystem
+  - Coding_Property
+  - ConceptMapping
+  - ConceptMapping_Attribute
+  - ContactPoint
+  - DatabaseMigration
+  - DomainConfiguration
+  - DomainConfiguration_History
+  - DomainConfiguration_References
+  - HumanName
+  - Identifier
+  - JsonWebKey
+  - JsonWebKey_History
+  - JsonWebKey_References
+  - Login
+  - Login_History
+  - Login_References
+  - Project
+  - ProjectMembership
+  - ProjectMembership_History
+  - ProjectMembership_References
+  - Project_History
+  - Project_References
+  - SmartAppLaunch
+  - SmartAppLaunch_History
+  - SmartAppLaunch_References
+  - SubscriptionStatus
+  - SubscriptionStatus_History
+  - SubscriptionStatus_References
+  - User
+  - UserConfiguration
+  - UserConfiguration_History
+  - UserConfiguration_References
+  - UserSecurityRequest
+  - UserSecurityRequest_History
+  - UserSecurityRequest_References
+  - User_History
+  - User_References
+
+=== ONLY IN MEDXAI (110) ===
+  - Account_Name
+  - ActivityDefinition_Name
+  - AuditEvent_Address
+  - CapabilityStatement_Name
+  - CodeSystem_Name
+  - CompartmentDefinition_Name
+  - ConceptMap_Name
+  - EffectEvidenceSynthesis_Name
+  - Endpoint_Name
+  - EventDefinition_Name
+  - EvidenceVariable_Name
+  - Evidence_Name
+  - ExampleScenario_Name
+  - GraphDefinition_Name
+  - HealthcareService_Name
+  - ImplementationGuide_Name
+  - InsurancePlan_Address
+  - InsurancePlan_Address-city
+  - InsurancePlan_Address-country
+  - InsurancePlan_Address-postalcode
+  - InsurancePlan_Address-state
+  - InsurancePlan_Address-use
+  - InsurancePlan_Phonetic
+  - Library_Name
+  - Location_Address
+  - Location_Address-city
+  - Location_Address-country
+  - Location_Address-postalcode
+  - Location_Address-state
+  - Location_Address-use
+  - Location_Name
+  - Measure_Name
+  - MedicinalProduct_Name
+  - MessageDefinition_Name
+  - NamingSystem_Name
+  - NamingSystem_Telecom
+  - OperationDefinition_Name
+  - OrganizationAffiliation_Email
+  - OrganizationAffiliation_Phone
+  - OrganizationAffiliation_Telecom
+  - Organization_Address
+  - Organization_Address-city
+  - Organization_Address-country
+  - Organization_Address-postalcode
+  - Organization_Address-state
+  - Organization_Address-use
+  - Organization_Name
+  - Organization_Phonetic
+  - Patient_Address
+  - Patient_Address-city
+  - Patient_Address-country
+  - Patient_Address-postalcode
+  - Patient_Address-state
+  - Patient_Address-use
+  - Patient_Email
+  - Patient_Family
+  - Patient_Given
+  - Patient_Name
+  - Patient_Phone
+  - Patient_Phonetic
+  - Patient_Telecom
+  - Person_Address
+  - Person_Address-city
+  - Person_Address-country
+  - Person_Address-postalcode
+  - Person_Address-state
+  - Person_Address-use
+  - Person_Email
+  - Person_Name
+  - Person_Phone
+  - Person_Phonetic
+  - Person_Telecom
+  - PlanDefinition_Name
+  - PractitionerRole_Email
+  - PractitionerRole_Phone
+  - PractitionerRole_Telecom
+  - Practitioner_Address
+  - Practitioner_Address-city
+  - Practitioner_Address-country
+  - Practitioner_Address-postalcode
+  - Practitioner_Address-state
+  - Practitioner_Address-use
+  - Practitioner_Email
+  - Practitioner_Family
+  - Practitioner_Given
+  - Practitioner_Name
+  - Practitioner_Phone
+  - Practitioner_Phonetic
+  - Practitioner_Telecom
+  - Questionnaire_Name
+  - RelatedPerson_Address
+  - RelatedPerson_Address-city
+  - RelatedPerson_Address-country
+  - RelatedPerson_Address-postalcode
+  - RelatedPerson_Address-state
+  - RelatedPerson_Address-use
+  - RelatedPerson_Email
+  - RelatedPerson_Name
+  - RelatedPerson_Phone
+  - RelatedPerson_Phonetic
+  - RelatedPerson_Telecom
+  - ResearchDefinition_Name
+  - ResearchElementDefinition_Name
+  - RiskEvidenceSynthesis_Name
+  - SearchParameter_Name
+  - StructureDefinition_Name
+  - StructureMap_Name
+  - TerminologyCapabilities_Name
+  - TestScript_Name
+  - ValueSet_Name
+
+=== COMMON MAIN TABLES: 146 ===
+
+=== COLUMN DIFFERENCES SUMMARY ===
+Columns only in Medplum: 1642
+Columns only in MedXAI:  1563
+Type mismatches:         316
+
+=== DETAILED COLUMN DIFFS (145 tables) ===
+
+  [Account]
+    Only in Medplum: name (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __ownerIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+
+  [ActivityDefinition]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __code (uuid[]), __codeText (text[]), __codeSort (text)
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [AdverseEvent]
+    Only in Medplum: actuality (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __locationIdentifierSort (text), __recorderIdentifierSort (text), __resultingconditionIdentifierSort (text), __studyIdentifierSort (text), __subjectIdentifierSort (text), __substanceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __actuality, __actualityText, __actualitySort
+    Type mismatch:   recorder: medplum=text vs medxai=text[]; resultingcondition: medplum=text[] vs medxai=text; study: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [AllergyIntolerance]
+    Only in Medplum: category (text[]), criticality (text), severity (text[]), type (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __asserterIdentifierSort (text), __patientIdentifierSort (text), __recorderIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), encounter (text), __encounterIdentifierSort (text)
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __category, __categoryText, __categorySort, __criticality, __criticalityText, __criticalitySort, __severity, __severityText, __severitySort, __type, __typeText, __typeSort
+    Type mismatch:   asserter: medplum=text vs medxai=text[]; onset timestamp with time: medplum=zone[] with time zone vs medxai=zone with time zone; patient: medplum=text vs medxai=text[]; recorder: medplum=text vs medxai=text[]
+
+  [Appointment]
+    Only in Medplum: partStatus (text[]), status (text), end (timestamp with time zone), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __actorIdentifierSort (text), __basedOnIdentifierSort (text), __locationIdentifierSort (text), __patientIdentifierSort (text), __practitionerIdentifierSort (text), __reasonReferenceIdentifierSort (text), __slotIdentifierSort (text), __supportingInfoIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __partStatus, __partStatusText, __partStatusSort, __reasonCode, __reasonCodeText, __status, __statusText, __statusSort
+    Type mismatch:   basedOn: medplum=text[] vs medxai=text; slot: medplum=text[] vs medxai=text
+
+  [AppointmentResponse]
+    Only in Medplum: partStatus (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __actorIdentifierSort (text), __appointmentIdentifierSort (text), __locationIdentifierSort (text), __patientIdentifierSort (text), __practitionerIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __partStatus, __partStatusText, __partStatusSort
+    Type mismatch:   actor: medplum=text vs medxai=text[]; location: medplum=text vs medxai=text[]; patient: medplum=text vs medxai=text[]; practitioner: medplum=text vs medxai=text[]
+
+  [AuditEvent]
+    Only in Medplum: action (text), address (text[]), altid (text[]), outcome (text), site (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __agentIdentifierSort (text), __entityIdentifierSort (text), __patientIdentifierSort (text), __sourceIdentifierSort (text)
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __action, __actionText, __actionSort, __addressSort, __agentRole, __agentRoleText, __altid, __altidText, __altidSort, __entityType, __entityTypeText, __outcome, __outcomeText, __outcomeSort, __site, __siteText, __siteSort, __subtype, __subtypeText
+    Type mismatch:   agentName: medplum=text[] vs medxai=text; entityName: medplum=text[] vs medxai=text; policy: medplum=text[] vs medxai=text; source: medplum=text vs medxai=text[]
+
+  [Basic]
+    Only in Medplum: created (date), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __authorIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, created timestamp with time
+    Type mismatch:   author: medplum=text vs medxai=text[]; patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [BiologicallyDerivedProduct]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [BodyStructure]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [Bundle]
+    Only in Medplum: type (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __compositionIdentifierSort (text), __messageIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __type, __typeText, __typeSort
+
+  [CapabilityStatement]
+    Only in Medplum: fhirversion (text), format (text[]), mode (text[]), name (text), resource (text[]), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __guideIdentifierSort (text), __resourceProfileIdentifierSort (text), __supportedProfileIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __fhirversion, __fhirversionText, __fhirversionSort, __format, __formatText, __formatSort, __mode, __modeText, __modeSort, __nameSort, __resource, __resourceText, __resourceSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; guide: medplum=text[] vs medxai=text; resourceProfile: medplum=text[] vs medxai=text; supportedProfile: medplum=text[] vs medxai=text
+
+  [CarePlan]
+    Only in Medplum: intent (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __activityReferenceIdentifierSort (text), __basedOnIdentifierSort (text), __careTeamIdentifierSort (text), __conditionIdentifierSort (text), __encounterIdentifierSort (text), __goalIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), __partOfIdentifierSort (text), __performerIdentifierSort (text), __replacesIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __intent, __intentText, __intentSort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; basedOn: medplum=text[] vs medxai=text; careTeam: medplum=text[] vs medxai=text; condition: medplum=text[] vs medxai=text; goal: medplum=text[] vs medxai=text; instantiatesUri: medplum=text[] vs medxai=text; partOf: medplum=text[] vs medxai=text; replaces: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [CareTeam]
+    Only in Medplum: status (text), name (text), ___securitySort (text), ___tagSort (text), __roleSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __participantIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __role (uuid[]), __roleText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [CatalogEntry]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [ChargeItem]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __accountIdentifierSort (text), __contextIdentifierSort (text), __entererIdentifierSort (text), __patientIdentifierSort (text), __performerActorIdentifierSort (text), __performingOrganizationIdentifierSort (text), __requestingOrganizationIdentifierSort (text), __serviceIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   account: medplum=text[] vs medxai=text; context: medplum=text vs medxai=text[]; enterer: medplum=text vs medxai=text[]; patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [ChargeItemDefinition]
+    Only in Medplum: status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Claim]
+    Only in Medplum: status (text), use (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __careTeamIdentifierSort (text), __detailUdiIdentifierSort (text), __encounterIdentifierSort (text), __entererIdentifierSort (text), __facilityIdentifierSort (text), __insurerIdentifierSort (text), __itemUdiIdentifierSort (text), __patientIdentifierSort (text), __payeeIdentifierSort (text), __procedureUdiIdentifierSort (text), __providerIdentifierSort (text), __subdetailUdiIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort, __use, __useText, __useSort
+    Type mismatch:   detailUdi: medplum=text[] vs medxai=text; encounter: medplum=text[] vs medxai=text; enterer: medplum=text vs medxai=text[]; itemUdi: medplum=text[] vs medxai=text; payee: medplum=text vs medxai=text[]; procedureUdi: medplum=text[] vs medxai=text; provider: medplum=text vs medxai=text[]; subdetailUdi: medplum=text[] vs medxai=text
+
+  [ClaimResponse]
+    Only in Medplum: outcome (text), status (text), use (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __insurerIdentifierSort (text), __patientIdentifierSort (text), __requestIdentifierSort (text), __requestorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __outcome, __outcomeText, __outcomeSort, __status, __statusText, __statusSort, __use, __useText, __useSort
+    Type mismatch:   paymentDate: medplum=date vs medxai=timestamp with time zone; requestor: medplum=text vs medxai=text[]
+
+  [ClinicalImpression]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __assessorIdentifierSort (text), __encounterIdentifierSort (text), __findingRefIdentifierSort (text), __investigationIdentifierSort (text), __previousIdentifierSort (text), __problemIdentifierSort (text), __subjectIdentifierSort (text), __supportingInfoIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; assessor: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [CodeSystem]
+    Only in Medplum: name (text), status (text), version (text), code (text[]), contentMode (text), language (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __supplementsIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __code, __codeText, __codeSort, __contentMode, __contentModeText, __contentModeSort, __language, __languageText, __languageSort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Communication]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), __topicSort (text), ___compartmentIdentifierSort (text), __basedOnIdentifierSort (text), __encounterIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), __partOfIdentifierSort (text), __patientIdentifierSort (text), __recipientIdentifierSort (text), __senderIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __topic (uuid[]), __topicText (text[]), priorityOrder (integer), priority (text)
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   instantiatesUri: medplum=text[] vs medxai=text; patient: medplum=text vs medxai=text[]; sender: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [CommunicationRequest]
+    Only in Medplum: priority (text), status (text), priorityOrder (integer), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __basedOnIdentifierSort (text), __encounterIdentifierSort (text), __patientIdentifierSort (text), __recipientIdentifierSort (text), __replacesIdentifierSort (text), __requesterIdentifierSort (text), __senderIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __priority, __priorityText, __prioritySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; replaces: medplum=text[] vs medxai=text; requester: medplum=text vs medxai=text[]; sender: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [CompartmentDefinition]
+    Only in Medplum: name (text), status (text), version (text), code (text), resource (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __code, __codeText, __codeSort, __nameSort, __resource, __resourceText, __resourceSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Composition]
+    Only in Medplum: confidentiality (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __attesterIdentifierSort (text), __authorIdentifierSort (text), __encounterIdentifierSort (text), __entryIdentifierSort (text), __relatedRefIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __confidentiality, __confidentialityText, __confidentialitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; period timestamp with time: medplum=zone[] with time zone vs medxai=zone with time zone; relatedRef: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [ConceptMap]
+    Only in Medplum: name (text), status (text), version (text), sourceCode (text[]), targetCode (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __otherIdentifierSort (text), __sourceIdentifierSort (text), __sourceUriIdentifierSort (text), __targetIdentifierSort (text), __targetUriIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __sourceCode, __sourceCodeText, __sourceCodeSort, __status, __statusText, __statusSort, __targetCode, __targetCodeText, __targetCodeSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; dependson: medplum=text[] vs medxai=text; other: medplum=text[] vs medxai=text; product: medplum=text[] vs medxai=text; sourceSystem: medplum=text[] vs medxai=text; targetSystem: medplum=text[] vs medxai=text
+
+  [Condition]
+    Only in Medplum: assertedDate (timestamp with time zone), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __asserterIdentifierSort (text), __encounterIdentifierSort (text), __evidenceDetailIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __bodySite, __bodySiteText, __evidence, __evidenceText
+    Type mismatch:   patient: medplum=text vs medxai=text[]; asserter: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Consent]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __actorIdentifierSort (text), __consentorIdentifierSort (text), __dataIdentifierSort (text), __organizationIdentifierSort (text), __sourceReferenceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; organization: medplum=text[] vs medxai=text; sourceReference: medplum=text vs medxai=text[]
+
+  [Contract]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __authorityIdentifierSort (text), __domainIdentifierSort (text), __patientIdentifierSort (text), __signerIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   authority: medplum=text[] vs medxai=text; domain: medplum=text[] vs medxai=text
+
+  [Coverage]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __beneficiaryIdentifierSort (text), __patientIdentifierSort (text), __payorIdentifierSort (text), __policyHolderIdentifierSort (text), __subscriberIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   classValue: medplum=text[] vs medxai=text; policyHolder: medplum=text vs medxai=text[]; subscriber: medplum=text vs medxai=text[]
+
+  [CoverageEligibilityRequest]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __entererIdentifierSort (text), __facilityIdentifierSort (text), __patientIdentifierSort (text), __providerIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   enterer: medplum=text vs medxai=text[]; provider: medplum=text vs medxai=text[]
+
+  [CoverageEligibilityResponse]
+    Only in Medplum: outcome (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __insurerIdentifierSort (text), __patientIdentifierSort (text), __requestIdentifierSort (text), __requestorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __outcome, __outcomeText, __outcomeSort, __status, __statusText, __statusSort
+    Type mismatch:   requestor: medplum=text vs medxai=text[]
+
+  [DetectedIssue]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __authorIdentifierSort (text), __implicatedIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; author: medplum=text vs medxai=text[]
+
+  [Device]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __locationIdentifierSort (text), __organizationIdentifierSort (text), __patientIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   deviceName: medplum=text[] vs medxai=text; udiCarrier: medplum=text[] vs medxai=text; udiDi: medplum=text[] vs medxai=text
+
+  [DeviceDefinition]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), __classificationSort (text), ___compartmentIdentifierSort (text), __parentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __classification (uuid[]), __classificationText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [DeviceMetric]
+    Only in Medplum: category (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __parentIdentifierSort (text), __sourceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __category, __categoryText, __categorySort
+
+  [DeviceRequest]
+    Only in Medplum: intent (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __basedOnIdentifierSort (text), __deviceIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), __insuranceIdentifierSort (text), __performerIdentifierSort (text), __priorRequestIdentifierSort (text), __requesterIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __intent, __intentText, __intentSort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; instantiatesUri: medplum=text[] vs medxai=text; performer: medplum=text vs medxai=text[]; requester: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [DeviceUseStatement]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __deviceIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [DiagnosticReport]
+    Only in Medplum: status (text), study (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __basedOnIdentifierSort (text), __mediaIdentifierSort (text), __performerIdentifierSort (text), __resultIdentifierSort (text), __resultsInterpreterIdentifierSort (text), __specimenIdentifierSort (text), __subjectIdentifierSort (text), __studyIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __resultIdentifier (uuid[]), __resultIdentifierText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __conclusion, __conclusionText, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; media: medplum=text[] vs medxai=text; result: medplum=text[] vs medxai=text; specimen: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [DocumentManifest]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __authorIdentifierSort (text), __itemIdentifierSort (text), __recipientIdentifierSort (text), __relatedRefIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [DocumentReference]
+    Only in Medplum: contenttype (text[]), language (text[]), relation (text[]), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __authenticatorIdentifierSort (text), __authorIdentifierSort (text), __custodianIdentifierSort (text), __relatedIdentifierSort (text), __relatestoIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __contenttype, __contenttypeText, __contenttypeSort, __event, __eventText, __language, __languageText, __languageSort, __relation, __relationText, __relationSort, __setting, __settingText, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; authenticator: medplum=text vs medxai=text[]; location: medplum=text[] vs medxai=text; relatesto: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [EffectEvidenceSynthesis]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Encounter]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), __dischargeDispositionSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __accountIdentifierSort (text), __appointmentIdentifierSort (text), __basedOnIdentifierSort (text), __diagnosisIdentifierSort (text), __episodeOfCareIdentifierSort (text), __locationIdentifierSort (text), __partOfIdentifierSort (text), __participantIdentifierSort (text), __practitionerIdentifierSort (text), __reasonReferenceIdentifierSort (text), __serviceProviderIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __dischargeDisposition (uuid[]), __dischargeDispositionText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __specialArrangement, __specialArrangementText, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; account: medplum=text[] vs medxai=text; appointment: medplum=text[] vs medxai=text; basedOn: medplum=text[] vs medxai=text; episodeOfCare: medplum=text[] vs medxai=text; location: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [Endpoint]
+    Only in Medplum: name (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __organizationIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+
+  [EnrollmentRequest]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+
+  [EnrollmentResponse]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __requestIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+
+  [EpisodeOfCare]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __careManagerIdentifierSort (text), __conditionIdentifierSort (text), __incomingReferralIdentifierSort (text), __organizationIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; careManager: medplum=text vs medxai=text[]; condition: medplum=text[] vs medxai=text; incomingReferral: medplum=text[] vs medxai=text
+
+  [EventDefinition]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Evidence]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [EvidenceVariable]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), __characteristicTypeSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __characteristicType (uuid[]), __characteristicTypeText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __context, __contextText, __contextType, __contextTypeText, __jurisdiction, __jurisdictionText, __nameSort, __status, __statusText, __statusSort, __topic, __topicText
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [ExampleScenario]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [ExplanationOfBenefit]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __careTeamIdentifierSort (text), __claimIdentifierSort (text), __coverageIdentifierSort (text), __detailUdiIdentifierSort (text), __encounterIdentifierSort (text), __entererIdentifierSort (text), __facilityIdentifierSort (text), __itemUdiIdentifierSort (text), __patientIdentifierSort (text), __payeeIdentifierSort (text), __procedureUdiIdentifierSort (text), __providerIdentifierSort (text), __subdetailUdiIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   coverage: medplum=text[] vs medxai=text; detailUdi: medplum=text[] vs medxai=text; encounter: medplum=text[] vs medxai=text; enterer: medplum=text vs medxai=text[]; itemUdi: medplum=text[] vs medxai=text; payee: medplum=text vs medxai=text[]; procedureUdi: medplum=text[] vs medxai=text; provider: medplum=text vs medxai=text[]; subdetailUdi: medplum=text[] vs medxai=text
+
+  [FamilyMemberHistory]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; instantiatesUri: medplum=text[] vs medxai=text
+
+  [Flag]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), __categorySort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __authorIdentifierSort (text), __subjectIdentifierSort (text), status (text), ___tag (uuid[]), ___tagText (text[]), __category (uuid[]), __categoryText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; author: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Goal]
+    Only in Medplum: lifecycleStatus (text), ___securitySort (text), ___tagSort (text), __descriptionSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __description (uuid[]), __descriptionText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __lifecycleStatus, __lifecycleStatusText, __lifecycleStatusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; startDate: medplum=date vs medxai=timestamp with time zone; subject: medplum=text vs medxai=text[]; targetDate: medplum=date[] vs medxai=timestamp with time zone
+
+  [GraphDefinition]
+    Only in Medplum: name (text), status (text), version (text), start (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __start, __startText, __startSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Group]
+    Only in Medplum: actual (boolean), exclude (boolean[]), type (text), name (text), characteristicRange (double precision[]), characteristicReference (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __managingEntityIdentifierSort (text), __memberIdentifierSort (text), __characteristicReferenceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __actual, __actualText, __actualSort, __exclude, __excludeText, __excludeSort, __type, __typeText, __typeSort
+    Type mismatch:   managingEntity: medplum=text vs medxai=text[]
+
+  [GuidanceResponse]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [HealthcareService]
+    Only in Medplum: active (boolean), name (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __coverageAreaIdentifierSort (text), __endpointIdentifierSort (text), __locationIdentifierSort (text), __organizationIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort, __nameSort
+    Type mismatch:   coverageArea: medplum=text[] vs medxai=text; endpoint: medplum=text[] vs medxai=text; location: medplum=text[] vs medxai=text
+
+  [ImagingStudy]
+    Only in Medplum: instance (text[]), series (text[]), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __basedonIdentifierSort (text), __encounterIdentifierSort (text), __endpointIdentifierSort (text), __interpreterIdentifierSort (text), __performerIdentifierSort (text), __referrerIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __instance, __instanceText, __instanceSort, __series, __seriesText, __seriesSort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; referrer: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Immunization]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __locationIdentifierSort (text), __manufacturerIdentifierSort (text), __performerIdentifierSort (text), __reactionIdentifierSort (text), __reasonReferenceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), encounter (text), __encounterIdentifierSort (text)
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; reaction: medplum=text[] vs medxai=text; series: medplum=text[] vs medxai=text
+
+  [ImmunizationEvaluation]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __immunizationEventIdentifierSort (text), __patientIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+
+  [ImmunizationRecommendation]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __informationIdentifierSort (text), __patientIdentifierSort (text), __supportIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [ImplementationGuide]
+    Only in Medplum: name (text), status (text), version (text), experimental (boolean), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __dependsOnIdentifierSort (text), __globalIdentifierSort (text), __resourceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __experimental, __experimentalText, __experimentalSort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; dependsOn: medplum=text[] vs medxai=text; global: medplum=text[] vs medxai=text
+
+  [InsurancePlan]
+    Only in Medplum: phonetic (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __administeredByIdentifierSort (text), __endpointIdentifierSort (text), __ownedByIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __addressSort, __addressCitySort, __addressCountrySort, __addressPostalcodeSort, __addressStateSort, __addressUseSort, __phoneticSort, __status, __statusText, __statusSort
+    Type mismatch:   endpoint: medplum=text[] vs medxai=text
+
+  [Invoice]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __accountIdentifierSort (text), __issuerIdentifierSort (text), __participantIdentifierSort (text), __patientIdentifierSort (text), __recipientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; recipient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Library]
+    Only in Medplum: contentType (text[]), name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __contentType, __contentTypeText, __contentTypeSort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Linkage]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __authorIdentifierSort (text), __itemIdentifierSort (text), __sourceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   author: medplum=text vs medxai=text[]
+
+  [List]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __itemIdentifierSort (text), __sourceIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; notes: medplum=text[] vs medxai=text; source: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Location]
+    Only in Medplum: name (text[]), near (text), status (text), ___securitySort (text), ___tagSort (text), __physicalTypeSort (text), ___compartmentIdentifierSort (text), __endpointIdentifierSort (text), __organizationIdentifierSort (text), __partofIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __physicalType (uuid[]), __physicalTypeText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __addressSort, __addressCitySort, __addressCountrySort, __addressPostalcodeSort, __addressStateSort, __addressUseSort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   endpoint: medplum=text[] vs medxai=text
+
+  [Measure]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [MeasureReport]
+    Only in Medplum: status (text), period_range (tstzrange), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __evaluatedResourceIdentifierSort (text), __measureIdentifierSort (text), __patientIdentifierSort (text), __reporterIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; reporter: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Media]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __basedOnIdentifierSort (text), __deviceIdentifierSort (text), __encounterIdentifierSort (text), __operatorIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   device: medplum=text vs medxai=text[]; operator: medplum=text vs medxai=text[]; patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Medication]
+    Only in Medplum: lotNumber (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __ingredientIdentifierSort (text), __manufacturerIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __lotNumber, __lotNumberText, __lotNumberSort, __status, __statusText, __statusSort
+
+  [MedicationAdministration]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __contextIdentifierSort (text), __deviceIdentifierSort (text), __medicationIdentifierSort (text), __performerIdentifierSort (text), __requestIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; context: medplum=text vs medxai=text[]; device: medplum=text[] vs medxai=text; medication: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [MedicationDispense]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __medicationIdentifierSort (text), __contextIdentifierSort (text), __destinationIdentifierSort (text), __performerIdentifierSort (text), __prescriptionIdentifierSort (text), __receiverIdentifierSort (text), __responsiblepartyIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; medication: medplum=text vs medxai=text[]; context: medplum=text vs medxai=text[]; prescription: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [MedicationKnowledge]
+    Only in Medplum: monitoringProgramName (text[]), sourceCost (text[]), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __ingredientIdentifierSort (text), __manufacturerIdentifierSort (text), __monographIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __monitoringProgramName, __monitoringProgramNameText, __monitoringProgramNameSort, __sourceCost, __sourceCostText, __sourceCostSort, __status, __statusText, __statusSort
+    Type mismatch:   ingredient: medplum=text[] vs medxai=text
+
+  [MedicationRequest]
+    Only in Medplum: status (text), intent (text), priority (text), priorityOrder (integer), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __medicationIdentifierSort (text), __encounterIdentifierSort (text), __intendedDispenserIdentifierSort (text), __intendedPerformerIdentifierSort (text), __requesterIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __intendedPerformertype, __intendedPerformertypeText, __intent, __intentText, __intentSort, __priority, __priorityText, __prioritySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; medication: medplum=text vs medxai=text[]; date timestamp with time: medplum=zone[] with time zone vs medxai=zone with time zone; intendedPerformer: medplum=text vs medxai=text[]; requester: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [MedicationStatement]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __medicationIdentifierSort (text), __contextIdentifierSort (text), __partOfIdentifierSort (text), __sourceIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; medication: medplum=text vs medxai=text[]; context: medplum=text vs medxai=text[]; source: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [MedicinalProduct]
+    Only in Medplum: name (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort
+
+  [MedicinalProductAuthorization]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __holderIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   subject: medplum=text vs medxai=text[]
+
+  [MedicinalProductContraindication]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [MedicinalProductIndication]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [MedicinalProductIngredient]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [MedicinalProductInteraction]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [MedicinalProductManufactured]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [MedicinalProductPackaged]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   subject: medplum=text[] vs medxai=text
+
+  [MedicinalProductPharmaceutical]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [MedicinalProductUndesirableEffect]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [MessageDefinition]
+    Only in Medplum: name (text), status (text), version (text), category (text), focus (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __parentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __category, __categoryText, __categorySort, __focus, __focusText, __focusSort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [MessageHeader]
+    Only in Medplum: code (text), responseId (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __authorIdentifierSort (text), __entererIdentifierSort (text), __focusIdentifierSort (text), __receiverIdentifierSort (text), __responsibleIdentifierSort (text), __senderIdentifierSort (text), __targetIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __code, __codeText, __codeSort, __responseId, __responseIdText, __responseIdSort
+    Type mismatch:   author: medplum=text vs medxai=text[]; destination: medplum=text[] vs medxai=text; destinationUri: medplum=text[] vs medxai=text; enterer: medplum=text vs medxai=text[]; responsible: medplum=text vs medxai=text[]; sender: medplum=text vs medxai=text[]; target: medplum=text[] vs medxai=text
+
+  [MolecularSequence]
+    Only in Medplum: type (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __type, __typeText, __typeSort
+    Type mismatch:   variantEnd: medplum=double precision[] vs medxai=double precision; variantStart: medplum=double precision[] vs medxai=double precision
+
+  [NamingSystem]
+    Only in Medplum: name (text), status (text), idType (text[]), kind (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __telecom (uuid[]), __telecomText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __idType, __idTypeText, __idTypeSort, __kind, __kindText, __kindSort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; contact: medplum=text[] vs medxai=text; period timestamp with time: medplum=zone[] with time zone vs medxai=zone with time zone; value: medplum=text[] vs medxai=text
+
+  [NutritionOrder]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), __providerIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; instantiatesUri: medplum=text[] vs medxai=text; provider: medplum=text vs medxai=text[]
+
+  [Observation]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __basedOnIdentifierSort (text), __derivedFromIdentifierSort (text), __deviceIdentifierSort (text), __focusIdentifierSort (text), __hasMemberIdentifierSort (text), __partOfIdentifierSort (text), __performerIdentifierSort (text), __specimenIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __patientIdentifier (uuid[]), __patientIdentifierText (text[]), __performerIdentifier (uuid[]), __performerIdentifierText (text[]), __subjectIdentifier (uuid[]), __subjectIdentifierText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __componentDataAbsentReason, __componentDataAbsentReasonText, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; comboValueQuantity: medplum=double precision[] vs medxai=double precision; componentValueQuantity: medplum=double precision[] vs medxai=double precision; device: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [ObservationDefinition]
+    Only in Medplum: publisher (text), ___securitySort (text), ___tagSort (text), __codeSort (text), ___compartmentIdentifierSort (text), __publisherIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __code (uuid[]), __codeText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [OperationDefinition]
+    Only in Medplum: name (text), status (text), version (text), code (text), instance (boolean), kind (text), system (boolean), type (boolean), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __baseIdentifierSort (text), __inputProfileIdentifierSort (text), __outputProfileIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __code, __codeText, __codeSort, __instance, __instanceText, __instanceSort, __kind, __kindText, __kindSort, __nameSort, __status, __statusText, __statusSort, __system, __systemText, __systemSort, __type, __typeText, __typeSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [OperationOutcome]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [Organization]
+    Only in Medplum: active (boolean), name (text[]), phonetic (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __endpointIdentifierSort (text), __partofIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort, __addressSort, __addressCitySort, __addressCountrySort, __addressPostalcodeSort, __addressStateSort, __addressUseSort, __nameSort, __phoneticSort
+    Type mismatch:   endpoint: medplum=text[] vs medxai=text
+
+  [OrganizationAffiliation]
+    Only in Medplum: active (boolean), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __endpointIdentifierSort (text), __locationIdentifierSort (text), __networkIdentifierSort (text), __participatingOrganizationIdentifierSort (text), __primaryOrganizationIdentifierSort (text), __serviceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __email (uuid[]), __emailText (text[]), __phone (uuid[]), __phoneText (text[]), __telecom (uuid[]), __telecomText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort
+    Type mismatch:   endpoint: medplum=text[] vs medxai=text; location: medplum=text[] vs medxai=text; network: medplum=text[] vs medxai=text; service: medplum=text[] vs medxai=text
+
+  [Parameters]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [Patient]
+    Only in Medplum: active (boolean), birthdate (date), deceased (boolean), gender (text), phonetic (text[]), ethnicity (text[]), genderIdentity (text[]), race (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __generalPractitionerIdentifierSort (text), __linkIdentifierSort (text), __organizationIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __email (uuid[]), __emailText (text[]), __phone (uuid[]), __phoneText (text[]), __telecom (uuid[]), __telecomText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort, __addressSort, __addressCitySort, __addressCountrySort, __addressPostalcodeSort, __addressStateSort, __addressUseSort, birthdate timestamp with time, __deceased, __deceasedText, __deceasedSort, __gender, __genderText, __genderSort, __phoneticSort
+
+  [PaymentNotice]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __providerIdentifierSort (text), __requestIdentifierSort (text), __responseIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   provider: medplum=text vs medxai=text[]; request: medplum=text vs medxai=text[]; response: medplum=text vs medxai=text[]
+
+  [PaymentReconciliation]
+    Only in Medplum: outcome (text), status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __paymentIssuerIdentifierSort (text), __requestIdentifierSort (text), __requestorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __outcome, __outcomeText, __outcomeSort, __status, __statusText, __statusSort
+    Type mismatch:   requestor: medplum=text vs medxai=text[]
+
+  [Person]
+    Only in Medplum: birthdate (date), gender (text), phonetic (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __linkIdentifierSort (text), __organizationIdentifierSort (text), __patientIdentifierSort (text), __practitionerIdentifierSort (text), __relatedpersonIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __email (uuid[]), __emailText (text[]), __phone (uuid[]), __phoneText (text[]), __telecom (uuid[]), __telecomText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __addressSort, __addressCitySort, __addressCountrySort, __addressPostalcodeSort, __addressStateSort, __addressUseSort, birthdate timestamp with time, __gender, __genderText, __genderSort, __phoneticSort
+
+  [PlanDefinition]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __definitionIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Practitioner]
+    Only in Medplum: gender (text), phonetic (text[]), active (boolean), ___securitySort (text), ___tagSort (text), __qualificationCodeSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __email (uuid[]), __emailText (text[]), __phone (uuid[]), __phoneText (text[]), __telecom (uuid[]), __telecomText (text[]), __qualificationCode (uuid[]), __qualificationCodeText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort, __addressSort, __addressCitySort, __addressCountrySort, __addressPostalcodeSort, __addressStateSort, __addressUseSort, __gender, __genderText, __genderSort, __phoneticSort
+
+  [PractitionerRole]
+    Only in Medplum: active (boolean), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __endpointIdentifierSort (text), __locationIdentifierSort (text), __organizationIdentifierSort (text), __practitionerIdentifierSort (text), __serviceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __email (uuid[]), __emailText (text[]), __phone (uuid[]), __phoneText (text[]), __telecom (uuid[]), __telecomText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort
+    Type mismatch:   endpoint: medplum=text[] vs medxai=text; location: medplum=text[] vs medxai=text; service: medplum=text[] vs medxai=text
+
+  [Procedure]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __basedOnIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), __locationIdentifierSort (text), __partOfIdentifierSort (text), __performerIdentifierSort (text), __reasonReferenceIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; instantiatesUri: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [Provenance]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __agentIdentifierSort (text), __entityIdentifierSort (text), __locationIdentifierSort (text), __patientIdentifierSort (text), __targetIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [Questionnaire]
+    Only in Medplum: name (text), status (text), subjectType (text[]), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort, __subjectType, __subjectTypeText, __subjectTypeSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; definition: medplum=text[] vs medxai=text
+
+  [QuestionnaireResponse]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __authorIdentifierSort (text), __basedOnIdentifierSort (text), __encounterIdentifierSort (text), __partOfIdentifierSort (text), __patientIdentifierSort (text), __questionnaireIdentifierSort (text), __sourceIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   author: medplum=text vs medxai=text[]; patient: medplum=text vs medxai=text[]; source: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [RelatedPerson]
+    Only in Medplum: birthdate (date), gender (text), phonetic (text[]), active (boolean), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __email (uuid[]), __emailText (text[]), __phone (uuid[]), __phoneText (text[]), __telecom (uuid[]), __telecomText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort, __addressSort, __addressCitySort, __addressCountrySort, __addressPostalcodeSort, __addressStateSort, __addressUseSort, birthdate timestamp with time, __gender, __genderText, __genderSort, __phoneticSort
+
+  [RequestGroup]
+    Only in Medplum: intent (text), priority (text), status (text), priorityOrder (integer), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __authorIdentifierSort (text), __encounterIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), __participantIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __intent, __intentText, __intentSort, __priority, __priorityText, __prioritySort, __status, __statusText, __statusSort
+    Type mismatch:   author: medplum=text vs medxai=text[]; instantiatesCanonical: medplum=text[] vs medxai=text; instantiatesUri: medplum=text[] vs medxai=text; patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [ResearchDefinition]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [ResearchElementDefinition]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __composedOfIdentifierSort (text), __dependsOnIdentifierSort (text), __derivedFromIdentifierSort (text), __predecessorIdentifierSort (text), __successorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [ResearchStudy]
+    Only in Medplum: status (text), description (text), eligibility (text), name (text), objectiveDescription (text[]), partOf (text[]), recruitmentActual (double precision), recruitmentTarget (double precision), outcomeMeasureReference (text[]), ___securitySort (text), ___tagSort (text), __classifierSort (text), __conditionSort (text), __objectiveTypeSort (text), __phaseSort (text), __regionSort (text), __studyDesignSort (text), ___compartmentIdentifierSort (text), __partofIdentifierSort (text), __principalinvestigatorIdentifierSort (text), __protocolIdentifierSort (text), __siteIdentifierSort (text), __sponsorIdentifierSort (text), __eligibilityIdentifierSort (text), __partOfIdentifierSort (text), __outcomeMeasureReferenceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __condition (uuid[]), __conditionText (text[]), __phase (uuid[]), __phaseText (text[]), __studyDesign (uuid[]), __studyDesignText (text[]), __eligibilityIdentifier (uuid[]), __eligibilityIdentifierText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __category, __categoryText, __focus, __focusText, __location, __locationText, __status, __statusText, __statusSort
+    Type mismatch:   partof: medplum=text[] vs medxai=text; principalinvestigator: medplum=text vs medxai=text[]; protocol: medplum=text[] vs medxai=text; site: medplum=text[] vs medxai=text
+
+  [ResearchSubject]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __individualIdentifierSort (text), __patientIdentifierSort (text), __studyIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+
+  [RiskAssessment]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __conditionIdentifierSort (text), __performerIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; performer: medplum=text vs medxai=text[]; probability double: medplum=precision[] vs medxai=precision; subject: medplum=text vs medxai=text[]
+
+  [RiskEvidenceSynthesis]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Schedule]
+    Only in Medplum: active (boolean), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __actorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __active, __activeText, __activeSort
+
+  [SearchParameter]
+    Only in Medplum: name (text), status (text), version (text), base (text[]), code (text), target (text[]), type (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __componentIdentifierSort (text), __derivedFromIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __base, __baseText, __baseSort, __code, __codeText, __codeSort, __nameSort, __status, __statusText, __statusSort, __target, __targetText, __targetSort, __type, __typeText, __typeSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; component: medplum=text[] vs medxai=text
+
+  [ServiceRequest]
+    Only in Medplum: intent (text), priority (text), status (text), orderDetail (text[]), priorityOrder (integer), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __basedOnIdentifierSort (text), __instantiatesCanonicalIdentifierSort (text), __performerIdentifierSort (text), __replacesIdentifierSort (text), __requesterIdentifierSort (text), __specimenIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[]), __subjectIdentifier (uuid[]), __subjectIdentifierText (text[]), __reasonCode (uuid[]), __reasonCodeText (text[]), __reasonCodeSort (text)
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __bodySite, __bodySiteText, __intent, __intentText, __intentSort, __priority, __priorityText, __prioritySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; instantiatesUri: medplum=text[] vs medxai=text; replaces: medplum=text[] vs medxai=text; requester: medplum=text vs medxai=text[]; specimen: medplum=text[] vs medxai=text; subject: medplum=text vs medxai=text[]
+
+  [Slot]
+    Only in Medplum: status (text), end (timestamp with time zone), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __scheduleIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+
+  [Specimen]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __collectorIdentifierSort (text), __parentIdentifierSort (text), __patientIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   collector: medplum=text vs medxai=text[]; parent: medplum=text[] vs medxai=text; patient: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [SpecimenDefinition]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [StructureDefinition]
+    Only in Medplum: name (text), status (text), version (text), abstract (boolean), basePath (text[]), derivation (text), experimental (boolean), extContext (text[]), kind (text), path (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __baseIdentifierSort (text), __valuesetIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __abstract, __abstractText, __abstractSort, __basePath, __basePathText, __basePathSort, __derivation, __derivationText, __derivationSort, __experimental, __experimentalText, __experimentalSort, __extContext, __extContextText, __extContextSort, __kind, __kindText, __kindSort, __nameSort, __path, __pathText, __pathSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; valueset: medplum=text[] vs medxai=text
+
+  [StructureMap]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [Subscription]
+    Only in Medplum: payload (text), status (text), type (text), author (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __authorIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __payload, __payloadText, __payloadSort, __status, __statusText, __statusSort, __type, __typeText, __typeSort
+
+  [Substance]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __substanceReferenceIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   expiry timestamp with time: medplum=zone[] with time zone vs medxai=zone with time zone; quantity double: medplum=precision[] vs medxai=precision; substanceReference: medplum=text[] vs medxai=text
+
+  [SubstanceNucleicAcid]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [SubstancePolymer]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [SubstanceProtein]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [SubstanceReferenceInformation]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [SubstanceSourceMaterial]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [SubstanceSpecification]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [SupplyDelivery]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __receiverIdentifierSort (text), __supplierIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; supplier: medplum=text vs medxai=text[]
+
+  [SupplyRequest]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __requesterIdentifierSort (text), __subjectIdentifierSort (text), __supplierIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   requester: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [Task]
+    Only in Medplum: intent (text), priority (text), status (text), dueDate (timestamp with time zone), priorityOrder (integer), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __basedOnIdentifierSort (text), __encounterIdentifierSort (text), __focusIdentifierSort (text), __ownerIdentifierSort (text), __partOfIdentifierSort (text), __patientIdentifierSort (text), __requesterIdentifierSort (text), __subjectIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __intent, __intentText, __intentSort, __priority, __priorityText, __prioritySort, __status, __statusText, __statusSort
+    Type mismatch:   focus: medplum=text vs medxai=text[]; owner: medplum=text vs medxai=text[]; partOf: medplum=text[] vs medxai=text; patient: medplum=text vs medxai=text[]; requester: medplum=text vs medxai=text[]; subject: medplum=text vs medxai=text[]
+
+  [TerminologyCapabilities]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision
+
+  [TestReport]
+    Only in Medplum: result (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __testscriptIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __result, __resultText, __resultSort
+    Type mismatch:   participant: medplum=text[] vs medxai=text
+
+  [TestScript]
+    Only in Medplum: name (text), status (text), version (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; testscriptCapability: medplum=text[] vs medxai=text
+
+  [ValueSet]
+    Only in Medplum: name (text), status (text), version (text), code (text[]), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __code, __codeText, __codeSort, __nameSort, __status, __statusText, __statusSort
+    Type mismatch:   contextQuantity: medplum=double precision[] vs medxai=double precision; reference: medplum=text[] vs medxai=text
+
+  [VerificationResult]
+    Only in Medplum: ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __targetIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort
+
+  [VisionPrescription]
+    Only in Medplum: status (text), ___securitySort (text), ___tagSort (text), ___compartmentIdentifierSort (text), __patientIdentifierSort (text), __encounterIdentifierSort (text), __prescriberIdentifierSort (text), ___tag (uuid[]), ___tagText (text[])
+    Only in MedXAI:  __tag, __tagText, __tagSort, __security, __securityText, __securitySort, __status, __statusText, __statusSort
+    Type mismatch:   patient: medplum=text vs medxai=text[]; encounter: medplum=text vs medxai=text[]; prescriber: medplum=text vs medxai=text[]
+
+=== EXTENSIONS ===
+MedXAI extensions:  0
+Medplum extensions: 2
+  CREATE EXTENSION IF NOT EXISTS btree_gin WITH SCHEMA public
+  CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public
+
+MedXAI functions:  0
+Medplum functions: 1
+  CREATE FUNCTION public.token_array_to_text(text[]) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $_
+
+=== INDEXES ===
+MedXAI indexes:        4473 (0 unique)
+Medplum indexes:       4626 (11 unique)
+
+=== SAMPLE: Patient indexes ===
+  MedXAI Patient indexes: 39
+    CREATE INDEX "Patient___activeText_trgm_idx" ON public."Patient" USING gin ("__activeText")
+    CREATE INDEX "Patient___active_idx" ON public."Patient" USING gin (__active)
+    CREATE INDEX "Patient___addressCitySort_idx" ON public."Patient" USING btree ("__addressCitySort")
+    CREATE INDEX "Patient___addressCountrySort_idx" ON public."Patient" USING btree ("__addressCountrySort")
+    CREATE INDEX "Patient___addressPostalcodeSort_idx" ON public."Patient" USING btree ("__addressPostalcodeSort")
+    ... and 34 more
+  Medplum Patient indexes: 37
+    CREATE INDEX "Patient____tagTextTrgm_idx" ON public."Patient" USING gin (public.token_array_to_text("___tagText") public
+    CREATE INDEX "Patient____tag_idx" ON public."Patient" USING gin (___tag)
+    CREATE INDEX "Patient___emailTextTrgm_idx" ON public."Patient" USING gin (public.token_array_to_text("__emailText") publ
+    CREATE INDEX "Patient___email_idx" ON public."Patient" USING gin (__email)
+    CREATE INDEX "Patient___familySort_idx" ON public."Patient" USING btree ("__familySort")
+    ... and 32 more
+
+=== CONSTRAINTS ===
+MedXAI primary keys:  548
+Medplum primary keys: 492
+
+  MedXAI Account PK:  N/A
+  Medplum Account PK: N/A
+
+=== COMPARISON COMPLETE ===

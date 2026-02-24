@@ -10,9 +10,9 @@
  * @module fhir-persistence/repo
  */
 
-import { createHash } from 'node:crypto';
-import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
-import type { FhirResource } from './types.js';
+import { createHash } from "node:crypto";
+import type { SearchParameterImpl } from "../registry/search-parameter-registry.js";
+import type { FhirResource } from "./types.js";
 
 // =============================================================================
 // Section 1: Types
@@ -38,7 +38,7 @@ export interface SearchColumnValues {
  */
 export function hashToken(system: string, code: string): string {
   const input = `${system}|${code}`;
-  const hash = createHash('sha256').update(input).digest('hex');
+  const hash = createHash("sha256").update(input).digest("hex");
   // Format as UUID: 8-4-4-4-12
   return [
     hash.slice(0, 8),
@@ -46,7 +46,7 @@ export function hashToken(system: string, code: string): string {
     hash.slice(12, 16),
     hash.slice(16, 20),
     hash.slice(20, 32),
-  ].join('-');
+  ].join("-");
 }
 
 // =============================================================================
@@ -72,7 +72,7 @@ export function extractPropertyPath(
   if (!expression) return null;
 
   // Split by union operator and find the path for this resource type
-  const parts = expression.split('|').map((p) => p.trim());
+  const parts = expression.split("|").map((p) => p.trim());
   let matchedPath: string | null = null;
 
   for (const part of parts) {
@@ -89,20 +89,20 @@ export function extractPropertyPath(
 
   // Strip .where(...) clauses (handles nested parens like .where(resolve() is Patient))
   // Use greedy match to consume all content including nested parens
-  path = path.replace(/\.where\(.*\)/g, '');
+  path = path.replace(/\.where\(.*\)/g, "");
 
   // Strip .as(...) type casts
-  path = path.replace(/\.as\([^)]*\)/g, '');
+  path = path.replace(/\.as\([^)]*\)/g, "");
 
   // Strip .resolve() calls
-  path = path.replace(/\.resolve\(\)/g, '');
+  path = path.replace(/\.resolve\(\)/g, "");
 
   // Strip trailing dots
-  path = path.replace(/\.+$/, '');
+  path = path.replace(/\.+$/, "");
 
   if (!path) return null;
 
-  return path.split('.');
+  return path.split(".");
 }
 
 // =============================================================================
@@ -117,7 +117,10 @@ export function extractPropertyPath(
  *
  * @returns Array of extracted values (may be empty).
  */
-export function getNestedValues(obj: unknown, pathSegments: string[]): unknown[] {
+export function getNestedValues(
+  obj: unknown,
+  pathSegments: string[],
+): unknown[] {
   if (obj === null || obj === undefined) return [];
 
   if (Array.isArray(obj)) {
@@ -133,7 +136,7 @@ export function getNestedValues(obj: unknown, pathSegments: string[]): unknown[]
 
   const [head, ...rest] = pathSegments;
 
-  if (typeof obj === 'object') {
+  if (typeof obj === "object") {
     const record = obj as Record<string, unknown>;
     const value = record[head];
     if (value === undefined || value === null) return [];
@@ -150,10 +153,10 @@ export function getNestedValues(obj: unknown, pathSegments: string[]): unknown[]
  * Output: `"Patient/123"`
  */
 function extractReferenceValue(value: unknown): string | null {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value !== null) {
     const ref = (value as Record<string, unknown>).reference;
-    if (typeof ref === 'string') return ref;
+    if (typeof ref === "string") return ref;
   }
   return null;
 }
@@ -168,54 +171,57 @@ function extractReferenceValue(value: unknown): string | null {
  * - boolean: `"true"` or `"false"`
  * - Identifier: `{ system, value }`
  */
-function extractTokenValues(value: unknown): Array<{ system: string; code: string; display: string }> {
+function extractTokenValues(
+  value: unknown,
+): Array<{ system: string; code: string; display: string }> {
   if (value === null || value === undefined) return [];
 
   // Boolean
-  if (typeof value === 'boolean') {
-    return [{ system: '', code: String(value), display: String(value) }];
+  if (typeof value === "boolean") {
+    return [{ system: "", code: String(value), display: String(value) }];
   }
 
   // Plain string (code)
-  if (typeof value === 'string') {
-    return [{ system: '', code: value, display: value }];
+  if (typeof value === "string") {
+    return [{ system: "", code: value, display: value }];
   }
 
-  if (typeof value !== 'object') return [];
+  if (typeof value !== "object") return [];
 
   const obj = value as Record<string, unknown>;
 
   // CodeableConcept: has `coding` array
   if (Array.isArray(obj.coding)) {
-    const results: Array<{ system: string; code: string; display: string }> = [];
+    const results: Array<{ system: string; code: string; display: string }> =
+      [];
     for (const coding of obj.coding) {
-      if (typeof coding === 'object' && coding !== null) {
+      if (typeof coding === "object" && coding !== null) {
         const c = coding as Record<string, unknown>;
-        const system = typeof c.system === 'string' ? c.system : '';
-        const code = typeof c.code === 'string' ? c.code : '';
-        const display = typeof c.display === 'string' ? c.display : '';
+        const system = typeof c.system === "string" ? c.system : "";
+        const code = typeof c.code === "string" ? c.code : "";
+        const display = typeof c.display === "string" ? c.display : "";
         if (code) {
           results.push({ system, code, display });
         }
       }
     }
     // Also include text if present
-    if (typeof obj.text === 'string' && results.length === 0) {
-      results.push({ system: '', code: obj.text, display: obj.text });
+    if (typeof obj.text === "string" && results.length === 0) {
+      results.push({ system: "", code: obj.text, display: obj.text });
     }
     return results;
   }
 
   // Coding: has `code` field (but not `coding` array)
-  if (typeof obj.code === 'string') {
-    const system = typeof obj.system === 'string' ? obj.system : '';
-    const display = typeof obj.display === 'string' ? obj.display : '';
+  if (typeof obj.code === "string") {
+    const system = typeof obj.system === "string" ? obj.system : "";
+    const display = typeof obj.display === "string" ? obj.display : "";
     return [{ system, code: obj.code, display }];
   }
 
   // Identifier: has `value` field
-  if (typeof obj.value === 'string') {
-    const system = typeof obj.system === 'string' ? obj.system : '';
+  if (typeof obj.value === "string") {
+    const system = typeof obj.system === "string" ? obj.system : "";
     return [{ system, code: obj.value, display: obj.value }];
   }
 
@@ -230,40 +236,40 @@ function extractTokenValues(value: unknown): Array<{ system: string; code: strin
  * String: as-is
  */
 function extractSortString(value: unknown): string | null {
-  if (typeof value === 'string') return value;
-  if (typeof value !== 'object' || value === null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value !== "object" || value === null) return null;
 
   const obj = value as Record<string, unknown>;
 
   // HumanName
-  if (typeof obj.family === 'string' || Array.isArray(obj.given)) {
+  if (typeof obj.family === "string" || Array.isArray(obj.given)) {
     const parts: string[] = [];
-    if (typeof obj.family === 'string') parts.push(obj.family);
+    if (typeof obj.family === "string") parts.push(obj.family);
     if (Array.isArray(obj.given)) {
       for (const g of obj.given) {
-        if (typeof g === 'string') parts.push(g);
+        if (typeof g === "string") parts.push(g);
       }
     }
-    return parts.join(' ') || null;
+    return parts.join(" ") || null;
   }
 
   // Address
-  if (Array.isArray(obj.line) || typeof obj.city === 'string') {
+  if (Array.isArray(obj.line) || typeof obj.city === "string") {
     const parts: string[] = [];
     if (Array.isArray(obj.line)) {
       for (const l of obj.line) {
-        if (typeof l === 'string') parts.push(l);
+        if (typeof l === "string") parts.push(l);
       }
     }
-    if (typeof obj.city === 'string') parts.push(obj.city);
-    if (typeof obj.state === 'string') parts.push(obj.state);
-    if (typeof obj.postalCode === 'string') parts.push(obj.postalCode);
-    if (typeof obj.country === 'string') parts.push(obj.country);
-    return parts.join(' ') || null;
+    if (typeof obj.city === "string") parts.push(obj.city);
+    if (typeof obj.state === "string") parts.push(obj.state);
+    if (typeof obj.postalCode === "string") parts.push(obj.postalCode);
+    if (typeof obj.country === "string") parts.push(obj.country);
+    return parts.join(" ") || null;
   }
 
   // ContactPoint (telecom)
-  if (typeof obj.value === 'string') {
+  if (typeof obj.value === "string") {
     return obj.value;
   }
 
@@ -297,13 +303,13 @@ export function buildSearchColumns(
     if (!path) continue;
 
     switch (impl.strategy) {
-      case 'column':
+      case "column":
         populateColumnStrategy(resource, impl, path, columns);
         break;
-      case 'token-column':
+      case "token-column":
         populateTokenColumnStrategy(resource, impl, path, columns);
         break;
-      case 'lookup-table':
+      case "lookup-table":
         populateLookupTableStrategy(resource, impl, path, columns);
         break;
     }
@@ -328,7 +334,7 @@ function populateColumnStrategy(
   const values = getNestedValues(resource, path);
   if (values.length === 0) return;
 
-  if (impl.type === 'reference') {
+  if (impl.type === "reference") {
     const refs = values
       .map(extractReferenceValue)
       .filter((r): r is string => r !== null);
@@ -344,7 +350,8 @@ function populateColumnStrategy(
 
   // For date, number, string, uri — take the first primitive value
   const primitives = values.filter(
-    (v) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean',
+    (v) =>
+      typeof v === "string" || typeof v === "number" || typeof v === "boolean",
   );
   if (primitives.length === 0) return;
 
@@ -367,7 +374,8 @@ function populateTokenColumnStrategy(
   const values = getNestedValues(resource, path);
   if (values.length === 0) return;
 
-  const allTokens: Array<{ system: string; code: string; display: string }> = [];
+  const allTokens: Array<{ system: string; code: string; display: string }> =
+    [];
   for (const val of values) {
     allTokens.push(...extractTokenValues(val));
   }
@@ -379,7 +387,9 @@ function populateTokenColumnStrategy(
   columns[`__${impl.columnName}`] = hashes;
 
   // Text column: __<name>Text TEXT[]
-  const texts = allTokens.map((t) => (t.system ? `${t.system}|${t.code}` : t.code));
+  const texts = allTokens.map((t) =>
+    t.system ? `${t.system}|${t.code}` : t.code,
+  );
   columns[`__${impl.columnName}Text`] = texts;
 
   // Sort column: __<name>Sort TEXT — stores display text for :text modifier search
@@ -428,35 +438,35 @@ export function buildSharedTokenColumns(
   const allTexts: string[] = [];
 
   // Collect from identifier token columns (search columns)
-  if (Array.isArray(searchCols['__identifier'])) {
-    allHashes.push(...(searchCols['__identifier'] as string[]));
+  if (Array.isArray(searchCols["__identifier"])) {
+    allHashes.push(...(searchCols["__identifier"] as string[]));
   }
-  if (Array.isArray(searchCols['__identifierText'])) {
-    allTexts.push(...(searchCols['__identifierText'] as string[]));
+  if (Array.isArray(searchCols["__identifierText"])) {
+    allTexts.push(...(searchCols["__identifierText"] as string[]));
   }
 
   // Collect from _tag (metadata columns)
-  if (Array.isArray(metadataCols['__tag'])) {
-    allHashes.push(...(metadataCols['__tag'] as string[]));
+  if (Array.isArray(metadataCols["__tag"])) {
+    allHashes.push(...(metadataCols["__tag"] as string[]));
   }
-  if (Array.isArray(metadataCols['__tagText'])) {
-    allTexts.push(...(metadataCols['__tagText'] as string[]));
+  if (Array.isArray(metadataCols["__tagText"])) {
+    allTexts.push(...(metadataCols["__tagText"] as string[]));
   }
 
   // Collect from _security (metadata columns)
-  if (Array.isArray(metadataCols['__security'])) {
-    allHashes.push(...(metadataCols['__security'] as string[]));
+  if (Array.isArray(metadataCols["__security"])) {
+    allHashes.push(...(metadataCols["__security"] as string[]));
   }
-  if (Array.isArray(metadataCols['__securityText'])) {
-    allTexts.push(...(metadataCols['__securityText'] as string[]));
+  if (Array.isArray(metadataCols["__securityText"])) {
+    allTexts.push(...(metadataCols["__securityText"] as string[]));
   }
 
   const result: SearchColumnValues = {};
   if (allHashes.length > 0) {
-    result['__sharedTokens'] = allHashes;
+    result["__sharedTokens"] = allHashes;
   }
   if (allTexts.length > 0) {
-    result['__sharedTokensText'] = allTexts;
+    result["__sharedTokensText"] = allTexts;
   }
   return result;
 }
@@ -478,9 +488,13 @@ export function buildSharedTokenColumns(
  * @param resource - The FHIR resource to extract metadata from.
  * @returns Column name → value map for metadata search columns.
  */
-export function buildMetadataColumns(resource: FhirResource): SearchColumnValues {
+export function buildMetadataColumns(
+  resource: FhirResource,
+): SearchColumnValues {
   const columns: SearchColumnValues = {};
-  const meta = (resource as Record<string, unknown>).meta as Record<string, unknown> | undefined;
+  const meta = (resource as Record<string, unknown>).meta as
+    | Record<string, unknown>
+    | undefined;
   if (!meta) return columns;
 
   // _tag — meta.tag (array of Coding)
@@ -490,9 +504,11 @@ export function buildMetadataColumns(resource: FhirResource): SearchColumnValues
       tokens.push(...extractTokenValues(tag));
     }
     if (tokens.length > 0) {
-      columns['__tag'] = tokens.map((t) => hashToken(t.system, t.code));
-      columns['__tagText'] = tokens.map((t) => (t.system ? `${t.system}|${t.code}` : t.code));
-      columns['__tagSort'] = (columns['__tagText'] as string[])[0] ?? null;
+      columns["__tag"] = tokens.map((t) => hashToken(t.system, t.code));
+      columns["__tagText"] = tokens.map((t) =>
+        t.system ? `${t.system}|${t.code}` : t.code,
+      );
+      columns["__tagSort"] = (columns["__tagText"] as string[])[0] ?? null;
     }
   }
 
@@ -503,9 +519,12 @@ export function buildMetadataColumns(resource: FhirResource): SearchColumnValues
       tokens.push(...extractTokenValues(sec));
     }
     if (tokens.length > 0) {
-      columns['__security'] = tokens.map((t) => hashToken(t.system, t.code));
-      columns['__securityText'] = tokens.map((t) => (t.system ? `${t.system}|${t.code}` : t.code));
-      columns['__securitySort'] = (columns['__securityText'] as string[])[0] ?? null;
+      columns["__security"] = tokens.map((t) => hashToken(t.system, t.code));
+      columns["__securityText"] = tokens.map((t) =>
+        t.system ? `${t.system}|${t.code}` : t.code,
+      );
+      columns["__securitySort"] =
+        (columns["__securityText"] as string[])[0] ?? null;
     }
   }
 
