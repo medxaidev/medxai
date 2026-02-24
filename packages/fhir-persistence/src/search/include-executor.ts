@@ -1,9 +1,12 @@
 /**
  * Include / Revinclude Executor
  *
- * Implements `_include` and `_revinclude` FHIR search features.
+ * Implements `_include`, `_include:iterate`, `_include=*`,
+ * `_revinclude`, and `_revinclude:iterate` FHIR search features.
  *
  * - `_include`: After primary search, load referenced resources.
+ * - `_include:iterate`: Recursively include references from included resources (max depth).
+ * - `_include=*`: Include ALL referenced resources (wildcard).
  * - `_revinclude`: After primary search, load resources that reference the results.
  *
  * @module fhir-persistence/search
@@ -14,6 +17,12 @@ import type { PersistedResource } from '../repo/types.js';
 import type { SearchParameterRegistry } from '../registry/search-parameter-registry.js';
 import type { IncludeTarget } from './types.js';
 
+/**
+ * Maximum recursion depth for `_include:iterate`.
+ * Prevents infinite loops in circular reference graphs.
+ */
+const MAX_ITERATE_DEPTH = 3;
+
 // =============================================================================
 // Section 1: _include Execution
 // =============================================================================
@@ -21,12 +30,10 @@ import type { IncludeTarget } from './types.js';
 /**
  * Execute `_include` — load resources referenced by the primary search results.
  *
- * Algorithm:
- * 1. For each include target, find the search parameter impl
- * 2. Extract reference column values from primary results
- * 3. Parse reference strings to get target type + ID
- * 4. Batch-load target resources
- * 5. Deduplicate
+ * Supports three modes:
+ * 1. **Normal** `_include=Type:param` — single-pass include
+ * 2. **Iterate** `_include:iterate=Type:param` — recursive include (max depth 3)
+ * 3. **Wildcard** `_include=*` — include all references via References table
  *
  * @param db - Database client.
  * @param primaryResults - Primary search results (match resources).
@@ -44,15 +51,77 @@ export async function executeInclude(
     return [];
   }
 
-  // Collect all target references: Map<targetResourceType, Set<targetId>>
+  const seen = new Set(primaryResults.map((r) => `${r.resourceType}/${r.id}`));
+  const allIncluded: PersistedResource[] = [];
+
+  // Separate wildcard, iterate, and normal includes
+  const wildcardIncludes = includes.filter((i) => i.wildcard);
+  const iterateIncludes = includes.filter((i) => i.iterate && !i.wildcard);
+  const normalIncludes = includes.filter((i) => !i.iterate && !i.wildcard);
+
+  // 1. Normal includes (single pass)
+  if (normalIncludes.length > 0) {
+    const normalResults = await resolveIncludePass(db, primaryResults, normalIncludes, registry);
+    for (const r of normalResults) {
+      const key = `${r.resourceType}/${r.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        allIncluded.push(r);
+      }
+    }
+  }
+
+  // 2. Wildcard includes
+  if (wildcardIncludes.length > 0) {
+    const wildcardResults = await resolveWildcardInclude(db, primaryResults);
+    for (const r of wildcardResults) {
+      const key = `${r.resourceType}/${r.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        allIncluded.push(r);
+      }
+    }
+  }
+
+  // 3. Iterate includes (recursive with depth limit)
+  if (iterateIncludes.length > 0) {
+    let currentBatch = [...primaryResults, ...allIncluded];
+    for (let depth = 0; depth < MAX_ITERATE_DEPTH; depth++) {
+      const newResults = await resolveIncludePass(db, currentBatch, iterateIncludes, registry);
+      const newResources: PersistedResource[] = [];
+      for (const r of newResults) {
+        const key = `${r.resourceType}/${r.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          newResources.push(r);
+          allIncluded.push(r);
+        }
+      }
+      if (newResources.length === 0) break; // No new resources found — stop iterating
+      currentBatch = newResources;
+    }
+  }
+
+  return allIncluded;
+}
+
+/**
+ * Single-pass include resolution: collect referenced resources from sourceResources.
+ */
+async function resolveIncludePass(
+  db: DatabaseClient,
+  sourceResources: PersistedResource[],
+  includes: IncludeTarget[],
+  registry: SearchParameterRegistry,
+): Promise<PersistedResource[]> {
   const targetsByType = new Map<string, Set<string>>();
 
   for (const include of includes) {
     const impl = registry.getImpl(include.resourceType, include.searchParam);
     if (!impl || impl.type !== 'reference') continue;
 
-    // Filter primary results to matching source type
-    const sourceResults = primaryResults.filter(
+    // Filter source results to matching source type
+    const sourceResults = sourceResources.filter(
       (r) => r.resourceType === include.resourceType,
     );
 
@@ -74,8 +143,78 @@ export async function executeInclude(
     }
   }
 
-  // Batch-load all targets
-  return batchLoadResources(db, targetsByType, new Set(primaryResults.map((r) => `${r.resourceType}/${r.id}`)));
+  return batchLoadResources(db, targetsByType, new Set());
+}
+
+// =============================================================================
+// Section 1b: Wildcard Include
+// =============================================================================
+
+/**
+ * Execute wildcard `_include=*` — load ALL resources referenced by
+ * the primary search results, using the `{Type}_References` table.
+ *
+ * Since the References table only stores (resourceId, targetId, code)
+ * without a targetType column, we collect all targetIds and resolve
+ * the actual resource type by extracting references from the source
+ * resource JSON (which contains typed references like "Patient/123").
+ */
+async function resolveWildcardInclude(
+  db: DatabaseClient,
+  sourceResources: PersistedResource[],
+): Promise<PersistedResource[]> {
+  // Extract ALL reference strings from source resources
+  const targetsByType = new Map<string, Set<string>>();
+
+  for (const resource of sourceResources) {
+    const refs = extractAllReferenceStrings(resource);
+    for (const ref of refs) {
+      const parsed = parseReference(ref);
+      if (!parsed) continue;
+      const set = targetsByType.get(parsed.resourceType) ?? new Set();
+      set.add(parsed.id);
+      targetsByType.set(parsed.resourceType, set);
+    }
+  }
+
+  const excludeKeys = new Set(sourceResources.map((r) => `${r.resourceType}/${r.id}`));
+  return batchLoadResources(db, targetsByType, excludeKeys);
+}
+
+/**
+ * Extract ALL reference strings from a resource by deep-scanning
+ * the JSON for objects with a `reference` property.
+ */
+function extractAllReferenceStrings(resource: PersistedResource): string[] {
+  const results: string[] = [];
+  const stack: unknown[] = [resource];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === null || current === undefined || typeof current !== 'object') continue;
+
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        stack.push(item);
+      }
+      continue;
+    }
+
+    const record = current as Record<string, unknown>;
+    // Check if this object has a "reference" string property (FHIR Reference)
+    if (typeof record.reference === 'string') {
+      results.push(record.reference);
+    }
+
+    // Recurse into all object properties
+    for (const value of Object.values(record)) {
+      if (typeof value === 'object' && value !== null) {
+        stack.push(value);
+      }
+    }
+  }
+
+  return results;
 }
 
 // =============================================================================

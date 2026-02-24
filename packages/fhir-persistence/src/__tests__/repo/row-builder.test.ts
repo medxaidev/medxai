@@ -8,6 +8,7 @@ import {
   buildDeleteRow,
   buildHistoryRow,
   buildDeleteHistoryRow,
+  buildCompartments,
 } from '../../repo/row-builder.js';
 import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from '../../repo/types.js';
 import type { PersistedResource } from '../../repo/types.js';
@@ -190,5 +191,132 @@ describe('buildDeleteHistoryRow', () => {
     expect(row.versionId).toBe('ver-456');
     expect(row.lastUpdated).toBe('2026-01-01T00:00:00Z');
     expect(row.content).toBe('');
+  });
+});
+
+// =============================================================================
+// Phase 18: Full Compartment Extraction
+// =============================================================================
+
+describe('Phase 18 — buildCompartments', () => {
+  it('Patient resource: compartment = [own ID]', () => {
+    const patient = makePatient();
+    const result = buildCompartments(patient);
+    expect(result).toEqual(['550e8400-e29b-41d4-a716-446655440000']);
+  });
+
+  it('non-Patient resource with no impls: empty compartments', () => {
+    const obs = {
+      resourceType: 'Observation',
+      id: 'obs-1',
+      meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' },
+      subject: { reference: 'Patient/p1' },
+    } as PersistedResource;
+
+    const result = buildCompartments(obs);
+    expect(result).toEqual([]);
+  });
+
+  it('Observation with subject → Patient: extracts Patient ID', () => {
+    const patientUuid = '11111111-1111-1111-1111-111111111111';
+    const obs = {
+      resourceType: 'Observation',
+      id: 'obs-1',
+      meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' },
+      subject: { reference: `Patient/${patientUuid}` },
+    } as PersistedResource;
+
+    const impls = [
+      {
+        code: 'subject',
+        type: 'reference' as const,
+        resourceTypes: ['Observation'],
+        expression: 'Observation.subject',
+        strategy: 'column' as const,
+        columnName: 'subject',
+        columnType: 'TEXT' as const,
+        array: false,
+      },
+    ];
+
+    const result = buildCompartments(obs, impls);
+    expect(result).toEqual([patientUuid]);
+  });
+
+  it('Observation with subject → Organization: no Patient compartment', () => {
+    const obs = {
+      resourceType: 'Observation',
+      id: 'obs-1',
+      meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' },
+      subject: { reference: 'Organization/org-1' },
+    } as PersistedResource;
+
+    const impls = [
+      {
+        code: 'subject',
+        type: 'reference' as const,
+        resourceTypes: ['Observation'],
+        expression: 'Observation.subject',
+        strategy: 'column' as const,
+        columnName: 'subject',
+        columnType: 'TEXT' as const,
+        array: false,
+      },
+    ];
+
+    const result = buildCompartments(obs, impls);
+    expect(result).toEqual([]);
+  });
+
+  it('multiple reference fields: deduplicates Patient IDs', () => {
+    const patientUuid = '22222222-2222-2222-2222-222222222222';
+    const encounter = {
+      resourceType: 'Encounter',
+      id: 'enc-1',
+      meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' },
+      subject: { reference: `Patient/${patientUuid}` },
+      participant: [{ individual: { reference: `Patient/${patientUuid}` } }],
+    } as unknown as PersistedResource;
+
+    const impls = [
+      {
+        code: 'subject',
+        type: 'reference' as const,
+        resourceTypes: ['Encounter'],
+        expression: 'Encounter.subject',
+        strategy: 'column' as const,
+        columnName: 'subject',
+        columnType: 'TEXT' as const,
+        array: false,
+      },
+    ];
+
+    const result = buildCompartments(encounter, impls);
+    expect(result).toEqual([patientUuid]);
+  });
+
+  it('skips non-reference impls', () => {
+    const obs = {
+      resourceType: 'Observation',
+      id: 'obs-1',
+      meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' },
+      status: 'final',
+    } as PersistedResource;
+
+    const impls = [
+      {
+        code: 'status',
+        type: 'token' as const,
+        resourceTypes: ['Observation'],
+        expression: 'Observation.status',
+        strategy: 'token-column' as const,
+        columnName: 'status',
+        columnType: 'UUID[]' as const,
+        array: true,
+      },
+    ];
+
+    const result = buildCompartments(obs, impls);
+    expect(result).toEqual([]);
   });
 });

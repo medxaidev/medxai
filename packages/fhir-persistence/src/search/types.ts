@@ -88,6 +88,29 @@ export interface ParsedSearchParam {
    * Comma-separated values in the URL are split into this array.
    */
   values: string[];
+
+  /**
+   * Chained search info (single-level).
+   *
+   * Present when the param uses chained syntax:
+   * `subject:Patient.name=Smith` →
+   *   code = "subject", chain = { targetType: "Patient", targetParam: "name" }
+   */
+  chain?: ChainedSearchTarget;
+}
+
+/**
+ * Target information for a chained search parameter.
+ *
+ * Example: `subject:Patient.name=Smith`
+ * - `targetType` = `"Patient"`
+ * - `targetParam` = `"name"`
+ */
+export interface ChainedSearchTarget {
+  /** The target resource type (e.g., `"Patient"`). */
+  targetType: string;
+  /** The search parameter on the target resource (e.g., `"name"`). */
+  targetParam: string;
 }
 
 // =============================================================================
@@ -129,6 +152,15 @@ export interface IncludeTarget {
   searchParam: string;
   /** Optional target type filter (e.g., "Patient"). */
   targetType?: string;
+  /**
+   * If true, this is an `_include:iterate` — recursively include
+   * resources referenced by included resources (max depth 3, with cycle detection).
+   */
+  iterate?: boolean;
+  /**
+   * If true, this is a wildcard `_include=*` — include ALL referenced resources.
+   */
+  wildcard?: boolean;
 }
 
 // =============================================================================
@@ -183,6 +215,18 @@ export interface SearchRequest {
    * Corresponds to `_revinclude`.
    */
   revinclude?: IncludeTarget[];
+
+  /**
+   * Compartment filter for compartment search.
+   * Set when the URL is `/:compartmentType/:compartmentId/:resourceType`.
+   *
+   * Example: `GET /Patient/123/Observation` →
+   *   `{ resourceType: "Patient", id: "123" }`
+   */
+  compartment?: {
+    resourceType: string;
+    id: string;
+  };
 }
 
 /**

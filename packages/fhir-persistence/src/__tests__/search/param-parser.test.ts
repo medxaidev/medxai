@@ -299,3 +299,107 @@ describe('parseIncludeValue', () => {
     expect(parseIncludeValue('Patient:')).toBeNull();
   });
 });
+
+// =============================================================================
+// Phase 18: Chained Search Parsing
+// =============================================================================
+
+describe('Phase 18 — parseParamKey chained syntax', () => {
+  it('parses subject:Patient.name as chained search', () => {
+    const result = parseParamKey('subject:Patient.name');
+    expect(result).toEqual({
+      code: 'subject',
+      chain: { targetType: 'Patient', targetParam: 'name' },
+    });
+    expect(result.modifier).toBeUndefined();
+  });
+
+  it('parses performer:Practitioner.family as chained search', () => {
+    const result = parseParamKey('performer:Practitioner.family');
+    expect(result).toEqual({
+      code: 'performer',
+      chain: { targetType: 'Practitioner', targetParam: 'family' },
+    });
+  });
+
+  it('does not confuse regular modifier with chained search', () => {
+    const result = parseParamKey('name:exact');
+    expect(result).toEqual({ code: 'name', modifier: 'exact' });
+    expect(result.chain).toBeUndefined();
+  });
+});
+
+describe('Phase 18 — parseSearchRequest chained params', () => {
+  it('parses chained search param into request.params with chain field', () => {
+    const request = parseSearchRequest('Observation', {
+      'subject:Patient.name': 'Smith',
+    });
+    expect(request.params).toHaveLength(1);
+    expect(request.params[0].code).toBe('subject');
+    expect(request.params[0].values).toEqual(['Smith']);
+    expect(request.params[0].chain).toEqual({
+      targetType: 'Patient',
+      targetParam: 'name',
+    });
+  });
+
+  it('chained param coexists with normal params', () => {
+    const request = parseSearchRequest('Observation', {
+      'subject:Patient.name': 'Smith',
+      '_count': '10',
+    });
+    expect(request.params).toHaveLength(1);
+    expect(request.count).toBe(10);
+    expect(request.params[0].chain).toBeDefined();
+  });
+});
+
+// =============================================================================
+// Phase 18: _include:iterate and _include=* Parsing
+// =============================================================================
+
+describe('Phase 18 — _include:iterate parsing', () => {
+  it('_include:iterate sets iterate=true on target', () => {
+    const request = parseSearchRequest('Observation', {
+      '_include:iterate': 'Observation:subject',
+    });
+    expect(request.include).toHaveLength(1);
+    expect(request.include![0].iterate).toBe(true);
+    expect(request.include![0].resourceType).toBe('Observation');
+    expect(request.include![0].searchParam).toBe('subject');
+  });
+
+  it('_revinclude:iterate sets iterate=true on target', () => {
+    const request = parseSearchRequest('Patient', {
+      '_revinclude:iterate': 'Observation:subject',
+    });
+    expect(request.revinclude).toHaveLength(1);
+    expect(request.revinclude![0].iterate).toBe(true);
+  });
+
+  it('normal _include does not set iterate', () => {
+    const request = parseSearchRequest('Observation', {
+      '_include': 'Observation:subject',
+    });
+    expect(request.include).toHaveLength(1);
+    expect(request.include![0].iterate).toBeUndefined();
+  });
+});
+
+describe('Phase 18 — _include=* wildcard parsing', () => {
+  it('_include=* produces wildcard IncludeTarget', () => {
+    const result = parseIncludeValue('*');
+    expect(result).not.toBeNull();
+    expect(result!.wildcard).toBe(true);
+    expect(result!.resourceType).toBe('*');
+    expect(result!.searchParam).toBe('*');
+  });
+
+  it('parseSearchRequest with _include=* sets wildcard in include array', () => {
+    const request = parseSearchRequest('Observation', {
+      '_include': '*',
+    });
+    expect(request.include).toHaveLength(1);
+    expect(request.include![0].wildcard).toBe(true);
+  });
+});

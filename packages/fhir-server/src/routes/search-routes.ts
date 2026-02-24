@@ -33,6 +33,12 @@ interface ResourceTypeParams {
   resourceType: string;
 }
 
+interface CompartmentSearchParams {
+  compartmentType: string;
+  compartmentId: string;
+  resourceType: string;
+}
+
 // =============================================================================
 // Section 2: Route Registration
 // =============================================================================
@@ -99,6 +105,33 @@ export async function searchRoutes(fastify: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  // ── GET /:compartmentType/:compartmentId/:resourceType (compartment search) ─
+  fastify.get<{ Params: CompartmentSearchParams; Querystring: Record<string, string> }>(
+    "/:compartmentType/:compartmentId/:resourceType",
+    async (request, reply) => {
+      const { compartmentType, compartmentId, resourceType } = request.params;
+      const queryParams = request.query;
+
+      try {
+        return await handleCompartmentSearch(
+          repo,
+          registry,
+          compartmentType,
+          compartmentId,
+          resourceType,
+          queryParams,
+          request,
+          reply,
+          serverBaseUrl,
+        );
+      } catch (err) {
+        const { status, outcome } = errorToOutcome(err);
+        reply.status(status).header("content-type", FHIR_JSON);
+        return outcome;
+      }
+    },
+  );
 }
 
 // =============================================================================
@@ -149,6 +182,73 @@ async function handleSearch(
     total: result.total,
     selfUrl: buildSelfLink(paginationCtx),
     nextUrl: buildNextLink(paginationCtx),
+    included: result.included,
+  });
+
+  reply.header("content-type", FHIR_JSON);
+  return bundle;
+}
+
+// =============================================================================
+// Section 3b: Compartment Search Handler
+// =============================================================================
+
+/**
+ * Handle compartment search: GET /:compartmentType/:compartmentId/:resourceType
+ *
+ * Example: GET /Patient/123/Observation
+ * → Search Observations where compartments array contains Patient 123's UUID.
+ *
+ * Adds a synthetic `_compartment` search parameter that filters on
+ * the `compartments` UUID[] column.
+ */
+async function handleCompartmentSearch(
+  repo: ResourceRepository,
+  registry: SearchParameterRegistry,
+  compartmentType: string,
+  compartmentId: string,
+  resourceType: string,
+  queryParams: Record<string, string>,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  serverBaseUrl: string,
+): Promise<unknown> {
+  // Parse the search request (additional filters from query string)
+  const searchRequest: SearchRequest = parseSearchRequest(
+    resourceType,
+    queryParams,
+    registry,
+  );
+
+  // Add compartment filter: compartments @> ARRAY[compartmentId]::uuid[]
+  searchRequest.compartment = {
+    resourceType: compartmentType,
+    id: compartmentId,
+  };
+
+  // Execute search
+  const result = await repo.searchResources(searchRequest, {
+    total: searchRequest.total,
+  });
+
+  // Build pagination context
+  const baseUrl = serverBaseUrl || getBaseUrl(request);
+
+  // Build compartment-aware self URL
+  const selfBase = `${baseUrl}/${compartmentType}/${compartmentId}/${resourceType}`;
+  const qsParts: string[] = [];
+  for (const [k, v] of Object.entries(queryParams)) {
+    if (v !== undefined && v !== '') {
+      qsParts.push(`${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+    }
+  }
+  const selfUrl = qsParts.length > 0 ? `${selfBase}?${qsParts.join('&')}` : selfBase;
+
+  // Build Bundle
+  const bundle = buildSearchBundle(result.resources, {
+    baseUrl,
+    total: result.total,
+    selfUrl,
     included: result.included,
   });
 

@@ -64,6 +64,13 @@ export function buildSearchSQL(
   // Always filter out deleted resources
   whereConditions.push('"deleted" = false');
 
+  // Add compartment filter if present
+  if (request.compartment) {
+    whereConditions.push(`"compartments" @> ARRAY[$${paramIndex}]::uuid[]`);
+    allValues.push(request.compartment.id);
+    paramIndex++;
+  }
+
   // Add search parameter conditions
   if (request.params.length > 0) {
     const whereFragment = buildWhereClause(request.params, registry, request.resourceType);
@@ -126,6 +133,13 @@ export function buildCountSQL(
 
   const whereConditions: string[] = [];
   whereConditions.push('"deleted" = false');
+
+  // Add compartment filter if present
+  if (request.compartment) {
+    whereConditions.push(`"compartments" @> ARRAY[$${paramIndex}]::uuid[]`);
+    allValues.push(request.compartment.id);
+    paramIndex++;
+  }
 
   if (request.params.length > 0) {
     const whereFragment = buildWhereClause(request.params, registry, request.resourceType);

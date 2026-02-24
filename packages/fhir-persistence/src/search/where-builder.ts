@@ -19,7 +19,7 @@
 
 import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
 import type { SearchParameterRegistry } from '../registry/search-parameter-registry.js';
-import type { ParsedSearchParam, WhereFragment, SearchPrefix } from './types.js';
+import type { ParsedSearchParam, WhereFragment, SearchPrefix, ChainedSearchTarget } from './types.js';
 
 // =============================================================================
 // Section 1: Prefix → SQL Operator Mapping
@@ -108,6 +108,94 @@ export function buildWhereFragment(
     default:
       return buildDefaultFragment(impl, param, startIndex);
   }
+}
+
+// =============================================================================
+// Section 2b: Chained Search Fragment
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for a chained search parameter.
+ *
+ * Chained search: `subject:Patient.name=Smith`
+ * - Source param: `subject` (reference on source resource type)
+ * - Target type: `Patient`
+ * - Target param: `name` (search param on target type)
+ * - Value: `Smith`
+ *
+ * Generated SQL:
+ * ```sql
+ * EXISTS (
+ *   SELECT 1 FROM "Observation_References" __ref
+ *   JOIN "Patient" __target ON __ref."targetId" = __target."id"
+ *   WHERE __ref."resourceId" = "Observation"."id"
+ *     AND __ref."code" = 'subject'
+ *     AND __target."deleted" = false
+ *     AND <target param condition>
+ * )
+ * ```
+ */
+function buildChainedFragment(
+  param: ParsedSearchParam,
+  chain: ChainedSearchTarget,
+  registry: SearchParameterRegistry,
+  sourceResourceType: string,
+  startIndex: number,
+): WhereFragment | null {
+  // Resolve the target param implementation on the TARGET resource type
+  const targetImpl = resolveImpl(
+    { code: chain.targetParam, values: param.values, modifier: param.modifier, prefix: param.prefix },
+    registry,
+    chain.targetType,
+  );
+  if (!targetImpl) return null;
+
+  // Build the inner WHERE condition for the target table
+  // We use a temporary param that represents the target search
+  const innerParam: ParsedSearchParam = {
+    code: chain.targetParam,
+    values: param.values,
+    modifier: param.modifier,
+    prefix: param.prefix,
+  };
+
+  const innerFragment = buildWhereFragment(targetImpl, innerParam, startIndex);
+  if (!innerFragment) return null;
+
+  // Rewrite the inner SQL to prefix column names with __target.
+  // The inner fragment produces SQL like: "name" = $1
+  // We need: __target."name" = $1
+  const innerSql = rewriteColumnRefsForAlias(innerFragment.sql, '__target');
+
+  const refTable = `${sourceResourceType}_References`;
+  const sql = [
+    `EXISTS (`,
+    `  SELECT 1 FROM "${refTable}" __ref`,
+    `  JOIN "${chain.targetType}" __target ON __ref."targetId" = __target."id"`,
+    `  WHERE __ref."resourceId" = "${sourceResourceType}"."id"`,
+    `    AND __ref."code" = '${param.code}'`,
+    `    AND __target."deleted" = false`,
+    `    AND ${innerSql}`,
+    `)`,
+  ].join('\n');
+
+  return { sql, values: innerFragment.values };
+}
+
+/**
+ * Rewrite quoted column references in SQL to use a table alias prefix.
+ *
+ * Transforms `"columnName"` → `__alias."columnName"`
+ * but avoids rewriting `$N` parameters or already-aliased references.
+ *
+ * This is needed because buildWhereFragment generates column references
+ * without table qualification, but inside an EXISTS subquery we need
+ * to qualify them with the target table alias.
+ */
+function rewriteColumnRefsForAlias(sql: string, alias: string): string {
+  // Match quoted identifiers that are NOT preceded by a dot or another quote
+  // Pattern: a standalone "identifier" at the start or after whitespace/operators
+  return sql.replace(/(?<![."a-zA-Z])"([^"]+)"/g, `${alias}."$1"`);
 }
 
 // =============================================================================
@@ -607,6 +695,16 @@ export function buildWhereClause(
   let paramIndex = 1;
 
   for (const param of params) {
+    // Handle chained search parameters
+    if (param.chain) {
+      const fragment = buildChainedFragment(param, param.chain, registry, resourceType, paramIndex);
+      if (fragment) {
+        fragments.push(fragment);
+        paramIndex += fragment.values.length;
+      }
+      continue;
+    }
+
     // Handle special parameters
     const impl = resolveImpl(param, registry, resourceType);
     if (!impl) {

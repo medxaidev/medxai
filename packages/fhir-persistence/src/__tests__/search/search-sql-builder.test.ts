@@ -308,3 +308,59 @@ describe('buildCountSQL', () => {
     expect(result.sql).not.toContain('ORDER BY');
   });
 });
+
+// =============================================================================
+// Phase 18: Compartment Search SQL
+// =============================================================================
+
+describe('Phase 18 — compartment search SQL', () => {
+  const registry = createTestRegistry();
+
+  it('buildSearchSQL adds compartment filter to WHERE clause', () => {
+    const request: SearchRequest = {
+      resourceType: 'Observation',
+      params: [],
+      compartment: { resourceType: 'Patient', id: '550e8400-e29b-41d4-a716-446655440000' },
+    };
+    const result = buildSearchSQL(request, registry);
+
+    expect(result.sql).toContain('"compartments" @> ARRAY[$1]::uuid[]');
+    expect(result.values[0]).toBe('550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('compartment filter combined with search params', () => {
+    const request: SearchRequest = {
+      resourceType: 'Observation',
+      params: [{ code: 'status', values: ['final'] }],
+      compartment: { resourceType: 'Patient', id: '550e8400-e29b-41d4-a716-446655440000' },
+    };
+    const result = buildSearchSQL(request, registry);
+
+    expect(result.sql).toContain('"compartments" @> ARRAY[$1]::uuid[]');
+    expect(result.sql).toContain('"__statusText" && ARRAY[$2]::text[]');
+    expect(result.values[0]).toBe('550e8400-e29b-41d4-a716-446655440000');
+    expect(result.values[1]).toBe('final');
+  });
+
+  it('buildCountSQL adds compartment filter', () => {
+    const request: SearchRequest = {
+      resourceType: 'Observation',
+      params: [],
+      compartment: { resourceType: 'Patient', id: 'abc-123' },
+    };
+    const result = buildCountSQL(request, registry);
+
+    expect(result.sql).toContain('"compartments" @> ARRAY[$1]::uuid[]');
+    expect(result.values[0]).toBe('abc-123');
+  });
+
+  it('no compartment filter when compartment is undefined', () => {
+    const request: SearchRequest = {
+      resourceType: 'Observation',
+      params: [],
+    };
+    const result = buildSearchSQL(request, registry);
+
+    expect(result.sql).not.toContain('compartments');
+  });
+});

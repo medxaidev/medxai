@@ -12,6 +12,7 @@
 
 import type { SearchParameterRegistry } from '../registry/search-parameter-registry.js';
 import type {
+  ChainedSearchTarget,
   IncludeTarget,
   ParsedSearchParam,
   SearchModifier,
@@ -143,18 +144,20 @@ function processQueryParam(
     return;
   }
 
-  if (key === '_include') {
+  if (key === '_include' || key === '_include:iterate') {
     const target = parseIncludeValue(value);
     if (target) {
+      if (key === '_include:iterate') target.iterate = true;
       if (!request.include) request.include = [];
       request.include.push(target);
     }
     return;
   }
 
-  if (key === '_revinclude') {
+  if (key === '_revinclude' || key === '_revinclude:iterate') {
     const target = parseIncludeValue(value);
     if (target) {
+      if (key === '_revinclude:iterate') target.iterate = true;
       if (!request.revinclude) request.revinclude = [];
       request.revinclude.push(target);
     }
@@ -166,11 +169,11 @@ function processQueryParam(
     return;
   }
 
-  // Parse the parameter code and optional modifier
-  const { code, modifier } = parseParamKey(key);
+  // Parse the parameter code, optional modifier, and optional chain
+  const { code, modifier, chain } = parseParamKey(key);
 
-  // Validate against registry if provided (skip special params)
-  if (registry && !SPECIAL_PARAMS.has(code)) {
+  // Validate against registry if provided (skip special params and chained params)
+  if (registry && !SPECIAL_PARAMS.has(code) && !chain) {
     const impl = registry.getImpl(request.resourceType, code);
     if (!impl) {
       throw new Error(`Unknown search parameter: ${code} for ${request.resourceType}`);
@@ -178,8 +181,12 @@ function processQueryParam(
   }
 
   // Determine the FHIR search parameter type for prefix detection
+  // For chained params, detect prefix based on the TARGET param type
   let paramType: string | undefined;
-  if (registry && !SPECIAL_PARAMS.has(code)) {
+  if (chain && registry) {
+    const targetImpl = registry.getImpl(chain.targetType, chain.targetParam);
+    paramType = targetImpl?.type;
+  } else if (registry && !SPECIAL_PARAMS.has(code)) {
     const impl = registry.getImpl(request.resourceType, code);
     paramType = impl?.type;
   } else if (code === '_lastUpdated') {
@@ -205,6 +212,10 @@ function processQueryParam(
     param.prefix = prefix;
   }
 
+  if (chain) {
+    param.chain = chain;
+  }
+
   request.params.push(param);
 }
 
@@ -213,21 +224,37 @@ function processQueryParam(
 // =============================================================================
 
 /**
- * Parse a query parameter key into code and optional modifier.
+ * Parse a query parameter key into code, optional modifier, and optional chain.
  *
  * Examples:
  * - `"gender"` → `{ code: "gender" }`
  * - `"name:exact"` → `{ code: "name", modifier: "exact" }`
  * - `"code:not"` → `{ code: "code", modifier: "not" }`
+ * - `"subject:Patient.name"` → `{ code: "subject", chain: { targetType: "Patient", targetParam: "name" } }`
  */
-export function parseParamKey(key: string): { code: string; modifier?: SearchModifier } {
+export function parseParamKey(key: string): { code: string; modifier?: SearchModifier; chain?: ChainedSearchTarget } {
   const colonIdx = key.indexOf(':');
   if (colonIdx === -1) {
     return { code: key };
   }
 
   const code = key.substring(0, colonIdx);
-  const modifier = key.substring(colonIdx + 1) as SearchModifier;
+  const rest = key.substring(colonIdx + 1);
+
+  // Chained search: rest contains a dot → "Patient.name"
+  const dotIdx = rest.indexOf('.');
+  if (dotIdx !== -1) {
+    const targetType = rest.substring(0, dotIdx);
+    const targetParam = rest.substring(dotIdx + 1);
+    if (targetType && targetParam) {
+      return {
+        code,
+        chain: { targetType, targetParam },
+      };
+    }
+  }
+
+  const modifier = rest as SearchModifier;
   return { code, modifier };
 }
 
@@ -317,6 +344,11 @@ export function extractPrefix(
  * @returns Parsed IncludeTarget, or null if the format is invalid.
  */
 export function parseIncludeValue(value: string): IncludeTarget | null {
+  // Wildcard: _include=*
+  if (value === '*') {
+    return { resourceType: '*', searchParam: '*', wildcard: true };
+  }
+
   const parts = value.split(':');
   if (parts.length < 2 || !parts[0] || !parts[1]) {
     return null;

@@ -17,7 +17,7 @@ import type {
 } from './types.js';
 import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './types.js';
 import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
-import { buildSearchColumns, buildMetadataColumns } from './row-indexer.js';
+import { buildSearchColumns, buildMetadataColumns, extractPropertyPath, getNestedValues } from './row-indexer.js';
 
 // =============================================================================
 // Section 1: Main Table Row
@@ -76,29 +76,110 @@ export function buildResourceRowWithSearch(
   const fixedRow = buildResourceRow(resource);
   const searchCols = buildSearchColumns(resource, searchImpls);
   const metadataCols = buildMetadataColumns(resource);
-  return { ...fixedRow, ...searchCols, ...metadataCols };
+
+  // Override compartments with full extraction (using search impls)
+  const compartments = resource.resourceType === 'Binary'
+    ? undefined
+    : buildCompartments(resource, searchImpls);
+
+  return { ...fixedRow, ...searchCols, ...metadataCols, compartments };
 }
 
 // =============================================================================
-// Section 1b: Compartment Extraction (MVP)
+// Section 1b: Compartment Extraction
 // =============================================================================
 
 /**
  * Build compartments array for a resource.
  *
- * Phase 9 MVP: only Patient resources get their own ID as compartment.
- * Full FHIRPath-based compartment extraction (from CompartmentDefinition)
- * will be added in a future phase.
+ * Phase 18: Full compartment extraction.
+ * - Patient resources: compartment = [own ID]
+ * - Other resources: scan all reference-type search params for Patient references,
+ *   extract the Patient IDs as compartment members.
  *
  * @param resource - The persisted resource.
- * @returns Array of compartment UUIDs.
+ * @param searchImpls - Optional SearchParameterImpl list for reference extraction.
+ * @returns Array of compartment UUIDs (Patient IDs).
  */
-function buildCompartments(resource: PersistedResource): string[] {
+export function buildCompartments(
+  resource: PersistedResource,
+  searchImpls?: SearchParameterImpl[],
+): string[] {
+  // Patient resources belong to their own compartment
   if (resource.resourceType === 'Patient') {
     return [resource.id];
   }
-  // Future: extract Patient references from CompartmentDefinition
-  return [];
+
+  if (!searchImpls || searchImpls.length === 0) {
+    return [];
+  }
+
+  // Scan all reference-type search params for Patient references
+  const patientIds = new Set<string>();
+  const resourceType = resource.resourceType;
+
+  for (const impl of searchImpls) {
+    if (impl.type !== 'reference') continue;
+
+    const path = extractPropertyPath(impl.expression, resourceType);
+    if (!path) continue;
+
+    const values = getNestedValues(resource, path);
+    for (const val of values) {
+      const patientId = extractPatientReferenceId(val);
+      if (patientId) {
+        patientIds.add(patientId);
+      }
+    }
+  }
+
+  // Filter to valid UUIDs only (compartments column is UUID[])
+  return [...patientIds].filter(isValidUuid);
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
+/**
+ * Extract a Patient ID from a FHIR Reference value, if it points to Patient.
+ *
+ * - `{ reference: "Patient/123" }` → `"123"`
+ * - `{ reference: "Organization/456" }` → null (not Patient)
+ * - `"Patient/abc"` → `"abc"`
+ */
+function extractPatientReferenceId(value: unknown): string | null {
+  let refString: string | null = null;
+
+  if (typeof value === 'string') {
+    refString = value;
+  } else if (typeof value === 'object' && value !== null) {
+    const ref = (value as Record<string, unknown>).reference;
+    if (typeof ref === 'string') {
+      refString = ref;
+    }
+  }
+
+  if (!refString) return null;
+
+  // Skip contained and URN references
+  if (refString.startsWith('#') || refString.startsWith('urn:')) return null;
+
+  // Check if this is a Patient reference
+  // Handle both "Patient/id" and "http://example.com/fhir/Patient/id"
+  const segments = refString.split('/');
+  if (segments.length < 2) return null;
+
+  const id = segments[segments.length - 1];
+  const type = segments[segments.length - 2];
+
+  if (type === 'Patient' && id) {
+    return id;
+  }
+
+  return null;
 }
 
 // =============================================================================

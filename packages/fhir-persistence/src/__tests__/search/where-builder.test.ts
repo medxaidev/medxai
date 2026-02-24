@@ -624,3 +624,144 @@ describe('Phase 17 — lookup-table strategy', () => {
     expect(result!.values).toEqual(['555%']);
   });
 });
+
+// =============================================================================
+// Phase 18: Chained Search
+// =============================================================================
+
+describe('Phase 18 — chained search WHERE clause', () => {
+  // Build a registry with impls for both Observation and Patient
+  function makeChainRegistry(): SearchParameterRegistry {
+    const registry = new SearchParameterRegistry();
+    registry.indexImpl('Observation', makeImpl({
+      code: 'subject', type: 'reference', columnName: 'subject', columnType: 'TEXT[]', array: true,
+    }));
+    registry.indexImpl('Patient', makeImpl({
+      code: 'name', type: 'string', columnName: 'name', strategy: 'lookup-table',
+    }));
+    registry.indexImpl('Patient', makeImpl({
+      code: 'gender', type: 'token', columnName: 'gender', strategy: 'token-column', columnType: 'UUID[]', array: true,
+    }));
+    registry.indexImpl('Patient', makeImpl({
+      code: 'birthdate', type: 'date', columnName: 'birthdate', columnType: 'TIMESTAMPTZ',
+    }));
+    return registry;
+  }
+
+  it('chained string search generates EXISTS with JOIN and LIKE', () => {
+    const registry = makeChainRegistry();
+    const params: ParsedSearchParam[] = [
+      {
+        code: 'subject',
+        values: ['Smith'],
+        chain: { targetType: 'Patient', targetParam: 'name' },
+      },
+    ];
+
+    const result = buildWhereClause(params, registry, 'Observation');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('EXISTS');
+    expect(result!.sql).toContain('"Observation_References"');
+    expect(result!.sql).toContain('"Patient"');
+    expect(result!.sql).toContain('__ref."targetId" = __target."id"');
+    expect(result!.sql).toContain('__ref."code" = \'subject\'');
+    expect(result!.sql).toContain('__target."deleted" = false');
+    expect(result!.sql).toContain('LIKE $1');
+    expect(result!.values).toEqual(['smith%']);
+  });
+
+  it('chained token search generates EXISTS with token text overlap', () => {
+    const registry = makeChainRegistry();
+    const params: ParsedSearchParam[] = [
+      {
+        code: 'subject',
+        values: ['male'],
+        chain: { targetType: 'Patient', targetParam: 'gender' },
+      },
+    ];
+
+    const result = buildWhereClause(params, registry, 'Observation');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('EXISTS');
+    expect(result!.sql).toContain('__target."__genderText"');
+    expect(result!.sql).toContain('ARRAY[$1]::text[]');
+    expect(result!.values).toEqual(['male']);
+  });
+
+  it('chained date search generates EXISTS with date comparison', () => {
+    const registry = makeChainRegistry();
+    const params: ParsedSearchParam[] = [
+      {
+        code: 'subject',
+        values: ['1990-01-01'],
+        prefix: 'ge',
+        chain: { targetType: 'Patient', targetParam: 'birthdate' },
+      },
+    ];
+
+    const result = buildWhereClause(params, registry, 'Observation');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('EXISTS');
+    expect(result!.sql).toContain('>= $1');
+    expect(result!.values).toEqual(['1990-01-01']);
+  });
+
+  it('returns null for unknown target param', () => {
+    const registry = makeChainRegistry();
+    const params: ParsedSearchParam[] = [
+      {
+        code: 'subject',
+        values: ['value'],
+        chain: { targetType: 'Patient', targetParam: 'nonexistent' },
+      },
+    ];
+
+    const result = buildWhereClause(params, registry, 'Observation');
+    expect(result).toBeNull();
+  });
+
+  it('chained param combined with normal param generates AND', () => {
+    const extendedRegistry = makeChainRegistry();
+    extendedRegistry.indexImpl('Observation', makeImpl({
+      code: 'code', type: 'token', columnName: 'code', strategy: 'token-column', columnType: 'UUID[]', array: true,
+    }));
+
+    const params: ParsedSearchParam[] = [
+      {
+        code: 'subject',
+        values: ['Smith'],
+        chain: { targetType: 'Patient', targetParam: 'name' },
+      },
+      {
+        code: 'code',
+        values: ['12345'],
+      },
+    ];
+
+    const result = buildWhereClause(params, extendedRegistry, 'Observation');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('EXISTS');
+    expect(result!.sql).toContain('AND');
+    expect(result!.sql).toContain('"__codeText"');
+    expect(result!.values.length).toBe(2);
+  });
+
+  it('chained search with :exact modifier on target param', () => {
+    const registry = makeChainRegistry();
+    const params: ParsedSearchParam[] = [
+      {
+        code: 'subject',
+        values: ['Smith'],
+        modifier: 'exact',
+        chain: { targetType: 'Patient', targetParam: 'name' },
+      },
+    ];
+
+    const result = buildWhereClause(params, registry, 'Observation');
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('EXISTS');
+    expect(result!.sql).toContain('= $1');
+    expect(result!.sql).not.toContain('LIKE');
+    expect(result!.values).toEqual(['Smith']);
+  });
+});
