@@ -237,13 +237,13 @@ describe('updateResource — validation and optimistic locking (A-09 ~ A-11)', (
     const { mockDb, mockClient } = makeMockDb();
     const existing = makePersistedPatient();
 
-    // readResource returns existing
-    mockDb.query.mockResolvedValueOnce({
-      rows: [{ content: JSON.stringify(existing), deleted: false }],
-      rowCount: 1,
-    });
-    // withTransaction calls succeed
-    mockClient.query.mockResolvedValue({ rows: [], rowCount: 0 });
+    // SELECT FOR UPDATE returns existing (inside transaction)
+    mockClient.query
+      .mockResolvedValueOnce({
+        rows: [{ content: JSON.stringify(existing), deleted: false }],
+        rowCount: 1,
+      })
+      .mockResolvedValue({ rows: [], rowCount: 0 });
 
     const repo = new FhirRepository(mockDb as any);
     const result = await repo.updateResource(
@@ -256,10 +256,11 @@ describe('updateResource — validation and optimistic locking (A-09 ~ A-11)', (
   });
 
   it('A-11: throws ResourceVersionConflictError when ifMatch does not match', async () => {
-    const { mockDb } = makeMockDb();
+    const { mockDb, mockClient } = makeMockDb();
     const existing = makePersistedPatient();
 
-    mockDb.query.mockResolvedValueOnce({
+    // SELECT FOR UPDATE returns existing (inside transaction)
+    mockClient.query.mockResolvedValueOnce({
       rows: [{ content: JSON.stringify(existing), deleted: false }],
       rowCount: 1,
     });
@@ -275,10 +276,11 @@ describe('updateResource — validation and optimistic locking (A-09 ~ A-11)', (
   });
 
   it('A-11b: conflict error contains expected and actual versions', async () => {
-    const { mockDb } = makeMockDb();
+    const { mockDb, mockClient } = makeMockDb();
     const existing = makePersistedPatient();
 
-    mockDb.query.mockResolvedValueOnce({
+    // SELECT FOR UPDATE returns existing (inside transaction)
+    mockClient.query.mockResolvedValueOnce({
       rows: [{ content: JSON.stringify(existing), deleted: false }],
       rowCount: 1,
     });
@@ -316,24 +318,31 @@ describe('deleteResource — soft delete semantics (A-12 ~ A-14)', () => {
     mockClient = mocks.mockClient;
     existing = makePersistedPatient();
 
-    // readResource returns existing
-    mockDb.query.mockResolvedValueOnce({
-      rows: [{ content: JSON.stringify(existing), deleted: false }],
-      rowCount: 1,
-    });
-    mockClient.query.mockResolvedValue({ rows: [], rowCount: 0 });
+    // SELECT FOR UPDATE returns existing (inside transaction), then remaining calls succeed
+    mockClient.query
+      .mockResolvedValueOnce({
+        rows: [{ deleted: false }],
+        rowCount: 1,
+      })
+      .mockResolvedValue({ rows: [], rowCount: 0 });
 
     repo = new FhirRepository(mockDb as any);
   });
 
-  it('A-12: calls DB twice inside transaction (UPSERT + History INSERT)', async () => {
+  it('A-12: calls DB four times inside transaction (SELECT FOR UPDATE + UPSERT + History INSERT + DELETE refs)', async () => {
     await repo.deleteResource('Patient', existing.id);
-    expect(mockClient.query).toHaveBeenCalledTimes(2);
+    expect(mockClient.query).toHaveBeenCalledTimes(4);
+  });
+
+  it('A-12b: first call is SELECT FOR UPDATE', async () => {
+    await repo.deleteResource('Patient', existing.id);
+    const firstCall = mockClient.query.mock.calls[0];
+    expect(firstCall[0]).toContain('FOR UPDATE');
   });
 
   it('A-13: UPSERT row has content = empty string', async () => {
     await repo.deleteResource('Patient', existing.id);
-    const upsertCall = mockClient.query.mock.calls[0];
+    const upsertCall = mockClient.query.mock.calls[1];
     // The values array should contain '' as the content value
     const values = upsertCall[1] as unknown[];
     expect(values).toContain('');
@@ -341,21 +350,21 @@ describe('deleteResource — soft delete semantics (A-12 ~ A-14)', () => {
 
   it('A-14: UPSERT row has __version = -1 (DELETED_SCHEMA_VERSION)', async () => {
     await repo.deleteResource('Patient', existing.id);
-    const upsertCall = mockClient.query.mock.calls[0];
+    const upsertCall = mockClient.query.mock.calls[1];
     const values = upsertCall[1] as unknown[];
     expect(values).toContain(DELETED_SCHEMA_VERSION);
   });
 
   it('A-14b: UPSERT row has deleted = true', async () => {
     await repo.deleteResource('Patient', existing.id);
-    const upsertCall = mockClient.query.mock.calls[0];
+    const upsertCall = mockClient.query.mock.calls[1];
     const values = upsertCall[1] as unknown[];
     expect(values).toContain(true);
   });
 
   it('A-14c: History INSERT has empty content', async () => {
     await repo.deleteResource('Patient', existing.id);
-    const histCall = mockClient.query.mock.calls[1];
+    const histCall = mockClient.query.mock.calls[2];
     const values = histCall[1] as unknown[];
     expect(values).toContain('');
   });

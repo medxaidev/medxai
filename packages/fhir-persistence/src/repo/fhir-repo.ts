@@ -36,6 +36,7 @@ import {
 } from './errors.js';
 import { buildResourceRow, buildResourceRowWithSearch, buildDeleteRow, buildHistoryRow, buildDeleteHistoryRow } from './row-builder.js';
 import { buildUpsertSQL, buildInsertSQL, buildSelectByIdSQL, buildSelectVersionSQL, buildInstanceHistorySQL, buildTypeHistorySQL } from './sql-builder.js';
+import { extractReferences } from './reference-indexer.js';
 
 // =============================================================================
 // Section 1: FhirRepository Class
@@ -66,6 +67,51 @@ export class FhirRepository implements ResourceRepository {
       return buildResourceRowWithSearch(resource, impls);
     }
     return buildResourceRow(resource);
+  }
+
+  /**
+   * Write reference rows for a resource. Deletes existing rows first (replace strategy).
+   */
+  private async writeReferences(
+    client: { query: (text: string, values?: unknown[]) => Promise<unknown> },
+    resource: PersistedResource,
+  ): Promise<void> {
+    if (!this.registry) return;
+
+    const resourceType = resource.resourceType;
+    const refTable = `${resourceType}_References`;
+
+    // Delete existing references for this resource
+    await this.deleteReferences(client, resourceType, resource.id);
+
+    // Extract and insert new references
+    const impls = this.registry.getForResource(resourceType);
+    const rows = extractReferences(resource, impls);
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+      // Skip rows with non-UUID targetId (References table uses UUID columns)
+      if (!isValidUuid(row.targetId)) continue;
+
+      const sql = `INSERT INTO "${refTable}" ("resourceId", "targetId", "code") VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`;
+      await client.query(sql, [row.resourceId, row.targetId, row.code]);
+    }
+  }
+
+  /**
+   * Delete all reference rows for a resource.
+   */
+  private async deleteReferences(
+    client: { query: (text: string, values?: unknown[]) => Promise<unknown> },
+    resourceType: string,
+    id: string,
+  ): Promise<void> {
+    const refTable = `${resourceType}_References`;
+    try {
+      await client.query(`DELETE FROM "${refTable}" WHERE "resourceId" = $1`, [id]);
+    } catch {
+      // Table may not exist — skip silently
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -99,6 +145,9 @@ export class FhirRepository implements ResourceRepository {
 
       const histInsert = buildInsertSQL(`${resource.resourceType}_History`, historyRow);
       await client.query(histInsert.sql, histInsert.values);
+
+      // Write reference rows
+      await this.writeReferences(client, persisted);
     });
 
     return persisted;
@@ -139,19 +188,6 @@ export class FhirRepository implements ResourceRepository {
       throw new Error('Resource must have an id for update');
     }
 
-    // Read existing for validation and optimistic locking
-    const existing = await this.readResource(resourceType, id);
-
-    // Optimistic locking check
-    if (options?.ifMatch && existing.meta.versionId !== options.ifMatch) {
-      throw new ResourceVersionConflictError(
-        resourceType,
-        id,
-        options.ifMatch,
-        existing.meta.versionId,
-      );
-    }
-
     const now = new Date().toISOString();
     const versionId = randomUUID();
 
@@ -169,11 +205,42 @@ export class FhirRepository implements ResourceRepository {
     const historyRow = buildHistoryRow(persisted);
 
     await this.db.withTransaction(async (client) => {
+      // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
+      const lockResult = await client.query(
+        `SELECT "content", "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
+        [id],
+      );
+
+      if (lockResult.rows.length === 0) {
+        throw new ResourceNotFoundError(resourceType, id);
+      }
+
+      const existingRow = lockResult.rows[0] as { content: string; deleted: boolean };
+      if (existingRow.deleted) {
+        throw new ResourceGoneError(resourceType, id);
+      }
+
+      // Optimistic locking check (under row lock — no race possible)
+      if (options?.ifMatch) {
+        const existing = JSON.parse(existingRow.content) as PersistedResource;
+        if (existing.meta.versionId !== options.ifMatch) {
+          throw new ResourceVersionConflictError(
+            resourceType,
+            id,
+            options.ifMatch,
+            existing.meta.versionId,
+          );
+        }
+      }
+
       const upsert = buildUpsertSQL(resourceType, mainRow);
       await client.query(upsert.sql, upsert.values);
 
       const histInsert = buildInsertSQL(`${resourceType}_History`, historyRow);
       await client.query(histInsert.sql, histInsert.values);
+
+      // Update reference rows (delete old, write new)
+      await this.writeReferences(client, persisted);
     });
 
     return persisted;
@@ -184,9 +251,6 @@ export class FhirRepository implements ResourceRepository {
   // ---------------------------------------------------------------------------
 
   async deleteResource(resourceType: string, id: string): Promise<void> {
-    // Verify exists and not already deleted
-    await this.readResource(resourceType, id);
-
     const now = new Date().toISOString();
     const versionId = randomUUID();
 
@@ -194,11 +258,29 @@ export class FhirRepository implements ResourceRepository {
     const historyRow = buildDeleteHistoryRow(id, versionId, now);
 
     await this.db.withTransaction(async (client) => {
+      // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
+      const lockResult = await client.query(
+        `SELECT "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
+        [id],
+      );
+
+      if (lockResult.rows.length === 0) {
+        throw new ResourceNotFoundError(resourceType, id);
+      }
+
+      const existingRow = lockResult.rows[0] as { deleted: boolean };
+      if (existingRow.deleted) {
+        throw new ResourceGoneError(resourceType, id);
+      }
+
       const upsert = buildUpsertSQL(resourceType, mainRow);
       await client.query(upsert.sql, upsert.values);
 
       const histInsert = buildInsertSQL(`${resourceType}_History`, historyRow);
       await client.query(histInsert.sql, histInsert.values);
+
+      // Delete reference rows for deleted resource
+      await this.deleteReferences(client, resourceType, id);
     });
   }
 
@@ -280,6 +362,12 @@ interface HistoryRawRow {
   versionId: string;
   lastUpdated: string;
   content: string;
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value);
 }
 
 function toHistoryEntry(row: HistoryRawRow, resourceType: string): HistoryEntry {

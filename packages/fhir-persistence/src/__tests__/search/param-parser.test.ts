@@ -9,6 +9,7 @@ import {
   splitSearchValues,
   extractPrefix,
   parseSortParam,
+  parseIncludeValue,
 } from '../../search/param-parser.js';
 
 // =============================================================================
@@ -228,13 +229,36 @@ describe('parseSearchRequest', () => {
     expect(result.params[0].values).toEqual(['2026-01-01']);
   });
 
-  it('skips result parameters like _include', () => {
+  it('parses _include into request.include', () => {
     const result = parseSearchRequest('Patient', {
       _include: 'Patient:organization',
       gender: 'male',
     });
     expect(result.params).toHaveLength(1);
     expect(result.params[0].code).toBe('gender');
+    expect(result.include).toHaveLength(1);
+    expect(result.include![0]).toEqual({ resourceType: 'Patient', searchParam: 'organization' });
+  });
+
+  it('parses _revinclude into request.revinclude', () => {
+    const result = parseSearchRequest('Patient', {
+      _revinclude: 'Observation:subject',
+    });
+    expect(result.params).toHaveLength(0);
+    expect(result.revinclude).toHaveLength(1);
+    expect(result.revinclude![0]).toEqual({ resourceType: 'Observation', searchParam: 'subject' });
+  });
+
+  it('parses _include with target type', () => {
+    const result = parseSearchRequest('Patient', {
+      _include: 'Observation:subject:Patient',
+    });
+    expect(result.include).toHaveLength(1);
+    expect(result.include![0]).toEqual({
+      resourceType: 'Observation',
+      searchParam: 'subject',
+      targetType: 'Patient',
+    });
   });
 
   it('skips undefined and empty values', () => {
@@ -243,5 +267,35 @@ describe('parseSearchRequest', () => {
       active: '',
     });
     expect(result.params).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// parseIncludeValue
+// =============================================================================
+
+describe('parseIncludeValue', () => {
+  it('parses ResourceType:param', () => {
+    expect(parseIncludeValue('MedicationRequest:patient')).toEqual({
+      resourceType: 'MedicationRequest',
+      searchParam: 'patient',
+    });
+  });
+
+  it('parses ResourceType:param:targetType', () => {
+    expect(parseIncludeValue('Observation:subject:Patient')).toEqual({
+      resourceType: 'Observation',
+      searchParam: 'subject',
+      targetType: 'Patient',
+    });
+  });
+
+  it('returns null for invalid format (no colon)', () => {
+    expect(parseIncludeValue('InvalidValue')).toBeNull();
+  });
+
+  it('returns null for empty parts', () => {
+    expect(parseIncludeValue(':subject')).toBeNull();
+    expect(parseIncludeValue('Patient:')).toBeNull();
   });
 });

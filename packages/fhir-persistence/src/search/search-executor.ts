@@ -14,6 +14,7 @@ import type { PersistedResource } from '../repo/types.js';
 import type { SearchParameterRegistry } from '../registry/search-parameter-registry.js';
 import type { SearchRequest } from './types.js';
 import { buildSearchSQL, buildCountSQL } from './search-sql-builder.js';
+import { executeInclude, executeRevinclude } from './include-executor.js';
 
 // =============================================================================
 // Section 1: Types
@@ -33,6 +34,8 @@ export interface SearchOptions {
 export interface SearchResult {
   /** Matched resources. */
   resources: PersistedResource[];
+  /** Included resources from _include/_revinclude (search.mode = 'include'). */
+  included?: PersistedResource[];
   /** Total count (only when `total=accurate`). */
   total?: number;
 }
@@ -92,7 +95,25 @@ export async function executeSearch(
     total = parseInt(countResult.rows[0]?.count ?? '0', 10);
   }
 
-  return { resources, total };
+  // 4. Execute _include and _revinclude
+  const allIncluded: PersistedResource[] = [];
+
+  if (request.include && request.include.length > 0) {
+    const included = await executeInclude(db, resources, request.include, registry);
+    allIncluded.push(...included);
+  }
+
+  if (request.revinclude && request.revinclude.length > 0) {
+    const revincluded = await executeRevinclude(db, resources, request.revinclude);
+    allIncluded.push(...revincluded);
+  }
+
+  const result: SearchResult = { resources, total };
+  if (allIncluded.length > 0) {
+    result.included = allIncluded;
+  }
+
+  return result;
 }
 
 // =============================================================================

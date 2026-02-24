@@ -258,6 +258,7 @@ function extractSortString(value: unknown): string | null {
     if (typeof obj.city === 'string') parts.push(obj.city);
     if (typeof obj.state === 'string') parts.push(obj.state);
     if (typeof obj.postalCode === 'string') parts.push(obj.postalCode);
+    if (typeof obj.country === 'string') parts.push(obj.country);
     return parts.join(' ') || null;
   }
 

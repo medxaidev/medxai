@@ -474,6 +474,81 @@ describe('Row Indexer — buildSearchColumns (lookup-table strategy)', () => {
     const cols = buildSearchColumns(resource, impls);
     expect(cols.__nameSort).toBe('Test Account');
   });
+
+  it('extracts sort string from ContactPoint (Patient.telecom)', () => {
+    const resource = {
+      resourceType: 'Patient',
+      telecom: [{ system: 'phone', value: '555-1234', use: 'home' }],
+    };
+    const impls = [makeImpl({
+      code: 'telecom',
+      type: 'token',
+      expression: 'Patient.telecom',
+      strategy: 'lookup-table',
+      columnName: 'telecom',
+      columnType: 'TEXT',
+      array: false,
+    })];
+    const cols = buildSearchColumns(resource, impls);
+    expect(cols.__telecomSort).toBe('555-1234');
+  });
+
+  it('Address sort string includes country', () => {
+    const resource = {
+      resourceType: 'Patient',
+      address: [{ line: ['456 Oak Ave'], city: 'Springfield', state: 'IL', postalCode: '62704', country: 'US' }],
+    };
+    const impls = [makeImpl({
+      code: 'address',
+      type: 'string',
+      expression: 'Patient.address',
+      strategy: 'lookup-table',
+      columnName: 'address',
+      columnType: 'TEXT',
+      array: false,
+    })];
+    const cols = buildSearchColumns(resource, impls);
+    expect(cols.__addressSort).toBe('456 Oak Ave Springfield IL 62704 US');
+  });
+
+  it('HumanName sort string includes family and all given names', () => {
+    const resource = {
+      resourceType: 'Patient',
+      name: [{ family: 'Doe', given: ['Jane', 'Marie'] }],
+    };
+    const impls = [makeImpl({
+      code: 'name',
+      type: 'string',
+      expression: 'Patient.name',
+      strategy: 'lookup-table',
+      columnName: 'name',
+      columnType: 'TEXT',
+      array: false,
+    })];
+    const cols = buildSearchColumns(resource, impls);
+    expect(cols.__nameSort).toBe('Doe Jane Marie');
+  });
+
+  it('multiple names uses first name for sort', () => {
+    const resource = {
+      resourceType: 'Patient',
+      name: [
+        { family: 'Official', given: ['First'] },
+        { family: 'Nickname', given: ['Nick'] },
+      ],
+    };
+    const impls = [makeImpl({
+      code: 'name',
+      type: 'string',
+      expression: 'Patient.name',
+      strategy: 'lookup-table',
+      columnName: 'name',
+      columnType: 'TEXT',
+      array: false,
+    })];
+    const cols = buildSearchColumns(resource, impls);
+    expect(cols.__nameSort).toBe('Official First');
+  });
 });
 
 // =============================================================================

@@ -80,9 +80,9 @@ export function buildWhereFragment(
     return buildMissingFragment(impl, param, startIndex);
   }
 
-  // Skip lookup-table strategy — these require JOINs (Phase 13)
+  // Lookup-table strategy — search the __<name>Sort column
   if (impl.strategy === 'lookup-table') {
-    return null;
+    return buildLookupTableFragment(impl, param, startIndex);
   }
 
   // Dispatch by strategy
@@ -129,6 +129,40 @@ function buildMissingFragment(
   const columnName = quoteColumn(impl.columnName);
   const sql = isMissing ? `${columnName} IS NULL` : `${columnName} IS NOT NULL`;
   return { sql, values: [] };
+}
+
+// =============================================================================
+// Section 3b: Lookup-Table Strategy (sort-column search)
+// =============================================================================
+
+/**
+ * Build a WHERE fragment for lookup-table strategy parameters.
+ *
+ * Searches the `__<name>Sort` column which stores a concatenated text
+ * representation (e.g., "Smith John" for HumanName, "123 Main St" for Address).
+ *
+ * Supports the same string modifiers:
+ * - No modifier → case-insensitive prefix match (ILIKE 'value%')
+ * - `:exact` → exact match (`= $N`)
+ * - `:contains` → contains match (ILIKE '%value%')
+ */
+function buildLookupTableFragment(
+  impl: SearchParameterImpl,
+  param: ParsedSearchParam,
+  startIndex: number,
+): WhereFragment {
+  const sortColumn = quoteColumn(`__${impl.columnName}Sort`);
+
+  if (param.modifier === 'exact') {
+    return buildOrFragment(sortColumn, '=', param.values, startIndex);
+  }
+
+  if (param.modifier === 'contains') {
+    return buildLikeFragment(sortColumn, param.values, startIndex, '%', '%');
+  }
+
+  // Default: prefix match
+  return buildLikeFragment(sortColumn, param.values, startIndex, '', '%');
 }
 
 // =============================================================================

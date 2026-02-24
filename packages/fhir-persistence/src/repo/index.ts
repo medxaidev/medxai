@@ -41,6 +41,10 @@ export {
   buildDeleteHistoryRow,
 } from './row-builder.js';
 
+// Reference Indexer
+export type { ReferenceRow } from './reference-indexer.js';
+export { extractReferences } from './reference-indexer.js';
+
 // Row Indexer
 export type { SearchColumnValues } from './row-indexer.js';
 export {

@@ -20,7 +20,7 @@ import { FhirRepository } from '../../repo/fhir-repo.js';
 import { SearchParameterRegistry } from '../../registry/search-parameter-registry.js';
 import type { SearchParameterBundle } from '../../registry/search-parameter-registry.js';
 import { executeSearch } from '../../search/search-executor.js';
-import type { SearchRequest } from '../../search/types.js';
+import type { SearchRequest, IncludeTarget } from '../../search/types.js';
 import type { FhirResource } from '../../repo/types.js';
 
 // =============================================================================
@@ -103,6 +103,15 @@ afterAll(async () => {
       `DELETE FROM "Observation" WHERE "content"::text LIKE $1`,
       [`%${RUN_ID}%`],
     );
+    // Clean up reference rows
+    await db.query(
+      `DELETE FROM "Patient_References" WHERE "resourceId" IN (SELECT "id" FROM "Patient" WHERE "content"::text LIKE $1)`,
+      [`%${RUN_ID}%`],
+    ).catch(() => { });
+    await db.query(
+      `DELETE FROM "Observation_References" WHERE "resourceId" IN (SELECT "id" FROM "Observation" WHERE "content"::text LIKE $1)`,
+      [`%${RUN_ID}%`],
+    ).catch(() => { });
   } catch {
     // ignore cleanup errors
   }
@@ -145,7 +154,14 @@ function makeObservation(subjectRef: string, overrides?: Partial<FhirResource>):
 async function search(
   resourceType: string,
   params: SearchRequest['params'],
-  options?: { count?: number; offset?: number; sort?: SearchRequest['sort']; total?: SearchRequest['total'] },
+  options?: {
+    count?: number;
+    offset?: number;
+    sort?: SearchRequest['sort'];
+    total?: SearchRequest['total'];
+    include?: IncludeTarget[];
+    revinclude?: IncludeTarget[];
+  },
 ): Promise<import('../../search/search-executor.js').SearchResult> {
   const request: SearchRequest = {
     resourceType,
@@ -154,6 +170,8 @@ async function search(
     offset: options?.offset,
     sort: options?.sort,
     total: options?.total,
+    include: options?.include,
+    revinclude: options?.revinclude,
   };
   return executeSearch(db, request, spRegistry, { total: options?.total });
 }
@@ -571,5 +589,216 @@ describe('Phase 15 — token enhancements', () => {
       { code: '_tag', modifier: 'not', values: [`http://example.com|exclude-${RUN_ID}`] },
     ]);
     expect(result.resources).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// Section 6: Phase 16 — _include / _revinclude
+// =============================================================================
+
+describe('Phase 16 — _include and _revinclude', () => {
+  let patientId: string;
+  let observationId: string;
+
+  beforeAll(async () => {
+    // Create a Patient, then an Observation referencing it
+    const patient = await repo.createResource(makePatient({
+      name: [{ family: `IncludeTest-${RUN_ID}`, given: ['Phase16'] }],
+    }));
+    patientId = patient.id;
+
+    const obs = await repo.createResource(makeObservation(`Patient/${patientId}`, {
+      code: {
+        coding: [{ system: 'http://loinc.org', code: '29463-7', display: `P16Weight-${RUN_ID}` }],
+      },
+    }));
+    observationId = obs.id;
+  }, 15_000);
+
+  it('_include loads referenced Patient from Observation search', async () => {
+    const result = await search('Observation', [
+      { code: '_id', values: [observationId] },
+    ], {
+      include: [{ resourceType: 'Observation', searchParam: 'subject' }],
+    });
+
+    expect(result.resources).toHaveLength(1);
+    expect(result.resources[0].id).toBe(observationId);
+    expect(result.included).toBeDefined();
+    expect(result.included!.length).toBeGreaterThanOrEqual(1);
+    const includedIds = result.included!.map((r: FhirResource) => r.id);
+    expect(includedIds).toContain(patientId);
+  });
+
+  it('_revinclude loads Observations referencing Patient', async () => {
+    const result = await search('Patient', [
+      { code: '_id', values: [patientId] },
+    ], {
+      revinclude: [{ resourceType: 'Observation', searchParam: 'subject' }],
+    });
+
+    expect(result.resources).toHaveLength(1);
+    expect(result.resources[0].id).toBe(patientId);
+    expect(result.included).toBeDefined();
+    expect(result.included!.length).toBeGreaterThanOrEqual(1);
+    const includedIds = result.included!.map((r: FhirResource) => r.id);
+    expect(includedIds).toContain(observationId);
+  });
+
+  it('_include with no matching references returns only primary results', async () => {
+    // Patient has no outgoing "subject" reference
+    const result = await search('Patient', [
+      { code: '_id', values: [patientId] },
+    ], {
+      include: [{ resourceType: 'Patient', searchParam: 'organization' }],
+    });
+
+    expect(result.resources).toHaveLength(1);
+    expect(result.included).toBeUndefined();
+  });
+
+  it('_revinclude with no reverse references returns only primary results', async () => {
+    // Search for the Observation — no other resource references it
+    const result = await search('Observation', [
+      { code: '_id', values: [observationId] },
+    ], {
+      revinclude: [{ resourceType: 'Patient', searchParam: 'link' }],
+    });
+
+    expect(result.resources).toHaveLength(1);
+    expect(result.included).toBeUndefined();
+  });
+
+  it('included resources are not duplicated with primary results', async () => {
+    const result = await search('Observation', [
+      { code: '_id', values: [observationId] },
+    ], {
+      include: [{ resourceType: 'Observation', searchParam: 'subject' }],
+    });
+
+    // Primary result is the Observation, included is the Patient
+    // They should not overlap
+    const primaryIds = result.resources.map((r: FhirResource) => r.id!);
+    const includedIds = (result.included ?? []).map((r: FhirResource) => r.id!);
+    const overlap = primaryIds.filter((id) => includedIds.includes(id));
+    expect(overlap).toHaveLength(0);
+  });
+
+  it('reference rows are written on create (verified via _revinclude)', async () => {
+    // Create a new Observation referencing the same Patient
+    const obs2 = await repo.createResource(makeObservation(`Patient/${patientId}`, {
+      code: {
+        coding: [{ system: 'http://loinc.org', code: '8867-4', display: `P16HR-${RUN_ID}` }],
+      },
+    }));
+
+    const result = await search('Patient', [
+      { code: '_id', values: [patientId] },
+    ], {
+      revinclude: [{ resourceType: 'Observation', searchParam: 'subject' }],
+    });
+
+    const includedIds = (result.included ?? []).map((r: FhirResource) => r.id);
+    expect(includedIds).toContain(obs2.id);
+    expect(includedIds).toContain(observationId);
+  });
+
+  it('delete resource cleans up reference rows', async () => {
+    // Create and then delete an Observation
+    const obs3 = await repo.createResource(makeObservation(`Patient/${patientId}`, {
+      code: {
+        coding: [{ system: 'http://loinc.org', code: '9999-9', display: `P16Del-${RUN_ID}` }],
+      },
+    }));
+    await repo.deleteResource('Observation', obs3.id);
+
+    // Verify the deleted obs is NOT in _revinclude results
+    const result = await search('Patient', [
+      { code: '_id', values: [patientId] },
+    ], {
+      revinclude: [{ resourceType: 'Observation', searchParam: 'subject' }],
+    });
+
+    const includedIds = (result.included ?? []).map((r: FhirResource) => r.id);
+    expect(includedIds).not.toContain(obs3.id);
+  });
+
+  it('update resource updates reference rows', async () => {
+    // Create a second patient
+    const patient2 = await repo.createResource(makePatient({
+      name: [{ family: `IncludeTest2-${RUN_ID}`, given: ['Phase16b'] }],
+    }));
+
+    // Create an Observation referencing patient2
+    const obs4 = await repo.createResource(makeObservation(`Patient/${patient2.id}`, {
+      code: {
+        coding: [{ system: 'http://loinc.org', code: '8888-8', display: `P16Upd-${RUN_ID}` }],
+      },
+    }));
+
+    // Update the Observation to reference the original patient instead
+    await repo.updateResource({
+      ...obs4,
+      subject: { reference: `Patient/${patientId}` },
+    } as any);
+
+    // _revinclude on original patient should now include obs4
+    const result = await search('Patient', [
+      { code: '_id', values: [patientId] },
+    ], {
+      revinclude: [{ resourceType: 'Observation', searchParam: 'subject' }],
+    });
+
+    const includedIds = (result.included ?? []).map((r: FhirResource) => r.id);
+    expect(includedIds).toContain(obs4.id);
+  });
+});
+
+// =============================================================================
+// Section 7: Phase 17 — lookup-table search (name, address)
+// =============================================================================
+
+describe('Phase 17 — lookup-table search', () => {
+  let namedPatientId: string;
+
+  beforeAll(async () => {
+    const p = await repo.createResource(makePatient({
+      name: [{ family: `Lookupfam-${RUN_ID}`, given: ['Giventest'] }],
+      address: [{ line: ['789 Elm St'], city: `LookupCity-${RUN_ID}`, state: 'CA', postalCode: '90210', country: 'US' }],
+    }));
+    namedPatientId = p.id;
+  }, 15_000);
+
+  it('search by name (prefix) finds patient', async () => {
+    const result = await search('Patient', [
+      { code: 'name', values: [`Lookupfam-${RUN_ID}`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(namedPatientId);
+  });
+
+  it('search by name :contains finds substring match', async () => {
+    const result = await search('Patient', [
+      { code: 'name', modifier: 'contains', values: [`lookupfam-${RUN_ID.toLowerCase()}`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(namedPatientId);
+  });
+
+  it('search by name :exact matches exactly', async () => {
+    // The sort column stores "Lookupfam-<RUN_ID> Giventest"
+    const result = await search('Patient', [
+      { code: 'name', modifier: 'exact', values: [`Lookupfam-${RUN_ID} Giventest`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(namedPatientId);
+  });
+
+  it('search by address finds patient by city', async () => {
+    const result = await search('Patient', [
+      { code: 'address', modifier: 'contains', values: [`LookupCity-${RUN_ID}`] },
+    ]);
+    const ids = result.resources.map((r: FhirResource) => r.id);
+    expect(ids).toContain(namedPatientId);
   });
 });

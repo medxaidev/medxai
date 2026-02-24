@@ -10,6 +10,7 @@ export type {
   SearchModifier,
   ParsedSearchParam,
   SortRule,
+  IncludeTarget,
   SearchRequest,
   WhereFragment,
   SearchSQL,
@@ -29,6 +30,7 @@ export {
   splitSearchValues,
   extractPrefix,
   parseSortParam,
+  parseIncludeValue,
 } from './param-parser.js';
 
 // WHERE Builder

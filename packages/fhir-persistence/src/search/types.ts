@@ -110,7 +110,29 @@ export interface SortRule {
 }
 
 // =============================================================================
-// Section 5: Search Request
+// Section 5: Include Target
+// =============================================================================
+
+/**
+ * A parsed `_include` or `_revinclude` target.
+ *
+ * Syntax: `{sourceType}:{searchParam}` or `{sourceType}:{searchParam}:{targetType}`
+ *
+ * Examples:
+ * - `_include=MedicationRequest:patient` → `{ resourceType: "MedicationRequest", searchParam: "patient" }`
+ * - `_include=Observation:subject:Patient` → `{ resourceType: "Observation", searchParam: "subject", targetType: "Patient" }`
+ */
+export interface IncludeTarget {
+  /** Source resource type (e.g., "MedicationRequest"). */
+  resourceType: string;
+  /** Search parameter code (e.g., "patient", "subject"). */
+  searchParam: string;
+  /** Optional target type filter (e.g., "Patient"). */
+  targetType?: string;
+}
+
+// =============================================================================
+// Section 6: Search Request
 // =============================================================================
 
 /**
@@ -149,6 +171,18 @@ export interface SearchRequest {
    * Corresponds to `_total`.
    */
   total?: 'none' | 'estimate' | 'accurate';
+
+  /**
+   * Resources to include (forward references).
+   * Corresponds to `_include`.
+   */
+  include?: IncludeTarget[];
+
+  /**
+   * Resources to reverse-include (reverse references).
+   * Corresponds to `_revinclude`.
+   */
+  revinclude?: IncludeTarget[];
 }
 
 /**

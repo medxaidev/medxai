@@ -12,6 +12,7 @@
 
 import type { SearchParameterRegistry } from '../registry/search-parameter-registry.js';
 import type {
+  IncludeTarget,
   ParsedSearchParam,
   SearchModifier,
   SearchPrefix,
@@ -138,6 +139,24 @@ function processQueryParam(
   if (key === '_total') {
     if (value === 'none' || value === 'estimate' || value === 'accurate') {
       request.total = value;
+    }
+    return;
+  }
+
+  if (key === '_include') {
+    const target = parseIncludeValue(value);
+    if (target) {
+      if (!request.include) request.include = [];
+      request.include.push(target);
+    }
+    return;
+  }
+
+  if (key === '_revinclude') {
+    const target = parseIncludeValue(value);
+    if (target) {
+      if (!request.revinclude) request.revinclude = [];
+      request.revinclude.push(target);
     }
     return;
   }
@@ -283,7 +302,40 @@ export function extractPrefix(
 }
 
 // =============================================================================
-// Section 6: Sort Parsing
+// Section 6: Include Parsing
+// =============================================================================
+
+/**
+ * Parse a `_include` or `_revinclude` value into an `IncludeTarget`.
+ *
+ * Syntax: `{sourceType}:{searchParam}` or `{sourceType}:{searchParam}:{targetType}`
+ *
+ * Examples:
+ * - `"MedicationRequest:patient"` → `{ resourceType: "MedicationRequest", searchParam: "patient" }`
+ * - `"Observation:subject:Patient"` → `{ resourceType: "Observation", searchParam: "subject", targetType: "Patient" }`
+ *
+ * @returns Parsed IncludeTarget, or null if the format is invalid.
+ */
+export function parseIncludeValue(value: string): IncludeTarget | null {
+  const parts = value.split(':');
+  if (parts.length < 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+
+  const target: IncludeTarget = {
+    resourceType: parts[0],
+    searchParam: parts[1],
+  };
+
+  if (parts.length >= 3 && parts[2]) {
+    target.targetType = parts[2];
+  }
+
+  return target;
+}
+
+// =============================================================================
+// Section 7: Sort Parsing
 // =============================================================================
 
 /**

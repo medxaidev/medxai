@@ -274,11 +274,13 @@ describe('buildWhereFragment — :missing', () => {
 // =============================================================================
 
 describe('buildWhereFragment — lookup-table', () => {
-  it('returns null for lookup-table strategy', () => {
+  it('searches __nameSort column for lookup-table strategy', () => {
     const impl = makeImpl({ code: 'name', type: 'string', columnName: 'name', strategy: 'lookup-table' });
     const param: ParsedSearchParam = { code: 'name', values: ['Smith'] };
     const result = buildWhereFragment(impl, param, 1);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('LOWER("__nameSort") LIKE $1');
+    expect(result!.values).toEqual(['smith%']);
   });
 });
 
@@ -540,5 +542,85 @@ describe('buildWhereFragment — token system|code', () => {
     const result = buildWhereFragment(impl, param, 1);
     expect(result!.sql).toBe('"__identifierText" && ARRAY[$1, $2]::text[]');
     expect(result!.values).toEqual(['12345', 'http://example.com|67890']);
+  });
+});
+
+// =============================================================================
+// Phase 17 — Lookup-table strategy (sort-column search)
+// =============================================================================
+
+describe('Phase 17 — lookup-table strategy', () => {
+  const nameImpl = makeImpl({
+    code: 'name',
+    type: 'string',
+    strategy: 'lookup-table',
+    columnName: 'name',
+    expression: 'Patient.name',
+  });
+
+  const addressImpl = makeImpl({
+    code: 'address',
+    type: 'string',
+    strategy: 'lookup-table',
+    columnName: 'address',
+    expression: 'Patient.address',
+  });
+
+  const telecomImpl = makeImpl({
+    code: 'telecom',
+    type: 'token',
+    strategy: 'lookup-table',
+    columnName: 'telecom',
+    expression: 'Patient.telecom',
+  });
+
+  it('name prefix search generates LIKE on __nameSort', () => {
+    const param: ParsedSearchParam = { code: 'name', values: ['Smith'] };
+    const result = buildWhereFragment(nameImpl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('LOWER("__nameSort") LIKE $1');
+    expect(result!.values).toEqual(['smith%']);
+  });
+
+  it('name :exact generates equality on __nameSort', () => {
+    const param: ParsedSearchParam = { code: 'name', modifier: 'exact', values: ['Smith'] };
+    const result = buildWhereFragment(nameImpl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('"__nameSort" = $1');
+    expect(result!.values).toEqual(['Smith']);
+  });
+
+  it('name :contains generates LIKE with wildcards on __nameSort', () => {
+    const param: ParsedSearchParam = { code: 'name', modifier: 'contains', values: ['mit'] };
+    const result = buildWhereFragment(nameImpl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('LOWER("__nameSort") LIKE $1');
+    expect(result!.values).toEqual(['%mit%']);
+  });
+
+  it('multiple values generate OR clause', () => {
+    const param: ParsedSearchParam = { code: 'name', values: ['Smith', 'Jones'] };
+    const result = buildWhereFragment(nameImpl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toContain('OR');
+    expect(result!.sql).toContain('LOWER("__nameSort") LIKE $1');
+    expect(result!.sql).toContain('LOWER("__nameSort") LIKE $2');
+    expect(result!.values).toEqual(['smith%', 'jones%']);
+  });
+
+  it('address search uses __addressSort column', () => {
+    const param: ParsedSearchParam = { code: 'address', values: ['Main'] };
+    const result = buildWhereFragment(addressImpl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('LOWER("__addressSort") LIKE $1');
+    expect(result!.values).toEqual(['main%']);
+  });
+
+  it('telecom search uses __telecomSort column', () => {
+    const param: ParsedSearchParam = { code: 'telecom', values: ['555'] };
+    const result = buildWhereFragment(telecomImpl, param, 1);
+    expect(result).not.toBeNull();
+    expect(result!.sql).toBe('LOWER("__telecomSort") LIKE $1');
+    expect(result!.values).toEqual(['555%']);
   });
 });

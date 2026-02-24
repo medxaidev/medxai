@@ -149,6 +149,7 @@ async function handleSearch(
     total: result.total,
     selfUrl: buildSelfLink(paginationCtx),
     nextUrl: buildNextLink(paginationCtx),
+    included: result.included,
   });
 
   reply.header("content-type", FHIR_JSON);

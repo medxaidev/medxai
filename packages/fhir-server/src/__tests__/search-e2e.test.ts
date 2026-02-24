@@ -371,3 +371,132 @@ describe('HTTP Search E2E — Phase 15 metadata params', () => {
     expect(body.entry[0].resource.id).toBe(securedPatientId);
   });
 });
+
+// =============================================================================
+// Section 4: Phase 16 — _include / _revinclude HTTP E2E
+// =============================================================================
+
+describe('HTTP Search E2E — Phase 16 _include/_revinclude', () => {
+  let p16PatientId: string;
+  let p16ObservationId: string;
+
+  beforeAll(async () => {
+    const patient = await repo.createResource({
+      resourceType: 'Patient',
+      name: [{ family: `P16E2E-${RUN_ID}`, given: ['Include'] }],
+      gender: 'female',
+    });
+    p16PatientId = patient.id;
+
+    const obs = await repo.createResource({
+      resourceType: 'Observation',
+      status: 'final',
+      code: { coding: [{ system: 'http://loinc.org', code: '29463-7', display: `P16E2EWeight-${RUN_ID}` }] },
+      subject: { reference: `Patient/${p16PatientId}` },
+      valueQuantity: { value: 65, unit: 'kg' },
+    });
+    p16ObservationId = obs.id;
+  }, 15_000);
+
+  it('GET /Observation?_include=Observation:subject returns Patient in Bundle', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Observation?_id=${p16ObservationId}&_include=Observation:subject`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.type).toBe('searchset');
+
+    const matchEntries = (body.entry ?? []).filter((e: any) => e.search?.mode === 'match');
+    const includeEntries = (body.entry ?? []).filter((e: any) => e.search?.mode === 'include');
+
+    expect(matchEntries).toHaveLength(1);
+    expect(matchEntries[0].resource.id).toBe(p16ObservationId);
+    expect(includeEntries.length).toBeGreaterThanOrEqual(1);
+    const includedIds = includeEntries.map((e: any) => e.resource.id);
+    expect(includedIds).toContain(p16PatientId);
+  });
+
+  it('GET /Patient?_revinclude=Observation:subject returns Observations in Bundle', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?_id=${p16PatientId}&_revinclude=Observation:subject`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+
+    const matchEntries = (body.entry ?? []).filter((e: any) => e.search?.mode === 'match');
+    const includeEntries = (body.entry ?? []).filter((e: any) => e.search?.mode === 'include');
+
+    expect(matchEntries).toHaveLength(1);
+    expect(matchEntries[0].resource.id).toBe(p16PatientId);
+    expect(includeEntries.length).toBeGreaterThanOrEqual(1);
+    const includedIds = includeEntries.map((e: any) => e.resource.id);
+    expect(includedIds).toContain(p16ObservationId);
+  });
+
+  it('included entries have search.mode = include', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Observation?_id=${p16ObservationId}&_include=Observation:subject`,
+    });
+    const body = JSON.parse(res.body);
+    const includeEntries = (body.entry ?? []).filter((e: any) => e.search?.mode === 'include');
+    for (const entry of includeEntries) {
+      expect(entry.search.mode).toBe('include');
+    }
+    expect(includeEntries.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('_include with no matches returns only primary entries', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?_id=${p16PatientId}&_include=Patient:organization`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const includeEntries = (body.entry ?? []).filter((e: any) => e.search?.mode === 'include');
+    expect(includeEntries).toHaveLength(0);
+    const matchEntries = (body.entry ?? []).filter((e: any) => e.search?.mode === 'match');
+    expect(matchEntries).toHaveLength(1);
+  });
+});
+
+// =============================================================================
+// Section 5: Phase 17 — lookup-table search (name) HTTP E2E
+// =============================================================================
+
+describe('HTTP Search E2E — Phase 17 lookup-table search', () => {
+  let p17PatientId: string;
+
+  beforeAll(async () => {
+    const patient = await repo.createResource({
+      resourceType: 'Patient',
+      name: [{ family: `P17E2EFam-${RUN_ID}`, given: ['Lookupgiven'] }],
+      gender: 'male',
+    });
+    p17PatientId = patient.id;
+  }, 15_000);
+
+  it('GET /Patient?name=value returns patient by name prefix', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?name=${encodeURIComponent(`P17E2EFam-${RUN_ID}`)}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const ids = (body.entry ?? []).map((e: any) => e.resource.id);
+    expect(ids).toContain(p17PatientId);
+  });
+
+  it('GET /Patient?name:exact=value returns exact match', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/Patient?name:exact=${encodeURIComponent(`P17E2EFam-${RUN_ID} Lookupgiven`)}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const ids = (body.entry ?? []).map((e: any) => e.resource.id);
+    expect(ids).toContain(p17PatientId);
+  });
+});

@@ -56,6 +56,8 @@ export interface BuildSearchBundleOptions {
   selfUrl?: string;
   /** Next page link URL. */
   nextUrl?: string;
+  /** Included resources from _include/_revinclude. */
+  included?: PersistedResource[];
 }
 
 // =============================================================================
@@ -97,10 +99,22 @@ export function buildSearchBundle(
   }
 
   // Entries
-  if (resources.length > 0) {
-    bundle.entry = resources.map((resource) =>
-      toSearchEntry(resource, options?.baseUrl),
-    );
+  const entries: SearchBundleEntry[] = [];
+
+  // Primary match entries
+  for (const resource of resources) {
+    entries.push(toSearchEntry(resource, 'match', options?.baseUrl));
+  }
+
+  // Included entries (_include / _revinclude)
+  if (options?.included && options.included.length > 0) {
+    for (const resource of options.included) {
+      entries.push(toSearchEntry(resource, 'include', options?.baseUrl));
+    }
+  }
+
+  if (entries.length > 0) {
+    bundle.entry = entries;
   }
 
   return bundle;
@@ -115,12 +129,13 @@ export function buildSearchBundle(
  */
 function toSearchEntry(
   resource: PersistedResource,
+  mode: 'match' | 'include' | 'outcome',
   baseUrl?: string,
 ): SearchBundleEntry {
   const entry: SearchBundleEntry = {
     resource: resource as unknown as Record<string, unknown>,
     search: {
-      mode: 'match',
+      mode,
     },
   };
 

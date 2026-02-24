@@ -143,6 +143,8 @@ export interface SearchOptions {
 export interface SearchResult {
   /** Matched resources. */
   resources: PersistedResource[];
+  /** Included resources from _include/_revinclude (search.mode = 'include'). */
+  included?: PersistedResource[];
   /** Total count (only when `total=accurate`). */
   total?: number;
 }
