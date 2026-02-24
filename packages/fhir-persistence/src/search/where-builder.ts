@@ -330,6 +330,19 @@ function buildReferenceFragment(
   startIndex: number,
 ): WhereFragment {
   const columnName = quoteColumn(impl.columnName);
+
+  // For array reference columns (TEXT[]), use array overlap operator
+  if (impl.array) {
+    if (param.values.length === 1) {
+      const sql = `${columnName} && ARRAY[$${startIndex}]::text[]`;
+      return { sql, values: [param.values[0]] };
+    }
+    const placeholders = param.values.map((_, i) => `$${startIndex + i}`);
+    const sql = `${columnName} && ARRAY[${placeholders.join(', ')}]::text[]`;
+    return { sql, values: [...param.values] };
+  }
+
+  // Scalar reference column — simple equality
   return buildOrFragment(columnName, '=', param.values, startIndex);
 }
 
@@ -372,13 +385,34 @@ function buildTokenColumnFragment(
   param: ParsedSearchParam,
   startIndex: number,
 ): WhereFragment {
-  const columnName = quoteColumn(impl.columnName);
+  // For token-column strategy, the actual DB columns are:
+  //   __<name>     UUID[]  (hash column)
+  //   __<name>Text TEXT[]  (system|code text column)
+  // We search against the Text column using array overlap.
+  const textColumnName = quoteColumn(`__${impl.columnName}Text`);
 
   if (param.modifier === 'not') {
-    return buildNotFragment(columnName, param.values, startIndex);
+    // NOT: none of the values should be in the array
+    // NOT ("__genderText" && ARRAY[$1]::text[])
+    if (param.values.length === 1) {
+      const sql = `NOT (${textColumnName} && ARRAY[$${startIndex}]::text[])`;
+      return { sql, values: [param.values[0]] };
+    }
+    const placeholders = param.values.map((_, i) => `$${startIndex + i}`);
+    const sql = `NOT (${textColumnName} && ARRAY[${placeholders.join(', ')}]::text[])`;
+    return { sql, values: [...param.values] };
   }
 
-  return buildOrFragment(columnName, '=', param.values, startIndex);
+  // Default: array overlap — any of the values match
+  // "__genderText" && ARRAY[$1]::text[]
+  if (param.values.length === 1) {
+    const sql = `${textColumnName} && ARRAY[$${startIndex}]::text[]`;
+    return { sql, values: [param.values[0]] };
+  }
+
+  const placeholders = param.values.map((_, i) => `$${startIndex + i}`);
+  const sql = `${textColumnName} && ARRAY[${placeholders.join(', ')}]::text[]`;
+  return { sql, values: [...param.values] };
 }
 
 // =============================================================================
@@ -443,36 +477,6 @@ function buildOrFragmentRaw(
   }
 
   const sql = `(${conditions.join(' OR ')})`;
-  return { sql, values: allValues };
-}
-
-/**
- * Build a NOT fragment (`:not` modifier).
- *
- * Single value: `"col" <> $1`
- * Multiple values: `("col" <> $1 AND "col" <> $2)`
- */
-function buildNotFragment(
-  columnName: string,
-  values: string[],
-  startIndex: number,
-): WhereFragment {
-  if (values.length === 1) {
-    const sql = `${columnName} <> $${startIndex}`;
-    return { sql, values: [values[0]] };
-  }
-
-  const conditions: string[] = [];
-  const allValues: unknown[] = [];
-  let idx = startIndex;
-
-  for (const value of values) {
-    conditions.push(`${columnName} <> $${idx}`);
-    allValues.push(value);
-    idx++;
-  }
-
-  const sql = `(${conditions.join(' AND ')})`;
   return { sql, values: allValues };
 }
 
@@ -553,7 +557,7 @@ function resolveImpl(
     case '_id':
       return {
         code: '_id',
-        type: 'token',
+        type: 'uri',
         resourceTypes: [resourceType],
         expression: 'id',
         strategy: 'column',

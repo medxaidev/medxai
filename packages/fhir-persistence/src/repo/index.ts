@@ -35,10 +35,20 @@ export { FhirRepository } from './fhir-repo.js';
 // Builders (for advanced usage / testing)
 export {
   buildResourceRow,
+  buildResourceRowWithSearch,
   buildDeleteRow,
   buildHistoryRow,
   buildDeleteHistoryRow,
 } from './row-builder.js';
+
+// Row Indexer
+export type { SearchColumnValues } from './row-indexer.js';
+export {
+  buildSearchColumns,
+  hashToken,
+  extractPropertyPath,
+  getNestedValues,
+} from './row-indexer.js';
 
 export {
   buildUpsertSQL,

@@ -211,10 +211,10 @@ describe('executeSearch — with params', () => {
     type: 'token',
     resourceTypes: ['Patient'],
     expression: '',
-    strategy: 'column',
+    strategy: 'token-column',
     columnName: 'gender',
-    columnType: 'TEXT',
-    array: false,
+    columnType: 'UUID[]',
+    array: true,
   });
 
   it('passes search params to SQL builder', async () => {
@@ -224,7 +224,7 @@ describe('executeSearch — with params', () => {
     });
     await executeSearch(db, request, registry);
     const [sql, values] = (db.query as any).mock.calls[0];
-    expect(sql).toContain('"gender"');
+    expect(sql).toContain('"__genderText"');
     expect(values).toContain('male');
   });
 

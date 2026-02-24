@@ -81,6 +81,14 @@ export {
 } from './repo/index.js';
 export { FhirRepository } from './repo/index.js';
 export { buildHistoryBundle } from './repo/index.js';
+export type { SearchColumnValues } from './repo/index.js';
+export {
+  buildSearchColumns,
+  buildResourceRowWithSearch,
+  hashToken,
+  extractPropertyPath,
+  getNestedValues,
+} from './repo/index.js';
 
 // ─── Search ─────────────────────────────────────────────────────────────────
 export type {

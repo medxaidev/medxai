@@ -2,11 +2,11 @@
 
 ## Status
 
-**Status:** Planned  
-**Version:** v1.0  
+**Status:** ✅ COMPLETED  
+**Version:** v2.0  
 **Stage:** Stage-2 (FHIR Persistence Platform)  
-**Estimated Duration:** 8-12 weeks  
-**Last Updated:** 2026-02-18  
+**Actual Duration:** ~5 days (2026-02-18 → 2026-02-24)  
+**Last Updated:** 2026-02-24  
 **Depends On:** Stage-1 ✅ Complete (Phases 1-6)
 
 ---
@@ -682,36 +682,81 @@ interface SearchExecutor {
 
 ---
 
+## Schema Verification Results (2026-02-24)
+
+After completing Phase 13, a systematic comparison was performed between MedXAI's
+generated DDL and Medplum's actual PostgreSQL schema, using the `Account` resource
+as the primary test case.
+
+### Fixes Applied
+
+| Issue                                 | Root Cause                                                    | Fix                                                                             |
+| ------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `Account.patient` was `TEXT` (scalar) | `resolveIsArray` did not detect `.where()` expression pattern | Enhanced to detect `expression.includes('.where(')` → array                     |
+| `Account.subject` was `TEXT` (scalar) | `resolveIsArray` did not check multiple target types          | Enhanced to detect `targets.length > 1` → array                                 |
+| `Account.name` used `column` strategy | `resolveStrategy` only checked `LOOKUP_TABLE_PARAMS` set      | Added expression-based suffix detection (`.name`, `.address`, `.telecom`, etc.) |
+
+### Verified Correct Behaviors
+
+- `Account.status` uses `token-column` (3 columns: `__status uuid[]`, `__statusText text[]`, `__statusSort text`) — correct per FHIR spec, Medplum uses simplified `text`
+- `Account_History` and `Account_References` tables — identical structure to Medplum
+- Multi-target references (`Patient.general-practitioner`, `Observation.subject`) correctly resolve to `TEXT[]` with GIN index
+- Single-target references (`Patient.organization`, `Observation.specimen`) correctly resolve to `TEXT` with btree index
+
+### Medplum Extra Columns — Deferred by Design
+
+The following Medplum columns are intentionally absent from MedXAI's current schema.
+They are planned for future phases:
+
+| Column Category       | Examples                                                                        | Purpose                             | Planned Phase |
+| --------------------- | ------------------------------------------------------------------------------- | ----------------------------------- | ------------- |
+| Metadata token search | `___tag uuid[]`, `___tagText text[]`, `___tagSort text`, `___securitySort text` | `_tag` / `_security` search params  | Phase 14      |
+| Shared token index    | `__sharedTokens uuid[]`, `__sharedTokensText text[]`                            | Cross-parameter unified token index | Stage-3+      |
+| Reference lookup sort | `__ownerIdentifierSort`, `__patientIdentifierSort`, `__subjectIdentifierSort`   | Reference parameter sort columns    | Phase 14      |
+| Trigram indexes       | `*TextTrgm` GIN indexes (requires `pg_trgm`)                                    | Full-text fuzzy search              | Stage-3+      |
+
+### Test Coverage for Schema Correctness
+
+- **15 new assertion tests** in `table-schema-builder.test.ts` Section 11
+- Covers: Account, Patient, Observation, Practitioner, Organization, DiagnosticReport
+- Verifies: reference array detection, lookup-table strategy, single vs multi-target references
+- **499/499** persistence tests passing, 0 regressions
+
+See also: [TEST-PLAN-002](./TEST-PLAN-002_schema-and-api-verification.md)
+
+---
+
 ## Success Metrics
 
-| Metric                          | Target             |
-| ------------------------------- | ------------------ |
-| Implementation files            | 25-35              |
-| Test files                      | 15-20              |
-| Total tests (Stage-2)           | 400-600            |
-| FHIR interactions supported     | 7 (CRUD + history) |
-| SearchParameter types supported | 6                  |
-| Write latency (p99)             | < 50ms             |
-| Read latency (p99)              | < 20ms             |
-| Search latency (p99, simple)    | < 100ms            |
-| Transaction isolation           | SERIALIZABLE       |
-| History correctness             | 100%               |
+| Metric                          | Target             | Actual                               |
+| ------------------------------- | ------------------ | ------------------------------------ |
+| Implementation files            | 25-35              | ~40                                  |
+| Test files                      | 15-20              | 25+                                  |
+| Total tests (Stage-2)           | 400-600            | 589 (499 persistence + 90 server)    |
+| FHIR interactions supported     | 7 (CRUD + history) | 9 (CRUD + history + search GET/POST) |
+| SearchParameter types supported | 6                  | 6 ✅                                 |
+| Write latency (p99)             | < 50ms             | TBD (not benchmarked)                |
+| Read latency (p99)              | < 20ms             | TBD (not benchmarked)                |
+| Search latency (p99, simple)    | < 100ms            | TBD (not benchmarked)                |
+| Transaction isolation           | SERIALIZABLE       | ✅ Verified                          |
+| History correctness             | 100%               | ✅ Verified                          |
 
 ---
 
 ## Stage-2 Completion Checklist
 
-- [ ] Phase 7: FHIR Model complete
-- [ ] Phase 8: Table generation working
-- [ ] Phase 9: Repository stable (CRUD + transactions)
-- [ ] Phase 10: History mechanism correct
-- [ ] Phase 11: REST API serving CRUD
-- [ ] Phase 12: SearchParameter index layer
-- [ ] Phase 13: Search execution working
-- [ ] All tests passing (400+ new tests)
-- [ ] Zero TypeScript errors
-- [ ] ADR-005 acceptance criteria met
-- [ ] Documentation updated
+- [x] Phase 7: FHIR Model complete — 38 tests, 2026-02-22
+- [x] Phase 8: Table generation working — 114 tests, 2026-02-22
+- [x] Phase 9: Repository stable (CRUD + transactions) — 180+ tests, 2026-02-23
+- [x] Phase 10: History mechanism correct — 60+ tests, 2026-02-23
+- [x] Phase 11: REST API serving CRUD — 65 tests, 2026-02-23
+- [x] Phase 12: SearchParameter index layer — 95 tests, 2026-02-23
+- [x] Phase 13: Search execution working — 90 tests, 2026-02-23
+- [x] All tests passing — 589 new Stage-2 tests (499 persistence + 90 server)
+- [x] Zero TypeScript errors — `tsc --noEmit` clean across all packages
+- [x] ADR-005 acceptance criteria met
+- [x] Documentation updated — 2026-02-24
+- [x] Schema verification — Medplum comparison completed, 15 correctness tests added
 
 ---
 

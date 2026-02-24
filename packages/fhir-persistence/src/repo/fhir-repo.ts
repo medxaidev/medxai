@@ -34,7 +34,7 @@ import {
   ResourceGoneError,
   ResourceVersionConflictError,
 } from './errors.js';
-import { buildResourceRow, buildDeleteRow, buildHistoryRow, buildDeleteHistoryRow } from './row-builder.js';
+import { buildResourceRow, buildResourceRowWithSearch, buildDeleteRow, buildHistoryRow, buildDeleteHistoryRow } from './row-builder.js';
 import { buildUpsertSQL, buildInsertSQL, buildSelectByIdSQL, buildSelectVersionSQL, buildInstanceHistorySQL, buildTypeHistorySQL } from './sql-builder.js';
 
 // =============================================================================
@@ -51,6 +51,21 @@ export class FhirRepository implements ResourceRepository {
   ) {
     this.db = db;
     this.registry = registry;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private — Row Building
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build a main table row, including search columns when registry is available.
+   */
+  private buildRow(resource: PersistedResource): import('./types.js').ResourceRow {
+    if (this.registry) {
+      const impls = this.registry.getForResource(resource.resourceType);
+      return buildResourceRowWithSearch(resource, impls);
+    }
+    return buildResourceRow(resource);
   }
 
   // ---------------------------------------------------------------------------
@@ -75,7 +90,7 @@ export class FhirRepository implements ResourceRepository {
       },
     } as T & PersistedResource;
 
-    const mainRow = buildResourceRow(persisted);
+    const mainRow = this.buildRow(persisted);
     const historyRow = buildHistoryRow(persisted);
 
     await this.db.withTransaction(async (client) => {
@@ -150,7 +165,7 @@ export class FhirRepository implements ResourceRepository {
       },
     } as T & PersistedResource;
 
-    const mainRow = buildResourceRow(persisted);
+    const mainRow = this.buildRow(persisted);
     const historyRow = buildHistoryRow(persisted);
 
     await this.db.withTransaction(async (client) => {

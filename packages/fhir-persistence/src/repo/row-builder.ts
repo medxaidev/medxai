@@ -16,6 +16,8 @@ import type {
   HistoryRow,
 } from './types.js';
 import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './types.js';
+import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
+import { buildSearchColumns } from './row-indexer.js';
 
 // =============================================================================
 // Section 1: Main Table Row
@@ -55,6 +57,25 @@ export function buildResourceRow(resource: PersistedResource): ResourceRow {
   }
 
   return row;
+}
+
+/**
+ * Build a main table row with search column values populated.
+ *
+ * Extends `buildResourceRow()` by extracting search parameter values
+ * from the resource JSON and merging them into the row.
+ *
+ * @param resource - The persisted resource.
+ * @param searchImpls - SearchParameterImpl list for this resource type.
+ * @returns A `ResourceRow` with both fixed and search columns.
+ */
+export function buildResourceRowWithSearch(
+  resource: PersistedResource,
+  searchImpls: SearchParameterImpl[],
+): ResourceRow {
+  const fixedRow = buildResourceRow(resource);
+  const searchCols = buildSearchColumns(resource, searchImpls);
+  return { ...fixedRow, ...searchCols };
 }
 
 // =============================================================================

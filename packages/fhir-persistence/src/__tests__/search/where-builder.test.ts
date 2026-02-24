@@ -224,25 +224,26 @@ describe('buildWhereFragment — uri', () => {
 // =============================================================================
 
 describe('buildWhereFragment — token', () => {
-  const impl = makeImpl({ code: 'gender', type: 'token', columnName: 'gender' });
+  const impl = makeImpl({ code: 'gender', type: 'token', columnName: 'gender', strategy: 'token-column' });
 
-  it('equality match', () => {
+  it('array overlap match on __genderText', () => {
     const param: ParsedSearchParam = { code: 'gender', values: ['male'] };
     const result = buildWhereFragment(impl, param, 1);
-    expect(result!.sql).toBe('"gender" = $1');
+    expect(result!.sql).toBe('"__genderText" && ARRAY[$1]::text[]');
     expect(result!.values).toEqual(['male']);
   });
 
-  it(':not modifier: inequality', () => {
+  it(':not modifier: NOT array overlap', () => {
     const param: ParsedSearchParam = { code: 'gender', modifier: 'not', values: ['male'] };
     const result = buildWhereFragment(impl, param, 1);
-    expect(result!.sql).toBe('"gender" <> $1');
+    expect(result!.sql).toBe('NOT ("__genderText" && ARRAY[$1]::text[])');
   });
 
-  it('multiple values produce OR', () => {
+  it('multiple values in single ARRAY', () => {
     const param: ParsedSearchParam = { code: 'gender', values: ['male', 'female'] };
     const result = buildWhereFragment(impl, param, 1);
-    expect(result!.sql).toContain('OR');
+    expect(result!.sql).toBe('"__genderText" && ARRAY[$1, $2]::text[]');
+    expect(result!.values).toEqual(['male', 'female']);
   });
 });
 
@@ -286,15 +287,15 @@ describe('buildWhereFragment — lookup-table', () => {
 // =============================================================================
 
 describe('buildWhereFragment — parameter indexing', () => {
-  it('uses startIndex for $N placeholder', () => {
-    const impl = makeImpl({ code: 'gender', type: 'token', columnName: 'gender' });
+  it('uses startIndex for $N placeholder (token-column)', () => {
+    const impl = makeImpl({ code: 'gender', type: 'token', columnName: 'gender', strategy: 'token-column' });
     const param: ParsedSearchParam = { code: 'gender', values: ['male'] };
     const result = buildWhereFragment(impl, param, 5);
-    expect(result!.sql).toBe('"gender" = $5');
+    expect(result!.sql).toBe('"__genderText" && ARRAY[$5]::text[]');
   });
 
-  it('increments index for multiple OR values', () => {
-    const impl = makeImpl({ code: 'gender', type: 'token', columnName: 'gender' });
+  it('increments index for multiple values (token-column)', () => {
+    const impl = makeImpl({ code: 'gender', type: 'token', columnName: 'gender', strategy: 'token-column' });
     const param: ParsedSearchParam = { code: 'gender', values: ['male', 'female'] };
     const result = buildWhereFragment(impl, param, 3);
     expect(result!.sql).toContain('$3');
@@ -310,8 +311,8 @@ describe('buildWhereClause', () => {
   const registry = new SearchParameterRegistry();
 
   // Manually index some test impls
-  registry.indexImpl('Patient', makeImpl({ code: 'gender', type: 'token', columnName: 'gender' }));
-  registry.indexImpl('Patient', makeImpl({ code: 'active', type: 'token', columnName: 'active' }));
+  registry.indexImpl('Patient', makeImpl({ code: 'gender', type: 'token', columnName: 'gender', strategy: 'token-column' }));
+  registry.indexImpl('Patient', makeImpl({ code: 'active', type: 'token', columnName: 'active', strategy: 'token-column' }));
   registry.indexImpl('Patient', makeImpl({ code: 'birthdate', type: 'date', columnName: 'birthdate', columnType: 'TIMESTAMPTZ' }));
 
   it('combines multiple params with AND', () => {
@@ -321,9 +322,9 @@ describe('buildWhereClause', () => {
     ];
     const result = buildWhereClause(params, registry, 'Patient');
     expect(result).not.toBeNull();
-    expect(result!.sql).toContain('"gender" = $1');
+    expect(result!.sql).toContain('"__genderText" && ARRAY[$1]::text[]');
     expect(result!.sql).toContain('AND');
-    expect(result!.sql).toContain('"active" = $2');
+    expect(result!.sql).toContain('"__activeText" && ARRAY[$2]::text[]');
     expect(result!.values).toEqual(['male', 'true']);
   });
 
@@ -365,8 +366,8 @@ describe('buildWhereClause', () => {
     ];
     const result = buildWhereClause(params, registry, 'Patient');
     expect(result).not.toBeNull();
-    expect(result!.sql).toContain('"id" = $1');
-    expect(result!.sql).toContain('"gender" = $2');
+    expect(result!.sql).toContain('"id"');
+    expect(result!.sql).toContain('"__genderText" && ARRAY[$2]::text[]');
     expect(result!.sql).toContain('"birthdate" >= $3');
     expect(result!.values).toEqual(['abc', 'male', '1990-01-01']);
   });

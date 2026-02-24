@@ -26,11 +26,11 @@ function makeImpl(overrides: Partial<SearchParameterImpl> & { code: string; type
 
 function createTestRegistry(): SearchParameterRegistry {
   const registry = new SearchParameterRegistry();
-  registry.indexImpl('Patient', makeImpl({ code: 'gender', type: 'token', columnName: 'gender' }));
-  registry.indexImpl('Patient', makeImpl({ code: 'active', type: 'token', columnName: 'active' }));
+  registry.indexImpl('Patient', makeImpl({ code: 'gender', type: 'token', columnName: 'gender', strategy: 'token-column' }));
+  registry.indexImpl('Patient', makeImpl({ code: 'active', type: 'token', columnName: 'active', strategy: 'token-column' }));
   registry.indexImpl('Patient', makeImpl({ code: 'birthdate', type: 'date', columnName: 'birthdate', columnType: 'TIMESTAMPTZ' }));
   registry.indexImpl('Patient', makeImpl({ code: 'family', type: 'string', columnName: 'family' }));
-  registry.indexImpl('Observation', makeImpl({ code: 'status', type: 'token', columnName: 'status', resourceTypes: ['Observation'] }));
+  registry.indexImpl('Observation', makeImpl({ code: 'status', type: 'token', columnName: 'status', strategy: 'token-column', resourceTypes: ['Observation'] }));
   return registry;
 }
 
@@ -61,7 +61,7 @@ describe('buildSearchSQL', () => {
     const result = buildSearchSQL(request, registry);
 
     expect(result.sql).toContain('"deleted" = false');
-    expect(result.sql).toContain('"gender" = $1');
+    expect(result.sql).toContain('"__genderText" && ARRAY[$1]::text[]');
     expect(result.sql).toContain('LIMIT $2');
     expect(result.values).toEqual(['male', 20]);
   });
@@ -76,8 +76,8 @@ describe('buildSearchSQL', () => {
     };
     const result = buildSearchSQL(request, registry);
 
-    expect(result.sql).toContain('"gender" = $1');
-    expect(result.sql).toContain('"active" = $2');
+    expect(result.sql).toContain('"__genderText" && ARRAY[$1]::text[]');
+    expect(result.sql).toContain('"__activeText" && ARRAY[$2]::text[]');
     expect(result.sql).toContain('LIMIT $3');
     expect(result.values).toEqual(['male', 'true', 20]);
   });
@@ -203,7 +203,7 @@ describe('buildSearchSQL', () => {
     expect(result.sql).toContain('SELECT "id", "content", "lastUpdated", "deleted"');
     expect(result.sql).toContain('FROM "Patient"');
     expect(result.sql).toContain('"deleted" = false');
-    expect(result.sql).toContain('"gender" = $1');
+    expect(result.sql).toContain('"__genderText" && ARRAY[$1]::text[]');
     expect(result.sql).toContain('"birthdate" >= $2');
     expect(result.sql).toContain('ORDER BY "birthdate" DESC');
     expect(result.sql).toContain('LIMIT $3');
@@ -291,7 +291,7 @@ describe('buildCountSQL', () => {
     };
     const result = buildCountSQL(request, registry);
 
-    expect(result.sql).toContain('"gender" = $1');
+    expect(result.sql).toContain('"__genderText" && ARRAY[$1]::text[]');
     expect(result.values).toEqual(['male']);
   });
 
