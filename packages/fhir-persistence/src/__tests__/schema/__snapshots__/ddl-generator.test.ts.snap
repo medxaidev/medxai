@@ -16,6 +16,8 @@ exports[`DDLGenerator — Snapshot Tests > Binary DDL snapshot 1`] = `
   "__security" UUID[],
   "__securityText" TEXT[],
   "__securitySort" TEXT,
+  "__sharedTokens" UUID[],
+  "__sharedTokensText" TEXT[],
   CONSTRAINT "Binary_pk" PRIMARY KEY ("id")
 );
 
@@ -55,6 +57,15 @@ CREATE INDEX IF NOT EXISTS "Binary_version_idx"
 CREATE INDEX IF NOT EXISTS "Binary_reindex_idx"
   ON "Binary" USING btree ("lastUpdated", "__version")
   WHERE deleted = false;
+
+CREATE INDEX IF NOT EXISTS "Binary___sharedTokens_idx"
+  ON "Binary" USING gin ("__sharedTokens");
+
+CREATE INDEX IF NOT EXISTS "Binary___tagText_trgm_idx"
+  ON "Binary" USING gin ("__tagText");
+
+CREATE INDEX IF NOT EXISTS "Binary___securityText_trgm_idx"
+  ON "Binary" USING gin ("__securityText");
 
 CREATE INDEX IF NOT EXISTS "Binary_History_id_idx"
   ON "Binary_History" USING btree ("id");
@@ -140,6 +151,8 @@ exports[`DDLGenerator — Snapshot Tests > Observation DDL snapshot 1`] = `
   "valueDate" TIMESTAMPTZ,
   "valueQuantity" DOUBLE PRECISION,
   "valueString" TEXT,
+  "__sharedTokens" UUID[],
+  "__sharedTokensText" TEXT[],
   CONSTRAINT "Observation_pk" PRIMARY KEY ("id")
 );
 
@@ -273,6 +286,54 @@ CREATE INDEX IF NOT EXISTS "Observation_valueQuantity_idx"
 CREATE INDEX IF NOT EXISTS "Observation_valueString_idx"
   ON "Observation" USING btree ("valueString");
 
+CREATE INDEX IF NOT EXISTS "Observation___sharedTokens_idx"
+  ON "Observation" USING gin ("__sharedTokens");
+
+CREATE INDEX IF NOT EXISTS "Observation___categoryText_trgm_idx"
+  ON "Observation" USING gin ("__categoryText");
+
+CREATE INDEX IF NOT EXISTS "Observation___codeText_trgm_idx"
+  ON "Observation" USING gin ("__codeText");
+
+CREATE INDEX IF NOT EXISTS "Observation___comboCodeText_trgm_idx"
+  ON "Observation" USING gin ("__comboCodeText");
+
+CREATE INDEX IF NOT EXISTS "Observation___comboDataAbsentReasonText_trgm_idx"
+  ON "Observation" USING gin ("__comboDataAbsentReasonText");
+
+CREATE INDEX IF NOT EXISTS "Observation___comboValueConceptText_trgm_idx"
+  ON "Observation" USING gin ("__comboValueConceptText");
+
+CREATE INDEX IF NOT EXISTS "Observation___componentCodeText_trgm_idx"
+  ON "Observation" USING gin ("__componentCodeText");
+
+CREATE INDEX IF NOT EXISTS "Observation___componentDataAbsentReasonText_trgm_idx"
+  ON "Observation" USING gin ("__componentDataAbsentReasonText");
+
+CREATE INDEX IF NOT EXISTS "Observation___componentValueConceptText_trgm_idx"
+  ON "Observation" USING gin ("__componentValueConceptText");
+
+CREATE INDEX IF NOT EXISTS "Observation___dataAbsentReasonText_trgm_idx"
+  ON "Observation" USING gin ("__dataAbsentReasonText");
+
+CREATE INDEX IF NOT EXISTS "Observation___identifierText_trgm_idx"
+  ON "Observation" USING gin ("__identifierText");
+
+CREATE INDEX IF NOT EXISTS "Observation___methodText_trgm_idx"
+  ON "Observation" USING gin ("__methodText");
+
+CREATE INDEX IF NOT EXISTS "Observation___statusText_trgm_idx"
+  ON "Observation" USING gin ("__statusText");
+
+CREATE INDEX IF NOT EXISTS "Observation___valueConceptText_trgm_idx"
+  ON "Observation" USING gin ("__valueConceptText");
+
+CREATE INDEX IF NOT EXISTS "Observation___tagText_trgm_idx"
+  ON "Observation" USING gin ("__tagText");
+
+CREATE INDEX IF NOT EXISTS "Observation___securityText_trgm_idx"
+  ON "Observation" USING gin ("__securityText");
+
 CREATE INDEX IF NOT EXISTS "Observation_History_id_idx"
   ON "Observation_History" USING btree ("id");
 
@@ -334,6 +395,8 @@ exports[`DDLGenerator — Snapshot Tests > Patient DDL snapshot 1`] = `
   "__phoneSort" TEXT,
   "__phoneticSort" TEXT,
   "__telecomSort" TEXT,
+  "__sharedTokens" UUID[],
+  "__sharedTokensText" TEXT[],
   CONSTRAINT "Patient_pk" PRIMARY KEY ("id")
 );
 
@@ -446,6 +509,30 @@ CREATE INDEX IF NOT EXISTS "Patient___phoneticSort_idx"
 CREATE INDEX IF NOT EXISTS "Patient___telecomSort_idx"
   ON "Patient" USING btree ("__telecomSort");
 
+CREATE INDEX IF NOT EXISTS "Patient___sharedTokens_idx"
+  ON "Patient" USING gin ("__sharedTokens");
+
+CREATE INDEX IF NOT EXISTS "Patient___activeText_trgm_idx"
+  ON "Patient" USING gin ("__activeText");
+
+CREATE INDEX IF NOT EXISTS "Patient___deceasedText_trgm_idx"
+  ON "Patient" USING gin ("__deceasedText");
+
+CREATE INDEX IF NOT EXISTS "Patient___genderText_trgm_idx"
+  ON "Patient" USING gin ("__genderText");
+
+CREATE INDEX IF NOT EXISTS "Patient___identifierText_trgm_idx"
+  ON "Patient" USING gin ("__identifierText");
+
+CREATE INDEX IF NOT EXISTS "Patient___languageText_trgm_idx"
+  ON "Patient" USING gin ("__languageText");
+
+CREATE INDEX IF NOT EXISTS "Patient___tagText_trgm_idx"
+  ON "Patient" USING gin ("__tagText");
+
+CREATE INDEX IF NOT EXISTS "Patient___securityText_trgm_idx"
+  ON "Patient" USING gin ("__securityText");
+
 CREATE INDEX IF NOT EXISTS "Patient_History_id_idx"
   ON "Patient_History" USING btree ("id");
 
@@ -454,5 +541,187 @@ CREATE INDEX IF NOT EXISTS "Patient_History_lastUpdated_idx"
 
 CREATE INDEX IF NOT EXISTS "Patient_References_targetId_code_idx"
   ON "Patient_References" USING btree ("targetId", "code")
-  INCLUDE ("resourceId");"
+  INCLUDE ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Address" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Address_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Address_value_idx"
+  ON "Patient_Address" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Address_resourceId_idx"
+  ON "Patient_Address" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Address-city" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Address-city_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-city_value_idx"
+  ON "Patient_Address-city" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-city_resourceId_idx"
+  ON "Patient_Address-city" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Address-country" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Address-country_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-country_value_idx"
+  ON "Patient_Address-country" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-country_resourceId_idx"
+  ON "Patient_Address-country" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Address-postalcode" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Address-postalcode_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-postalcode_value_idx"
+  ON "Patient_Address-postalcode" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-postalcode_resourceId_idx"
+  ON "Patient_Address-postalcode" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Address-state" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Address-state_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-state_value_idx"
+  ON "Patient_Address-state" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-state_resourceId_idx"
+  ON "Patient_Address-state" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Address-use" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Address-use_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-use_value_idx"
+  ON "Patient_Address-use" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Address-use_resourceId_idx"
+  ON "Patient_Address-use" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Email" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Email_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Email_value_idx"
+  ON "Patient_Email" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Email_resourceId_idx"
+  ON "Patient_Email" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Family" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Family_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Family_value_idx"
+  ON "Patient_Family" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Family_resourceId_idx"
+  ON "Patient_Family" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Given" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Given_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Given_value_idx"
+  ON "Patient_Given" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Given_resourceId_idx"
+  ON "Patient_Given" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Name" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Name_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Name_value_idx"
+  ON "Patient_Name" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Name_resourceId_idx"
+  ON "Patient_Name" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Phone" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Phone_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Phone_value_idx"
+  ON "Patient_Phone" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Phone_resourceId_idx"
+  ON "Patient_Phone" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Phonetic" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Phonetic_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Phonetic_value_idx"
+  ON "Patient_Phonetic" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Phonetic_resourceId_idx"
+  ON "Patient_Phonetic" USING btree ("resourceId");
+
+CREATE TABLE IF NOT EXISTS "Patient_Telecom" (
+  "resourceId" UUID NOT NULL,
+  "index" INTEGER NOT NULL,
+  "value" TEXT NOT NULL,
+  "system" TEXT,
+  CONSTRAINT "Patient_Telecom_pk" PRIMARY KEY ("resourceId", "index")
+);
+
+CREATE INDEX IF NOT EXISTS "Patient_Telecom_value_idx"
+  ON "Patient_Telecom" USING btree ("value");
+
+CREATE INDEX IF NOT EXISTS "Patient_Telecom_resourceId_idx"
+  ON "Patient_Telecom" USING btree ("resourceId");"
 `;

@@ -60,6 +60,25 @@ export class ResourceGoneError extends RepositoryError {
 }
 
 /**
+ * Multiple matches found for conditional operation (HTTP 412 Precondition Failed).
+ *
+ * Thrown when a conditional update/delete matches more than one resource.
+ */
+export class PreconditionFailedError extends RepositoryError {
+  override readonly name = 'PreconditionFailedError';
+  readonly resourceType: string;
+  readonly matchCount: number;
+
+  constructor(resourceType: string, matchCount: number) {
+    super(
+      `Conditional operation on ${resourceType} matched ${matchCount} resources (expected 0 or 1)`,
+    );
+    this.resourceType = resourceType;
+    this.matchCount = matchCount;
+  }
+}
+
+/**
  * Optimistic locking conflict (HTTP 412 Precondition Failed).
  *
  * Thrown when `ifMatch` (expected versionId) does not match

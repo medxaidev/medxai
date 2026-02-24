@@ -33,6 +33,7 @@ import {
   ResourceNotFoundError,
   ResourceGoneError,
   ResourceVersionConflictError,
+  PreconditionFailedError,
 } from './errors.js';
 import { buildResourceRow, buildResourceRowWithSearch, buildDeleteRow, buildHistoryRow, buildDeleteHistoryRow } from './row-builder.js';
 import { buildUpsertSQL, buildInsertSQL, buildSelectByIdSQL, buildSelectVersionSQL, buildInstanceHistorySQL, buildTypeHistorySQL } from './sql-builder.js';
@@ -326,6 +327,149 @@ export class FhirRepository implements ResourceRepository {
       throw new Error('SearchParameterRegistry is required for search operations');
     }
     return executeSearch(this.db, request, this.registry, options);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Conditional Create (If-None-Exist)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Conditional create: create only if no matching resource exists.
+   *
+   * @param resource - The resource to create.
+   * @param searchRequest - Search criteria (If-None-Exist).
+   * @returns The existing or newly created resource, and whether it was created.
+   */
+  async conditionalCreate<T extends FhirResource>(
+    resource: T,
+    searchRequest: SearchRequest,
+  ): Promise<{ resource: T & PersistedResource; created: boolean }> {
+    if (!this.registry) {
+      throw new Error('SearchParameterRegistry is required for conditional operations');
+    }
+
+    // Search for existing match
+    const result = await executeSearch(this.db, searchRequest, this.registry);
+    if (result.resources.length > 0) {
+      // Resource already exists — return it without creating
+      return { resource: result.resources[0] as T & PersistedResource, created: false };
+    }
+
+    // No match — create normally
+    const created = await this.createResource(resource);
+    return { resource: created, created: true };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Conditional Update
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Conditional update: search-based PUT.
+   *
+   * - 0 matches → create
+   * - 1 match → update that resource
+   * - 2+ matches → 412 Precondition Failed
+   */
+  async conditionalUpdate<T extends FhirResource>(
+    resource: T,
+    searchRequest: SearchRequest,
+  ): Promise<{ resource: T & PersistedResource; created: boolean }> {
+    if (!this.registry) {
+      throw new Error('SearchParameterRegistry is required for conditional operations');
+    }
+
+    const result = await executeSearch(this.db, searchRequest, this.registry);
+
+    if (result.resources.length > 1) {
+      throw new PreconditionFailedError(resource.resourceType, result.resources.length);
+    }
+
+    if (result.resources.length === 1) {
+      // Update existing
+      const existing = result.resources[0];
+      const toUpdate = { ...resource, id: existing.id } as T;
+      const updated = await this.updateResource(toUpdate);
+      return { resource: updated, created: false };
+    }
+
+    // No match — create
+    const created = await this.createResource(resource);
+    return { resource: created, created: true };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Conditional Delete
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Conditional delete: delete all resources matching search criteria.
+   *
+   * @returns Number of resources deleted.
+   */
+  async conditionalDelete(
+    resourceType: string,
+    searchRequest: SearchRequest,
+  ): Promise<number> {
+    if (!this.registry) {
+      throw new Error('SearchParameterRegistry is required for conditional operations');
+    }
+
+    const result = await executeSearch(this.db, searchRequest, this.registry);
+    let count = 0;
+
+    for (const resource of result.resources) {
+      try {
+        await this.deleteResource(resourceType, resource.id);
+        count++;
+      } catch {
+        // Skip already-deleted or not-found
+      }
+    }
+
+    return count;
+  }
+
+  // ---------------------------------------------------------------------------
+  // $everything (Patient Compartment Export)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Patient $everything: returns the Patient plus all resources in its compartment.
+   *
+   * Uses the compartments UUID[] column for efficient lookup.
+   */
+  async everything(
+    resourceType: string,
+    id: string,
+    compartmentResourceTypes: string[],
+  ): Promise<PersistedResource[]> {
+    // Read the focal resource first
+    const focal = await this.readResource(resourceType, id);
+    const results: PersistedResource[] = [focal];
+
+    // Search each compartment resource type
+    for (const rt of compartmentResourceTypes) {
+      try {
+        const { rows } = await this.db.query<{ content: string; deleted: boolean }>(
+          `SELECT "content", "deleted" FROM "${rt}" WHERE "deleted" = false AND "compartments" @> ARRAY[$1]::uuid[]`,
+          [id],
+        );
+        for (const row of rows) {
+          if (!row.deleted && row.content) {
+            try {
+              results.push(JSON.parse(row.content) as PersistedResource);
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      } catch {
+        // Table may not exist — skip
+      }
+    }
+
+    return results;
   }
 
   // ---------------------------------------------------------------------------

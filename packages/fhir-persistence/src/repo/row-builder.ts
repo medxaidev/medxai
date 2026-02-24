@@ -17,7 +17,7 @@ import type {
 } from './types.js';
 import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './types.js';
 import type { SearchParameterImpl } from '../registry/search-parameter-registry.js';
-import { buildSearchColumns, buildMetadataColumns, extractPropertyPath, getNestedValues } from './row-indexer.js';
+import { buildSearchColumns, buildMetadataColumns, buildSharedTokenColumns, extractPropertyPath, getNestedValues } from './row-indexer.js';
 
 // =============================================================================
 // Section 1: Main Table Row
@@ -76,13 +76,14 @@ export function buildResourceRowWithSearch(
   const fixedRow = buildResourceRow(resource);
   const searchCols = buildSearchColumns(resource, searchImpls);
   const metadataCols = buildMetadataColumns(resource);
+  const sharedTokenCols = buildSharedTokenColumns(searchCols, metadataCols);
 
   // Override compartments with full extraction (using search impls)
   const compartments = resource.resourceType === 'Binary'
     ? undefined
     : buildCompartments(resource, searchImpls);
 
-  return { ...fixedRow, ...searchCols, ...metadataCols, compartments };
+  return { ...fixedRow, ...searchCols, ...metadataCols, ...sharedTokenCols, compartments };
 }
 
 // =============================================================================

@@ -48,21 +48,35 @@ export class DatabaseClient {
    * - Automatically calls `BEGIN` before and `COMMIT` after.
    * - Calls `ROLLBACK` if the callback throws.
    * - Returns the callback's return value.
+   * - Auto-retries on PostgreSQL serialization_failure (40001) with
+   *   exponential backoff (max 3 retries).
    */
   async withTransaction<T>(
     fn: (client: PoolClient) => Promise<T>,
   ): Promise<T> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      const result = await fn(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (true) {
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await fn(client);
+        await client.query('COMMIT');
+        return result;
+      } catch (err) {
+        await client.query('ROLLBACK');
+        // Retry on serialization_failure (40001)
+        if (isSerializationFailure(err) && attempt < maxRetries) {
+          attempt++;
+          const delayMs = Math.min(50 * Math.pow(2, attempt), 1000);
+          await sleep(delayMs);
+          continue;
+        }
+        throw err;
+      } finally {
+        client.release();
+      }
     }
   }
 
@@ -96,6 +110,23 @@ export class DatabaseClient {
   }
 
   /**
+   * Run EXPLAIN ANALYZE on a query and return the plan.
+   *
+   * Useful for development-mode query optimization.
+   * Only call when MEDXAI_EXPLAIN=1 or in dev mode.
+   */
+  async explain(
+    text: string,
+    values?: unknown[],
+  ): Promise<string[]> {
+    const result = await this.pool.query<{ 'QUERY PLAN': string }>(
+      `EXPLAIN ANALYZE ${text}`,
+      values,
+    );
+    return result.rows.map((r) => r['QUERY PLAN']);
+  }
+
+  /**
    * Check if the database connection is alive.
    */
   async ping(): Promise<boolean> {
@@ -120,4 +151,25 @@ export class DatabaseClient {
   get isClosed(): boolean {
     return this._closed;
   }
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Check if a PostgreSQL error is a serialization_failure (40001).
+ */
+function isSerializationFailure(err: unknown): boolean {
+  if (typeof err === 'object' && err !== null && 'code' in err) {
+    return (err as { code: string }).code === '40001';
+  }
+  return false;
+}
+
+/**
+ * Promise-based sleep.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

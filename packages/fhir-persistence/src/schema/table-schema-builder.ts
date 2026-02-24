@@ -29,6 +29,7 @@ import type {
   MainTableSchema,
   HistoryTableSchema,
   ReferencesTableSchema,
+  LookupTableSchema,
   ResourceTableSet,
   SchemaDefinition,
 } from './table-schema.js';
@@ -312,6 +313,142 @@ function buildSearchIndexes(resourceType: string, impls: SearchParameterImpl[]):
 }
 
 // =============================================================================
+// Section 3b: Lookup Table Generation
+// =============================================================================
+
+/**
+ * Build lookup sub-tables for a resource type.
+ *
+ * For each `lookup-table` strategy param, generates a sub-table with:
+ * - `resourceId UUID NOT NULL`
+ * - `index INT NOT NULL`
+ * - `value TEXT NOT NULL`
+ * - `system TEXT` (for identifier-like params)
+ * - Composite PK: `(resourceId, index)`
+ * - btree index on `value`
+ */
+function buildLookupTables(
+  resourceType: string,
+  impls: SearchParameterImpl[],
+): LookupTableSchema[] {
+  const tables: LookupTableSchema[] = [];
+
+  for (const impl of impls) {
+    if (impl.strategy !== 'lookup-table') continue;
+
+    // Capitalize first letter for table name: name → Name
+    const paramName = impl.code.charAt(0).toUpperCase() + impl.code.slice(1);
+    const tableName = `${resourceType}_${paramName}`;
+
+    const columns: ColumnSchema[] = [
+      { name: 'resourceId', type: 'UUID', notNull: true, primaryKey: false },
+      { name: 'index', type: 'INTEGER', notNull: true, primaryKey: false },
+      { name: 'value', type: 'TEXT', notNull: true, primaryKey: false },
+      { name: 'system', type: 'TEXT', notNull: false, primaryKey: false },
+    ];
+
+    const indexes: IndexSchema[] = [
+      {
+        name: `${tableName}_value_idx`,
+        columns: ['value'],
+        indexType: 'btree',
+        unique: false,
+      },
+      {
+        name: `${tableName}_resourceId_idx`,
+        columns: ['resourceId'],
+        indexType: 'btree',
+        unique: false,
+      },
+    ];
+
+    tables.push({
+      tableName,
+      resourceType,
+      searchParamCode: impl.code,
+      columns,
+      indexes,
+      compositePrimaryKey: ['resourceId', 'index'],
+    });
+  }
+
+  return tables;
+}
+
+// =============================================================================
+// Section 3c: Shared Token Columns
+// =============================================================================
+
+/**
+ * Build shared token columns: `__sharedTokens UUID[]`, `__sharedTokensText TEXT[]`.
+ *
+ * These aggregate token values from `_tag`, `_security`, and `identifier`
+ * for unified token search.
+ */
+function buildSharedTokenColumns(): ColumnSchema[] {
+  return [
+    { name: '__sharedTokens', type: 'UUID[]', notNull: false, primaryKey: false },
+    { name: '__sharedTokensText', type: 'TEXT[]', notNull: false, primaryKey: false },
+  ];
+}
+
+/**
+ * Build shared token indexes.
+ */
+function buildSharedTokenIndexes(resourceType: string): IndexSchema[] {
+  return [
+    {
+      name: `${resourceType}___sharedTokens_idx`,
+      columns: ['__sharedTokens'],
+      indexType: 'gin',
+      unique: false,
+    },
+  ];
+}
+
+// =============================================================================
+// Section 3d: Trigram Indexes
+// =============================================================================
+
+/**
+ * Build trigram (pg_trgm) GIN indexes on token text columns.
+ *
+ * These enable fast substring/contains search on token text arrays.
+ */
+function buildTrigramIndexes(resourceType: string, impls: SearchParameterImpl[]): IndexSchema[] {
+  const indexes: IndexSchema[] = [];
+
+  for (const impl of impls) {
+    if (impl.strategy !== 'token-column') continue;
+
+    indexes.push({
+      name: `${resourceType}___${impl.columnName}Text_trgm_idx`,
+      columns: [`__${impl.columnName}Text`],
+      indexType: 'gin',
+      unique: false,
+    });
+  }
+
+  // Also add trigram for fixed metadata token text columns
+  indexes.push(
+    {
+      name: `${resourceType}___tagText_trgm_idx`,
+      columns: ['__tagText'],
+      indexType: 'gin',
+      unique: false,
+    },
+    {
+      name: `${resourceType}___securityText_trgm_idx`,
+      columns: ['__securityText'],
+      indexType: 'gin',
+      unique: false,
+    },
+  );
+
+  return indexes;
+}
+
+// =============================================================================
 // Section 4: Public API
 // =============================================================================
 
@@ -349,12 +486,15 @@ export function buildResourceTableSet(
     mainColumns.push(buildCompartmentsColumn());
   }
   mainColumns.push(...buildSearchColumns(searchImpls));
+  mainColumns.push(...buildSharedTokenColumns());
 
   const mainIndexes = buildFixedMainIndexes(resourceType);
   if (!isBinary) {
     mainIndexes.push(buildCompartmentsIndex(resourceType));
   }
   mainIndexes.push(...buildSearchIndexes(resourceType, searchImpls));
+  mainIndexes.push(...buildSharedTokenIndexes(resourceType));
+  mainIndexes.push(...buildTrigramIndexes(resourceType, searchImpls));
 
   const mainConstraints: ConstraintSchema[] = [
     {
@@ -389,7 +529,16 @@ export function buildResourceTableSet(
     compositePrimaryKey: ['resourceId', 'targetId', 'code'],
   };
 
-  return { resourceType, main, history, references };
+  // --- Lookup tables ---
+  const lookupTables = buildLookupTables(resourceType, searchImpls);
+
+  return {
+    resourceType,
+    main,
+    history,
+    references,
+    ...(lookupTables.length > 0 ? { lookupTables } : {}),
+  };
 }
 
 /**

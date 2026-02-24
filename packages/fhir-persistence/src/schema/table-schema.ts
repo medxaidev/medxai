@@ -190,13 +190,43 @@ export interface ReferencesTableSchema {
 }
 
 // =============================================================================
+// Section 5b: Lookup Table Schema
+// =============================================================================
+
+/**
+ * Schema for a lookup sub-table (e.g., `Patient_Name`, `Patient_Address`).
+ *
+ * Stores decomposed complex types (HumanName, Address, ContactPoint)
+ * for precise search via JOINs.
+ */
+export interface LookupTableSchema {
+  /** Table name (e.g., `'Patient_Name'`). */
+  tableName: string;
+
+  /** FHIR resource type name. */
+  resourceType: string;
+
+  /** Search parameter code (e.g., `'name'`, `'address'`). */
+  searchParamCode: string;
+
+  /** All columns. */
+  columns: ColumnSchema[];
+
+  /** All indexes. */
+  indexes: IndexSchema[];
+
+  /** Composite primary key column names. */
+  compositePrimaryKey: string[];
+}
+
+// =============================================================================
 // Section 6: Resource Table Set & Schema Definition
 // =============================================================================
 
 /**
  * Complete table set for a single FHIR resource type.
  *
- * Always contains exactly 3 tables: main, history, references.
+ * Contains 3 core tables (main, history, references) plus optional lookup sub-tables.
  */
 export interface ResourceTableSet {
   /** FHIR resource type (e.g., `'Patient'`). */
@@ -210,6 +240,9 @@ export interface ResourceTableSet {
 
   /** References table (outgoing references). */
   references: ReferencesTableSchema;
+
+  /** Lookup sub-tables for complex type search (HumanName, Address, etc.). */
+  lookupTables?: LookupTableSchema[];
 }
 
 /**

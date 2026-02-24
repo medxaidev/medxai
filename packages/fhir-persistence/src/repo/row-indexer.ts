@@ -410,6 +410,58 @@ function populateLookupTableStrategy(
 }
 
 // =============================================================================
+// Section 6b: Shared Token Aggregation
+// =============================================================================
+
+/**
+ * Build shared token columns by aggregating token values from
+ * `identifier`, `_tag`, and `_security` into unified arrays.
+ *
+ * Called after buildSearchColumns() and buildMetadataColumns()
+ * to merge their token values.
+ */
+export function buildSharedTokenColumns(
+  searchCols: SearchColumnValues,
+  metadataCols: SearchColumnValues,
+): SearchColumnValues {
+  const allHashes: string[] = [];
+  const allTexts: string[] = [];
+
+  // Collect from identifier token columns (search columns)
+  if (Array.isArray(searchCols['__identifier'])) {
+    allHashes.push(...(searchCols['__identifier'] as string[]));
+  }
+  if (Array.isArray(searchCols['__identifierText'])) {
+    allTexts.push(...(searchCols['__identifierText'] as string[]));
+  }
+
+  // Collect from _tag (metadata columns)
+  if (Array.isArray(metadataCols['__tag'])) {
+    allHashes.push(...(metadataCols['__tag'] as string[]));
+  }
+  if (Array.isArray(metadataCols['__tagText'])) {
+    allTexts.push(...(metadataCols['__tagText'] as string[]));
+  }
+
+  // Collect from _security (metadata columns)
+  if (Array.isArray(metadataCols['__security'])) {
+    allHashes.push(...(metadataCols['__security'] as string[]));
+  }
+  if (Array.isArray(metadataCols['__securityText'])) {
+    allTexts.push(...(metadataCols['__securityText'] as string[]));
+  }
+
+  const result: SearchColumnValues = {};
+  if (allHashes.length > 0) {
+    result['__sharedTokens'] = allHashes;
+  }
+  if (allTexts.length > 0) {
+    result['__sharedTokensText'] = allTexts;
+  }
+  return result;
+}
+
+// =============================================================================
 // Section 7: Metadata Column Population
 // =============================================================================
 

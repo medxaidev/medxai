@@ -216,12 +216,17 @@ function resolveOrderByColumn(
     return null;
   }
 
-  // Only column strategy supports ORDER BY directly
-  if (impl.strategy !== 'column') {
-    return null;
+  // Column strategy: use the column name directly
+  if (impl.strategy === 'column') {
+    return impl.columnName;
   }
 
-  return impl.columnName;
+  // Token-column and lookup-table strategies: use the __XSort column
+  if (impl.strategy === 'token-column' || impl.strategy === 'lookup-table') {
+    return `__${impl.columnName}Sort`;
+  }
+
+  return null;
 }
 
 // =============================================================================

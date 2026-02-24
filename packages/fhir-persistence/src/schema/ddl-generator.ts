@@ -21,6 +21,7 @@ import type {
   MainTableSchema,
   HistoryTableSchema,
   ReferencesTableSchema,
+  LookupTableSchema,
   ResourceTableSet,
   SchemaDefinition,
 } from './table-schema.js';
@@ -208,7 +209,41 @@ export function generateResourceDDL(tableSet: ResourceTableSet): string[] {
     statements.push(generateCreateIndex(idx, tableSet.references.tableName));
   }
 
+  // Lookup tables + their indexes
+  if (tableSet.lookupTables) {
+    for (const lookup of tableSet.lookupTables) {
+      statements.push(generateCreateLookupTable(lookup));
+      for (const idx of lookup.indexes) {
+        statements.push(generateCreateIndex(idx, lookup.tableName));
+      }
+    }
+  }
+
   return statements;
+}
+
+/**
+ * Generate a `CREATE TABLE IF NOT EXISTS` statement for a lookup sub-table.
+ */
+export function generateCreateLookupTable(table: LookupTableSchema): string {
+  const lines: string[] = [];
+
+  lines.push(`CREATE TABLE IF NOT EXISTS "${table.tableName}" (`);
+
+  const entries: string[] = [];
+  for (const col of table.columns) {
+    entries.push(columnDDL(col));
+  }
+
+  if (table.compositePrimaryKey.length > 0) {
+    const pkCols = table.compositePrimaryKey.map((c) => `"${c}"`).join(', ');
+    entries.push(`  CONSTRAINT "${table.tableName}_pk" PRIMARY KEY (${pkCols})`);
+  }
+
+  lines.push(entries.join(',\n'));
+  lines.push(');');
+
+  return lines.join('\n');
 }
 
 // =============================================================================
@@ -234,6 +269,13 @@ export function generateSchemaDDL(schema: SchemaDefinition): string[] {
     tableStatements.push(generateCreateHistoryTable(tableSet.history));
     tableStatements.push(generateCreateReferencesTable(tableSet.references));
 
+    // Lookup tables
+    if (tableSet.lookupTables) {
+      for (const lookup of tableSet.lookupTables) {
+        tableStatements.push(generateCreateLookupTable(lookup));
+      }
+    }
+
     // Indexes
     for (const idx of tableSet.main.indexes) {
       indexStatements.push(generateCreateIndex(idx, tableSet.main.tableName));
@@ -243,6 +285,13 @@ export function generateSchemaDDL(schema: SchemaDefinition): string[] {
     }
     for (const idx of tableSet.references.indexes) {
       indexStatements.push(generateCreateIndex(idx, tableSet.references.tableName));
+    }
+    if (tableSet.lookupTables) {
+      for (const lookup of tableSet.lookupTables) {
+        for (const idx of lookup.indexes) {
+          indexStatements.push(generateCreateIndex(idx, lookup.tableName));
+        }
+      }
     }
   }
 
