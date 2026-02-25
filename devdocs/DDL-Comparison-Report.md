@@ -1,25 +1,32 @@
 # MedXAI vs Medplum DDL Comparison Report
 
-**Updated**: 2026-02-25 (post gap-fix pass — all 8 medium/low gaps resolved)
-**MedXAI**: `medxai_all_1.sql` (442 tables, regenerated 2026-02-25 after gap-fix)
-**Medplum**: `medplum_all.sql` (497 tables)
+**Updated**: 2026-02-26 (v4 — full cross-system comparison with real Medplum pg_dump)
+**MedXAI**: `medxai_all_3.sql` (442 tables, 4281 indexes)
+**Medplum**: `medplum_all.sql` (497 tables, 4637 indexes)
 
 > v1 (2026-02-24): old per-resource lookup tables (548 MedXAI tables).
 > v2 (2026-02-25 12:43): global lookup table refactor — 442 tables, 0 MedXAI-only.
 > v3 (2026-02-25 16:13): all 8 medium/low gaps closed — schema now fully aligned.
+> v4 (2026-02-26 03:24): full cross-system comparison — medxai_all_3.sql vs medplum_all.sql (real Medplum pg_dump).
 
 ---
 
 ## 1. Overall Statistics
 
-| Metric                 | MedXAI | Medplum | Delta                                    |
-| ---------------------- | ------ | ------- | ---------------------------------------- |
-| Total tables           | 442    | 497     | Medplum has 55 extra platform tables     |
-| Tables only in MedXAI  | **0**  | —       | ✅ Down from 51 (lookup refactor)        |
-| Tables only in Medplum | 55     | —       | All platform-specific                    |
-| Common tables          | 442    | 442     | 100% of MedXAI tables are in Medplum     |
-| Extensions             | **2**  | 2       | ✅ Now matching (`pg_trgm`, `btree_gin`) |
-| Functions              | **1**  | 1       | ✅ `token_array_to_text()` now present   |
+| Metric                     | MedXAI | Medplum | Delta                                         |
+| -------------------------- | ------ | ------- | --------------------------------------------- |
+| Total tables               | 442    | 497     | Medplum has 55 extra platform tables          |
+| Tables only in MedXAI      | **0**  | —       | ✅ All MedXAI tables exist in Medplum         |
+| Tables only in Medplum     | 55     | —       | All platform-specific (non-FHIR R4)           |
+| Common tables              | 442    | 442     | 100% of MedXAI tables are in Medplum          |
+| Tables with column diffs   | 147    | —       | Systematic design differences (see §5)        |
+| Total indexes              | 4281   | 4637    | —                                             |
+| Matching indexes           | 2527   | —       | 59% identical                                 |
+| Indexes only in MedXAI     | 1754   | —       | Naming convention differences (see §6)        |
+| Indexes only in Medplum    | 2110   | —       | Naming convention + extra platform tables     |
+| Real index type mismatches | 339    | —       | btree↔gin + `__version` vs `version` (see §6) |
+| Extensions                 | **2**  | 2       | ✅ Matching (`pg_trgm`, `btree_gin`)          |
+| Functions                  | **1**  | 1       | ✅ `token_array_to_text()` present            |
 
 ---
 
@@ -97,154 +104,194 @@ All btree indexes (`address`, `city`, `country`, `postalCode`, `state`, `use`) +
 
 ---
 
-## 5. Patient Main Table Column Differences
+## 5. Column Differences — Systematic Analysis (147 tables)
 
-### Columns in MedXAI but NOT Medplum
+The 147 tables with column differences break down into **5 systematic categories**, all of which are known design choices — not bugs.
 
-| Column(s)                                                             | Strategy     | Notes                                             |
-| --------------------------------------------------------------------- | ------------ | ------------------------------------------------- |
-| `__active UUID[]` + `__activeText TEXT[]` + `__activeSort TEXT`       | token-column | Medplum uses plain `active BOOLEAN`               |
-| `__deceased UUID[]` + `__deceasedText TEXT[]` + `__deceasedSort TEXT` | token-column | Medplum uses plain `deceased BOOLEAN`             |
-| `__gender UUID[]` + `__genderText TEXT[]` + `__genderSort TEXT`       | token-column | Medplum uses plain `gender TEXT`                  |
-| `__addressSort TEXT` + 5 sub-sort cols                                | sort         | Medplum omits; uses Address lookup table only     |
-| `__phoneticSort TEXT`                                                 | sort         | Medplum stores `phonetic TEXT[]` in Patient table |
-| `ContactPoint.use TEXT`                                               | extra col    | Not present in Medplum's ContactPoint table       |
+### 5.1 Token-Column vs Plain Column (affects ~110 tables)
 
-### Columns in Medplum but NOT MedXAI (remaining — by design)
+**MedXAI**: Token-type search params (status, intent, type, category, etc.) stored as 3 columns:
+`__status UUID[]` + `__statusText TEXT[]` + `__statusSort TEXT`
 
-| Column                                                     | Type         | Notes                                    |
-| ---------------------------------------------------------- | ------------ | ---------------------------------------- |
-| `active BOOLEAN`                                           | plain        | MedXAI uses richer token-column instead  |
-| `deceased BOOLEAN`                                         | plain        | same                                     |
-| `gender TEXT`                                              | plain        | same                                     |
-| `phonetic TEXT[]`                                          | array        | MedXAI uses `__phoneticSort TEXT`        |
-| `__email UUID[]` + `__emailText TEXT[]`                    | token-column | MedXAI uses ContactPoint lookup table    |
-| `__phone UUID[]` + `__phoneText TEXT[]`                    | token-column | same                                     |
-| `__telecom UUID[]` + `__telecomText TEXT[]`                | token-column | same                                     |
-| `___compartmentIdentifierSort TEXT`                        | sort         | reference identifier sort (low priority) |
-| `__generalPractitionerIdentifierSort TEXT`                 | sort         | same                                     |
-| `ethnicity TEXT[]`, `genderIdentity TEXT[]`, `race TEXT[]` | array        | US Core extensions (low priority)        |
+**Medplum**: Same params stored as a single plain column:
+`status TEXT`
+
+| Example Params                                   | MedXAI (token-column)          | Medplum (plain)  | Tables Affected |
+| ------------------------------------------------ | ------------------------------ | ---------------- | --------------- |
+| `status`, `intent`, `priority`                   | `__status UUID[]` + 2 aux cols | `status TEXT`    | ~80             |
+| `active`                                         | `__active UUID[]` + 2 aux cols | `active BOOLEAN` | ~15             |
+| `gender`                                         | `__gender UUID[]` + 2 aux cols | `gender TEXT`    | 3               |
+| `category`, `code`, `type`, `kind`, `mode`, etc. | token-column (3 cols each)     | plain TEXT       | ~40             |
+
+**Root cause**: `resolveStrategy()` maps ALL `token`-type search params to `token-column`. Medplum special-cases boolean/simple-code tokens into scalar columns.
+
+**Verdict**: ✅ Accepted design choice. MedXAI is richer (supports `system|code` token search on all fields) but uses 3× storage per param.
+
+### 5.2 `___security` / `___securityText` — MedXAI Only (146 tables)
+
+MedXAI generates `___security UUID[]` + `___securityText TEXT[]` on every resource table.
+Medplum **does not** have these columns (security labels are handled differently).
+
+**Verdict**: ℹ️ Extra columns. Not harmful; enables security-label search. Medplum handles this via shared tokens.
+
+### 5.3 `___compartmentIdentifierSort` + `__*IdentifierSort` — Medplum Only (145 tables)
+
+Medplum generates reference identifier sort columns on nearly every table:
+
+- `___compartmentIdentifierSort TEXT` (145 tables)
+- `__patientIdentifierSort TEXT`, `__subjectIdentifierSort TEXT`, etc. (per reference field)
+
+MedXAI does not generate these.
+
+**Verdict**: ℹ️ Low priority. Only needed for `_sort=<reference>:identifier` queries.
+
+### 5.4 Reference Cardinality Mismatches (~267 column type mismatches)
+
+| Mismatch Type                              | Count | Cause                                          |
+| ------------------------------------------ | ----- | ---------------------------------------------- |
+| `TEXT` (MedXAI) vs `TEXT[]` (Medplum)      | 114   | MedXAI treats multi-target refs as scalar      |
+| `TEXT[]` (MedXAI) vs `TEXT` (Medplum)      | 153   | MedXAI treats some single-target refs as array |
+| `TIMESTAMPTZ` vs `TIMESTAMPTZ[]`           | 8     | Date array cardinality                         |
+| `DOUBLE PRECISION` vs `DOUBLE PRECISION[]` | 35    | contextQuantity always scalar in MedXAI        |
+| `TIMESTAMPTZ` vs `DATE`                    | 7     | Date type precision difference                 |
+
+**Root cause**: `resolveIsArray()` uses different heuristics than Medplum for determining when a reference column should be array vs scalar. The v3 fix (single-target `.where()` → TEXT) resolved the most common cases, but **many edge cases remain** across 442 tables.
+
+**Verdict**: ⚠️ **Medium priority**. While all 267 mismatches are functional (both sides can store and query the data), they affect:
+
+- Index type choice (btree for scalar, gin for array)
+- WHERE clause generation (`=` vs `&&`)
+- Storage efficiency
+
+### 5.5 Other Column Differences
+
+| Difference                                          | Tables | Details                                                   |
+| --------------------------------------------------- | ------ | --------------------------------------------------------- |
+| `name TEXT` (Medplum) vs `__nameSort TEXT` (MedXAI) | ~30    | Medplum uses plain `name` for resources with string names |
+| `version TEXT` (Medplum) vs absent (MedXAI)         | ~28    | Conformance resources version column                      |
+| `ContactPoint.use TEXT` (MedXAI only)               | 1      | Extra column in global lookup table                       |
 
 ---
 
-## 6. Remaining Design Differences (by design / low priority)
+## 6. Index Differences — Systematic Analysis (339 real mismatches)
 
-### 6.1 Boolean/Simple Token Fields: token-column vs plain column
+### 6.1 Index Naming Convention Divergence
 
-| Search Param                   | MedXAI                                                       | Medplum                    |
-| ------------------------------ | ------------------------------------------------------------ | -------------------------- |
-| `active`                       | `__active UUID[]` + `__activeText TEXT[]` (token-column)     | `active BOOLEAN` (plain)   |
-| `deceased`                     | `__deceased UUID[]` + `__deceasedText TEXT[]` (token-column) | `deceased BOOLEAN` (plain) |
-| `gender`                       | `__gender UUID[]` + `__genderText TEXT[]` (token-column)     | `gender TEXT` (plain)      |
-| `status`, `intent`, `priority` | token-column (3 cols each)                                   | `TEXT` plain column        |
+MedXAI and Medplum use **different naming conventions** for the same logical indexes, causing 1754 MedXAI-only + 2110 Medplum-only counts. These are the **same indexes** with different names:
 
-**Root cause**: `resolveStrategy()` maps ALL `token`-type search params to token-column. Medplum special-cases boolean/simple-code tokens into scalar columns.
+| MedXAI Pattern                  | Medplum Pattern                | Example                                |
+| ------------------------------- | ------------------------------ | -------------------------------------- |
+| `Account___statusText_trgm_idx` | `Account___statusTextTrgm_idx` | underscore vs camelCase in trgm suffix |
+| `Account___status_idx`          | `Account___status_idx`         | identical (2527 matched)               |
+| `Account_profile_idx`           | `Account__profile_idx`         | single vs double underscore prefix     |
+| `Account_version_idx`           | `Account___version_idx`        | MedXAI missing underscore prefix       |
 
-**Verdict**: ✅ Accepted design choice. MedXAI is richer (supports system-qualified token search) but uses 3× storage per param. Not a correctness issue.
+**Verdict**: ℹ️ Cosmetic only. The indexes cover the same columns with the same types. Naming can be harmonized in a future pass.
 
-### 6.2 Metadata Column Naming: ✅ Now aligned (`___tag` triple underscore)
+### 6.2 Real Index Type Mismatches (339)
 
-Fixed in 2026-02-25 gap-fix pass. MedXAI now uses `___tag`, `___tagText`, `___tagSort`, `___security`, `___securityText`, `___securitySort` (triple underscore) matching Medplum.
+| Mismatch Category                           | Count | Cause                                                                 |
+| ------------------------------------------- | ----- | --------------------------------------------------------------------- |
+| btree (MedXAI) vs gin (Medplum)             | ~158  | Array columns in Medplum need GIN; MedXAI has scalar → btree          |
+| gin (MedXAI) vs btree (Medplum)             | ~153  | Array columns in MedXAI need GIN; Medplum has scalar → btree          |
+| `__version` (MedXAI) vs `version` (Medplum) | 28    | MedXAI internal `__version` column vs Medplum's conformance `version` |
 
-### 6.3 `email`/`phone`/`telecom` Search Strategy
+**Root cause**: Directly mirrors §5.4 — when a column is `TEXT` (scalar), it gets a btree index; when it's `TEXT[]` (array), it gets a gin index. The 339 mismatches are a **consequence** of the 267 cardinality mismatches.
 
-| Param     | MedXAI                                             | Medplum                                                    |
-| --------- | -------------------------------------------------- | ---------------------------------------------------------- |
-| `email`   | `__emailSort TEXT` + global `ContactPoint` table   | `__email UUID[]` + `__emailText TEXT[]` (token-column)     |
-| `phone`   | `__phoneSort TEXT` + global `ContactPoint` table   | `__phone UUID[]` + `__phoneText TEXT[]` (token-column)     |
-| `telecom` | `__telecomSort TEXT` + global `ContactPoint` table | `__telecom UUID[]` + `__telecomText TEXT[]` (token-column) |
+**Verdict**: ⚠️ Same priority as §5.4. Fixing reference cardinality will automatically fix these index mismatches.
 
-**Verdict**: ✅ Accepted. MedXAI searches via EXISTS on global `ContactPoint`; Medplum additionally keeps hash arrays in the main table. Functionally equivalent for all queries.
+### 6.3 `__version` Column Index
 
-### 6.4 `token_array_to_text()` Function: ✅ Now present
+MedXAI names its internal version counter `__version` (double underscore), which is a fixed column on every table. Medplum also has `__version` but additionally has a `version TEXT` column on conformance resources (SearchParameter, ValueSet, StructureDefinition, etc.). The index `*_version_idx` in MedXAI indexes `__version` while in Medplum it indexes `version` (the conformance version string).
 
-Fixed in 2026-02-25 gap-fix pass. MedXAI now generates:
-
-```sql
-CREATE OR REPLACE FUNCTION token_array_to_text(arr text[]) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT array_to_string(arr, ' ') $$;
-```
-
-All trigram indexes on token text arrays now use `token_array_to_text("...") gin_trgm_ops`, matching Medplum.
-
-### 6.5 Reference Cardinality: ✅ Now aligned (`TEXT` for single-target refs)
-
-Fixed in 2026-02-25 gap-fix pass. `resolveIsArray()` no longer triggers on `.where()` expressions for single-target references. Single-target refs like `patient`, `subject`, `encounter` are now `TEXT` (scalar), matching Medplum.
-
-### 6.6 Missing `__*IdentifierSort` Columns
-
-Medplum generates `___compartmentIdentifierSort`, `__generalPractitionerIdentifierSort`, etc. for sort-by-reference-identifier. MedXAI does not.
-
-**Verdict**: ℹ️ Low priority. Only affects sort-by-reference-identifier queries. Not implemented.
+**Verdict**: ℹ️ Low priority. MedXAI should add `version TEXT` column for conformance resources.
 
 ---
 
 ## 7. Extensions and Functions
 
-| Item                             | MedXAI                      | Medplum | Status      |
-| -------------------------------- | --------------------------- | ------- | ----------- |
-| `pg_trgm` extension              | ✅ added 2026-02-25         | ✅      | ✅ Matching |
-| `btree_gin` extension            | ✅ added 2026-02-25         | ✅      | ✅ Matching |
-| `token_array_to_text()` function | ✅ added 2026-02-25 gap-fix | ✅      | ✅ Matching |
+| Item                             | MedXAI | Medplum | Status      |
+| -------------------------------- | ------ | ------- | ----------- |
+| `pg_trgm` extension              | ✅     | ✅      | ✅ Matching |
+| `btree_gin` extension            | ✅     | ✅      | ✅ Matching |
+| `token_array_to_text()` function | ✅     | ✅      | ✅ Matching |
 
 ---
 
-## 8. Summary — All Gaps Resolved ✅
+## 8. Priority Classification
 
-### ✅ Correct / By Design (unchanged from v2)
+### ✅ Fully Matching (no action needed)
 
-1. All 55 Medplum-only tables are platform-specific — correct to exclude
-2. **Zero MedXAI-only tables** — lookup table refactor complete ✅
-3. Global lookup tables (HumanName, Address, ContactPoint, Identifier) — structurally identical ✅
-4. Core fixed columns (id, content, lastUpdated, deleted, projectId, `__version`, compartments) — **identical** ✅
-5. History table structure — **identical** ✅
-6. References table structure — **identical** ✅
-7. `__sharedTokens` / `__sharedTokensText` pattern — **identical** ✅
+1. **442/442 FHIR R4 tables** present in both systems
+2. **0 MedXAI-only tables** — all 55 Medplum-only tables are platform-specific
+3. **Global lookup tables** (HumanName, Address, ContactPoint, Identifier) — structurally identical
+4. **Core fixed columns** (id, content, lastUpdated, deleted, projectId, `__version`, compartments) — identical
+5. **History + References table structure** — identical
+6. **`__sharedTokens` / `__sharedTokensText`** — identical
+7. **Extensions** (`pg_trgm`, `btree_gin`) + **`token_array_to_text()`** — identical
+8. **`___tag` / `___security` triple-underscore naming** — aligned
+9. **2527 indexes** — identical across both systems
 
-### ✅ Fixed in 2026-02-25 Gap-Fix Pass
+### ⚠️ Medium Priority (functional but divergent)
 
-1. **`token_array_to_text()` function** — ✅ added, trigram indexes now use `gin_trgm_ops`
-2. **Global lookup table index gaps** — ✅ Address btree for all fields, tsvector on HumanName+Address, `gin_trgm_ops` on HumanName trigrams, `system` index on ContactPoint+Identifier
-3. **`___tag` / `___security` naming** — ✅ triple underscore now matches Medplum
-4. **Reference cardinality** — ✅ single-target `.where()` refs now `TEXT` not `TEXT[]`
+| #   | Difference                                            | Tables                       | Impact                            |
+| --- | ----------------------------------------------------- | ---------------------------- | --------------------------------- |
+| 1   | Reference cardinality (TEXT vs TEXT[])                | ~267 cols across ~109 tables | Index type, WHERE clause, storage |
+| 2   | `contextQuantity` scalar vs array                     | 35 tables                    | Conformance resource search       |
+| 3   | Date type (`TIMESTAMPTZ` vs `DATE` / `TIMESTAMPTZ[]`) | 15 cols                      | Date precision                    |
 
-### ℹ️ Remaining (intentional / not implemented)
+### ℹ️ Low Priority / By Design
 
-1. `email`/`phone`/`telecom` — MedXAI uses ContactPoint lookup table; Medplum also keeps token-column in main table. Functionally equivalent.
-2. `___compartmentIdentifierSort` and `__*IdentifierSort` columns — only needed for sort-by-reference-identifier
-3. US Core extension columns (`ethnicity`, `genderIdentity`, `race`) — Medplum-specific clinical extension
-4. `active`/`deceased`/`gender` as plain columns — MedXAI uses richer token-column; not a correctness issue
+| #   | Difference                                                      | Scope         | Verdict                         |
+| --- | --------------------------------------------------------------- | ------------- | ------------------------------- |
+| 1   | Token-column (3 cols) vs plain column for boolean/simple tokens | ~110 tables   | MedXAI richer, accepted         |
+| 2   | `___security` / `___securityText` extra columns                 | 146 tables    | Extra, not harmful              |
+| 3   | `___compartmentIdentifierSort` + `__*IdentifierSort` missing    | 145 tables    | Sort-by-reference-identifier    |
+| 4   | `name TEXT` / `version TEXT` / `status TEXT` plain columns      | ~30-80 tables | Conformance resource plain cols |
+| 5   | `email`/`phone`/`telecom` via ContactPoint lookup only          | ~10 tables    | Functionally equivalent         |
+| 6   | Index naming convention divergence                              | ~1750 indexes | Cosmetic                        |
+| 7   | `ContactPoint.use TEXT` extra column                            | 1 table       | Semantically richer             |
 
 ---
 
 ## 9. Core Structural Match
 
-| Structural Element                                                  | Match?     |
-| ------------------------------------------------------------------- | ---------- |
-| 3 tables per resource (main + history + references)                 | ✅         |
-| UUID primary keys                                                   | ✅         |
-| `content TEXT` JSON storage                                         | ✅         |
-| `lastUpdated TIMESTAMPTZ`                                           | ✅         |
-| `deleted BOOLEAN DEFAULT false`                                     | ✅         |
-| `projectId UUID`                                                    | ✅         |
-| `__version INTEGER`                                                 | ✅         |
-| `compartments UUID[]`                                               | ✅         |
-| Token columns (UUID[] hash + TEXT[] display)                        | ✅         |
-| `__sharedTokens` / `__sharedTokensText`                             | ✅         |
-| History table (versionId PK + id + content + lastUpdated)           | ✅         |
-| References table (resourceId + targetId + code)                     | ✅         |
-| Global lookup tables (HumanName, Address, ContactPoint, Identifier) | ✅ **new** |
-| `pg_trgm` + `btree_gin` extensions                                  | ✅         |
-| `token_array_to_text()` function                                    | ✅ **new** |
-| `___tag` / `___security` triple-underscore metadata columns         | ✅ **new** |
-| Single-target reference columns as `TEXT` (not `TEXT[]`)            | ✅ **new** |
-| Lookup table indexes: `gin_trgm_ops`, tsvector, btree completeness  | ✅ **new** |
-
-**Overall assessment**: After the 2026-02-25 gap-fix pass, MedXAI's database schema is now **fully aligned** with Medplum's production design. All 442 FHIR R4 resource tables are present in Medplum, all medium and low priority gaps have been closed, and remaining differences are intentional design choices (richer token-column strategy, ContactPoint-based telecom search).
+| Structural Element                                                  | Match? |
+| ------------------------------------------------------------------- | ------ |
+| 3 tables per resource (main + history + references)                 | ✅     |
+| UUID primary keys                                                   | ✅     |
+| `content TEXT` JSON storage                                         | ✅     |
+| `lastUpdated TIMESTAMPTZ`                                           | ✅     |
+| `deleted BOOLEAN DEFAULT false`                                     | ✅     |
+| `projectId UUID`                                                    | ✅     |
+| `__version INTEGER`                                                 | ✅     |
+| `compartments UUID[]`                                               | ✅     |
+| Token columns (UUID[] hash + TEXT[] display + TEXT sort)            | ✅     |
+| `__sharedTokens` / `__sharedTokensText`                             | ✅     |
+| History table (versionId PK + id + content + lastUpdated)           | ✅     |
+| References table (resourceId + targetId + code)                     | ✅     |
+| Global lookup tables (HumanName, Address, ContactPoint, Identifier) | ✅     |
+| `pg_trgm` + `btree_gin` extensions                                  | ✅     |
+| `token_array_to_text()` function                                    | ✅     |
+| `___tag` / `___security` triple-underscore metadata columns         | ✅     |
+| Lookup table indexes: `gin_trgm_ops`, tsvector, btree               | ✅     |
 
 ---
 
-## 10. Status
+## 10. Summary & Status
 
-All medium and low priority gaps from v2 have been resolved in the 2026-02-25 gap-fix pass.
-The MedXAI schema is now **fully aligned** with Medplum's production design for all FHIR R4 resource tables.
-Remaining differences are intentional design choices, not gaps.
+**v4 (2026-02-26)**: Full cross-system comparison of `medxai_all_3.sql` (MedXAI pg_dump) vs `medplum_all.sql` (Medplum pg_dump).
+
+**Core architecture is fully aligned**: 442/442 FHIR R4 tables, identical core columns, identical global lookup tables, identical History/References structure, 2527 matching indexes.
+
+**Remaining differences are systematic, not random**:
+
+- The largest divergence is **reference cardinality** (TEXT vs TEXT[], ~267 columns) — a known `resolveIsArray()` heuristic difference. This cascades into ~339 index type mismatches (btree↔gin).
+- Token-column strategy for simple codes produces extra columns but provides richer search capabilities.
+- Missing `__*IdentifierSort` columns and conformance `version` columns are feature gaps, not bugs.
+
+**Next steps** (if desired):
+
+1. Fix `resolveIsArray()` to match Medplum's exact cardinality for all reference/date/quantity columns → eliminates ~267 column + ~339 index mismatches
+2. Add `version TEXT` plain column for conformance resources
+3. Harmonize index naming convention

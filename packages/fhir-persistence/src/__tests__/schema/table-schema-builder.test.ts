@@ -713,16 +713,16 @@ describe('TableSchemaBuilder — Schema Correctness (reference array & lookup-ta
   // Observation: multi-target references
   // ---------------------------------------------------------------------------
 
-  it('Observation: subject is TEXT[] (multi-target: Patient/Group/Device/Location)', () => {
+  it('Observation: subject is TEXT (max=1, despite multi-target: Patient/Group/Device/Location)', () => {
     const impl = spRegistry.getImpl('Observation', 'subject');
     expect(impl).toBeDefined();
-    expect(impl!.columnType).toBe('TEXT[]');
-    expect(impl!.array).toBe(true);
+    expect(impl!.columnType).toBe('TEXT');
+    expect(impl!.array).toBe(false);
     const tableSet = buildResourceTableSet('Observation', sdRegistry, spRegistry);
     const col = tableSet.main.columns.find((c) => c.name === 'subject');
-    expect(col!.type).toBe('TEXT[]');
+    expect(col!.type).toBe('TEXT');
     const idx = tableSet.main.indexes.find((i) => i.name === 'Observation_subject_idx');
-    expect(idx!.indexType).toBe('gin');
+    expect(idx!.indexType).toBe('btree');
   });
 
   it('Observation: specimen is TEXT (single-target: Specimen)', () => {
@@ -773,17 +773,17 @@ describe('TableSchemaBuilder — Schema Correctness (reference array & lookup-ta
   // DiagnosticReport: multi-target references
   // ---------------------------------------------------------------------------
 
-  it('DiagnosticReport: subject is TEXT[] (multi-target reference)', () => {
+  it('DiagnosticReport: subject is TEXT (max=1, despite multi-target reference)', () => {
     const impl = spRegistry.getImpl('DiagnosticReport', 'subject');
     expect(impl).toBeDefined();
-    expect(impl!.columnType).toBe('TEXT[]');
-    expect(impl!.array).toBe(true);
+    expect(impl!.columnType).toBe('TEXT');
+    expect(impl!.array).toBe(false);
   });
 
-  it('DiagnosticReport: encounter is TEXT[] (2 targets: Encounter/EpisodeOfCare)', () => {
+  it('DiagnosticReport: encounter is TEXT (max=1, despite 2 targets: Encounter/EpisodeOfCare)', () => {
     const impl = spRegistry.getImpl('DiagnosticReport', 'encounter');
     expect(impl).toBeDefined();
-    expect(impl!.columnType).toBe('TEXT[]');
-    expect(impl!.array).toBe(true);
+    expect(impl!.columnType).toBe('TEXT');
+    expect(impl!.array).toBe(false);
   });
 });

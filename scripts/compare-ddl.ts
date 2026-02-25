@@ -2,7 +2,7 @@
  * Compare two SQL DDL files: extract tables, columns, and indexes, then diff.
  * Usage: npx tsx scripts/compare-ddl.ts <file1> <file2>
  */
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 const file1 = resolve(process.argv[2]);
@@ -97,28 +97,32 @@ const tables2 = extractTables(sql2);
 const indexes1 = extractIndexes(sql1);
 const indexes2 = extractIndexes(sql2);
 
-const label1 = 'medxai_all_1 (generated)';
-const label2 = 'medxai_all_2 (pg_dump)';
+const label1 = process.argv[4] || 'medxai_all_1 (generated)';
+const label2 = process.argv[5] || 'medxai_all_2 (pg_dump)';
+const outputFile = process.argv[6] || '';
 
-console.log('='.repeat(80));
-console.log('DDL COMPARISON REPORT');
-console.log(`File 1: ${label1} — ${tables1.size} tables, ${indexes1.size} indexes`);
-console.log(`File 2: ${label2} — ${tables2.size} tables, ${indexes2.size} indexes`);
-console.log('='.repeat(80));
+const lines: string[] = [];
+function log(s: string = '') { lines.push(s); console.log(s); }
+
+log('='.repeat(80));
+log('DDL COMPARISON REPORT');
+log(`File 1: ${label1} — ${tables1.size} tables, ${indexes1.size} indexes`);
+log(`File 2: ${label2} — ${tables2.size} tables, ${indexes2.size} indexes`);
+log('='.repeat(80));
 
 // 1. Table-level diff
 const onlyIn1 = [...tables1.keys()].filter(t => !tables2.has(t)).sort();
 const onlyIn2 = [...tables2.keys()].filter(t => !tables1.has(t)).sort();
 const common = [...tables1.keys()].filter(t => tables2.has(t)).sort();
 
-console.log(`\n## Tables: ${common.length} common, ${onlyIn1.length} only in file1, ${onlyIn2.length} only in file2`);
+log(`\n## Tables: ${common.length} common, ${onlyIn1.length} only in file1, ${onlyIn2.length} only in file2`);
 if (onlyIn1.length > 0) {
-  console.log(`\n### Tables only in ${label1}:`);
-  onlyIn1.forEach(t => console.log(`  - ${t}`));
+  log(`\n### Tables only in ${label1}:`);
+  onlyIn1.forEach(t => log(`  - ${t}`));
 }
 if (onlyIn2.length > 0) {
-  console.log(`\n### Tables only in ${label2}:`);
-  onlyIn2.forEach(t => console.log(`  - ${t}`));
+  log(`\n### Tables only in ${label2}:`);
+  onlyIn2.forEach(t => log(`  - ${t}`));
 }
 
 // 2. Column-level diff for common tables
@@ -156,9 +160,9 @@ for (const tname of common) {
   }
 }
 
-console.log(`\n## Column differences: ${colDiffs} tables with differences`);
+log(`\n## Column differences: ${colDiffs} tables with differences`);
 if (colDiffDetails.length > 0) {
-  colDiffDetails.forEach(d => console.log(d));
+  colDiffDetails.forEach(d => log(d));
 }
 
 // 3. Index-level diff
@@ -166,19 +170,19 @@ const idxOnlyIn1 = [...indexes1.keys()].filter(i => !indexes2.has(i)).sort();
 const idxOnlyIn2 = [...indexes2.keys()].filter(i => !indexes1.has(i)).sort();
 const commonIdx = [...indexes1.keys()].filter(i => indexes2.has(i)).sort();
 
-console.log(`\n## Indexes: ${commonIdx.length} common, ${idxOnlyIn1.length} only in file1, ${idxOnlyIn2.length} only in file2`);
+log(`\n## Indexes: ${commonIdx.length} common, ${idxOnlyIn1.length} only in file1, ${idxOnlyIn2.length} only in file2`);
 if (idxOnlyIn1.length > 0) {
-  console.log(`\n### Indexes only in ${label1}:`);
+  log(`\n### Indexes only in ${label1}:`);
   idxOnlyIn1.forEach(i => {
     const idx = indexes1.get(i)!;
-    console.log(`  - ${i} ON ${idx.table}: ${idx.definition}`);
+    log(`  - ${i} ON ${idx.table}: ${idx.definition}`);
   });
 }
 if (idxOnlyIn2.length > 0) {
-  console.log(`\n### Indexes only in ${label2}:`);
+  log(`\n### Indexes only in ${label2}:`);
   idxOnlyIn2.forEach(i => {
     const idx = indexes2.get(i)!;
-    console.log(`  - ${i} ON ${idx.table}: ${idx.definition}`);
+    log(`  - ${i} ON ${idx.table}: ${idx.definition}`);
   });
 }
 
@@ -208,18 +212,23 @@ for (const iname of commonIdx) {
     }
   }
 }
-console.log(`\n## Index definition comparison:`);
-console.log(`  Quote-only differences (cosmetic): ${idxDefDiffsQuoteOnly}`);
-console.log(`  REAL semantic differences: ${idxDefDiffsReal}`);
+log(`\n## Index definition comparison:`);
+log(`  Quote-only differences (cosmetic): ${idxDefDiffsQuoteOnly}`);
+log(`  REAL semantic differences: ${idxDefDiffsReal}`);
 if (idxDefRealDetails.length > 0) {
-  console.log(`\n### Real index definition mismatches:`);
-  idxDefRealDetails.forEach(d => console.log(d));
+  log(`\n### Real index definition mismatches:`);
+  idxDefRealDetails.forEach(d => log(d));
 }
 
 // 5. Summary
-console.log('\n' + '='.repeat(80));
-console.log('SUMMARY');
-console.log(`Tables:  ${common.length} matching, ${onlyIn1.length} only-file1, ${onlyIn2.length} only-file2`);
-console.log(`Columns: ${colDiffs} tables with column differences`);
-console.log(`Indexes: ${commonIdx.length} matching, ${idxOnlyIn1.length} only-file1, ${idxOnlyIn2.length} only-file2, ${idxDefDiffsQuoteOnly} quote-only, ${idxDefDiffsReal} REAL mismatches`);
-console.log('='.repeat(80));
+log('\n' + '='.repeat(80));
+log('SUMMARY');
+log(`Tables:  ${common.length} matching, ${onlyIn1.length} only-file1, ${onlyIn2.length} only-file2`);
+log(`Columns: ${colDiffs} tables with column differences`);
+log(`Indexes: ${commonIdx.length} matching, ${idxOnlyIn1.length} only-file1, ${idxOnlyIn2.length} only-file2, ${idxDefDiffsQuoteOnly} quote-only, ${idxDefDiffsReal} REAL mismatches`);
+log('='.repeat(80));
+
+if (outputFile) {
+  writeFileSync(resolve(outputFile), lines.join('\n'), 'utf-8');
+  console.log(`\nOutput written to: ${outputFile}`);
+}

@@ -80,14 +80,15 @@ describe('SearchParameterRegistry — Strategy Resolution', () => {
     expect(impl!.strategy).toBe('lookup-table');
   });
 
-  it('non-lookup string param → column strategy, TEXT type', () => {
+  it('non-lookup string param → column strategy, TEXT[] when path has array element', () => {
     registry.indexBundle(makeBundle([
       makeSP({ code: 'language', type: 'string', base: ['Patient'], expression: 'Patient.communication.language' }),
     ]));
     const impl = registry.getImpl('Patient', 'language');
     expect(impl).toBeDefined();
     expect(impl!.strategy).toBe('column');
-    expect(impl!.columnType).toBe('TEXT');
+    // Patient.communication has max='*' → array
+    expect(impl!.columnType).toBe('TEXT[]');
   });
 
   it('reference param → column strategy, TEXT type', () => {
@@ -416,8 +417,8 @@ describe('SearchParameterRegistry — Integration', () => {
     const subject = registry.getImpl('Observation', 'subject');
     expect(subject).toBeDefined();
     expect(subject!.strategy).toBe('column');
-    // Observation.subject has multiple targets → TEXT[] (array reference)
-    expect(subject!.columnType).toBe('TEXT[]');
-    expect(subject!.array).toBe(true);
+    // Observation.subject has max='1' in FHIR → TEXT (scalar), regardless of multiple targets
+    expect(subject!.columnType).toBe('TEXT');
+    expect(subject!.array).toBe(false);
   });
 });

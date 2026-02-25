@@ -121,14 +121,14 @@ exports[`DDLGenerator — Snapshot Tests > Observation DDL snapshot 1`] = `
   "__componentValueConcept" UUID[],
   "__componentValueConceptText" TEXT[],
   "__componentValueConceptSort" TEXT,
-  "componentValueQuantity" DOUBLE PRECISION,
+  "componentValueQuantity" DOUBLE PRECISION[],
   "__dataAbsentReason" UUID[],
   "__dataAbsentReasonText" TEXT[],
   "__dataAbsentReasonSort" TEXT,
   "date" TIMESTAMPTZ,
   "derivedFrom" TEXT[],
-  "device" TEXT[],
-  "encounter" TEXT[],
+  "device" TEXT,
+  "encounter" TEXT,
   "focus" TEXT[],
   "hasMember" TEXT[],
   "__identifier" UUID[],
@@ -138,13 +138,13 @@ exports[`DDLGenerator — Snapshot Tests > Observation DDL snapshot 1`] = `
   "__methodText" TEXT[],
   "__methodSort" TEXT,
   "partOf" TEXT[],
-  "patient" TEXT[],
+  "patient" TEXT,
   "performer" TEXT[],
   "specimen" TEXT,
   "__status" UUID[],
   "__statusText" TEXT[],
   "__statusSort" TEXT,
-  "subject" TEXT[],
+  "subject" TEXT,
   "__valueConcept" UUID[],
   "__valueConceptText" TEXT[],
   "__valueConceptSort" TEXT,
@@ -227,7 +227,7 @@ CREATE INDEX IF NOT EXISTS "Observation___componentValueConcept_idx"
   ON "Observation" USING gin ("__componentValueConcept");
 
 CREATE INDEX IF NOT EXISTS "Observation_componentValueQuantity_idx"
-  ON "Observation" USING btree ("componentValueQuantity");
+  ON "Observation" USING gin ("componentValueQuantity");
 
 CREATE INDEX IF NOT EXISTS "Observation___dataAbsentReason_idx"
   ON "Observation" USING gin ("__dataAbsentReason");
@@ -239,10 +239,10 @@ CREATE INDEX IF NOT EXISTS "Observation_derivedFrom_idx"
   ON "Observation" USING gin ("derivedFrom");
 
 CREATE INDEX IF NOT EXISTS "Observation_device_idx"
-  ON "Observation" USING gin ("device");
+  ON "Observation" USING btree ("device");
 
 CREATE INDEX IF NOT EXISTS "Observation_encounter_idx"
-  ON "Observation" USING gin ("encounter");
+  ON "Observation" USING btree ("encounter");
 
 CREATE INDEX IF NOT EXISTS "Observation_focus_idx"
   ON "Observation" USING gin ("focus");
@@ -260,7 +260,7 @@ CREATE INDEX IF NOT EXISTS "Observation_partOf_idx"
   ON "Observation" USING gin ("partOf");
 
 CREATE INDEX IF NOT EXISTS "Observation_patient_idx"
-  ON "Observation" USING gin ("patient");
+  ON "Observation" USING btree ("patient");
 
 CREATE INDEX IF NOT EXISTS "Observation_performer_idx"
   ON "Observation" USING gin ("performer");
@@ -272,7 +272,7 @@ CREATE INDEX IF NOT EXISTS "Observation___status_idx"
   ON "Observation" USING gin ("__status");
 
 CREATE INDEX IF NOT EXISTS "Observation_subject_idx"
-  ON "Observation" USING gin ("subject");
+  ON "Observation" USING btree ("subject");
 
 CREATE INDEX IF NOT EXISTS "Observation___valueConcept_idx"
   ON "Observation" USING gin ("__valueConcept");

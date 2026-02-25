@@ -28,6 +28,7 @@
  */
 
 import type { SqlColumnType } from '../schema/table-schema.js';
+import { ARRAY_ELEMENT_PATHS } from './element-cardinality.js';
 
 // =============================================================================
 // Section 1: Types
@@ -253,33 +254,131 @@ function resolveColumnType(type: SearchParamType, array: boolean): SearchColumnT
 }
 
 /**
+ * Extract the expression fragment relevant to a specific resource type.
+ *
+ * Given "AllergyIntolerance.patient | CarePlan.subject.where(resolve() is Patient)",
+ * for resourceType "AllergyIntolerance" returns "AllergyIntolerance.patient".
+ */
+function getExpressionForResourceType(resourceType: string, expression: string): string | undefined {
+  const parts = expression.split('|').map(s => s.trim());
+  for (const part of parts) {
+    if (part.startsWith(resourceType + '.') || part.startsWith('(' + resourceType + '.')) {
+      // Only strip matching outer parentheses (not unbalanced ones)
+      let result = part;
+      if (result.startsWith('(') && result.endsWith(')')) {
+        result = result.slice(1, -1);
+      }
+      return result;
+    }
+  }
+  // Single expression without union
+  if (!expression.includes('|') && expression.startsWith(resourceType + '.')) {
+    return expression;
+  }
+  return undefined;
+}
+
+/**
+ * Strip a balanced function call from an expression string.
+ *
+ * Handles nested parentheses correctly, e.g.:
+ * - `.where(resolve() is Patient)` → removed entirely
+ * - `.ofType(CodeableConcept)` → removed entirely
+ *
+ * @param input - The expression string
+ * @param funcName - The function prefix to strip (e.g. '.where', '.as')
+ * @returns The expression with all occurrences of funcName(...) removed
+ */
+function stripBalancedCall(input: string, funcName: string): string {
+  let result = input;
+  let idx: number;
+  while ((idx = result.indexOf(funcName + '(')) !== -1) {
+    // Find the matching closing paren
+    let depth = 0;
+    let end = idx + funcName.length; // points to '('
+    for (let i = end; i < result.length; i++) {
+      if (result[i] === '(') depth++;
+      else if (result[i] === ')') {
+        depth--;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    result = result.slice(0, idx) + result.slice(end);
+  }
+  return result;
+}
+
+/**
  * Determine whether a search parameter produces an array column.
  *
+ * Uses FHIR R4 element cardinality (from StructureDefinitions) to determine
+ * whether any element along the FHIRPath expression path has max != '1'.
+ *
+ * This matches Medplum's `crawlSearchParameterDetails` logic which sets
+ * `builder.array = true` when `elementDefinition.isArray` is true.
+ *
  * Rules:
- * - token-column: always array (UUID[] hash column)
- * - reference with union expression (contains `|`): array (TEXT[])
- * - reference with multiple targets (>1 resource types): array (TEXT[])
- * - all others: scalar
+ * - token-column / lookup-table: always array (UUID[] hash column / sort only)
+ * - Walk each segment of the expression path for the specific resource type
+ * - If ANY segment has max != '1' in FHIR R4 → array
+ * - [0] indexer makes result NOT array
+ * - .where() / .as() / .resolve() / .ofType() are stripped
  */
 function resolveIsArray(
   type: SearchParamType,
   strategy: SearchStrategy,
   expression: string,
-  targets: string[],
+  _targets: string[],
+  resourceType?: string,
 ): boolean {
   if (strategy === 'token-column') {
     return true; // Token columns are always arrays
   }
-  if (type === 'reference') {
-    // Array if:
-    // - expression contains a union (multiple paths): e.g. "A.x | B.y"
-    // - multiple target resource types
-    // Note: .where() alone does NOT imply array — Medplum uses TEXT for single-target refs
-    if (expression.includes('|') || targets.length > 1) {
-      return true;
-    }
+
+  // If no resource type provided, fall back to old heuristic
+  if (!resourceType) {
     return false;
   }
+
+  // Get the expression fragment for this specific resource type
+  const rtExpr = getExpressionForResourceType(resourceType, expression);
+  if (!rtExpr) {
+    return false;
+  }
+
+  // Strip FHIRPath functions with potentially nested parentheses:
+  // .where(resolve() is Patient), .as(Type), .resolve(), .ofType(Type)
+  let cleaned = stripBalancedCall(rtExpr, '.where');
+  cleaned = stripBalancedCall(cleaned, '.as');
+  cleaned = stripBalancedCall(cleaned, '.ofType');
+  cleaned = cleaned.replace(/\.resolve\(\)/g, '');
+  // Strip FHIRPath infix 'as Type' syntax: (Observation.value as Quantity)
+  cleaned = cleaned.replace(/\s+as\s+\w+/g, '');
+
+  // Check for [0] indexer — makes result NOT array
+  const hasIndexer = cleaned.includes('[0]');
+  cleaned = cleaned.replace(/\[0\]/g, '');
+
+  // Walk each segment of the path
+  const segments = cleaned.split('.');
+  if (segments.length < 2) return false;
+
+  let currentPath = segments[0]; // ResourceType
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i];
+    if (!seg) continue;
+    currentPath += '.' + seg;
+
+    if (ARRAY_ELEMENT_PATHS.has(currentPath)) {
+      // If the last segment had [0] indexer, it's not array
+      if (hasIndexer) return false;
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -356,16 +455,16 @@ export class SearchParameterRegistry {
         continue;
       }
 
-      const impl = this.buildImpl(resource);
-      if (!impl) {
-        skipped++;
-        continue;
-      }
-
-      // Index for each base resource type
+      // Build a per-resource-type impl (array determination depends on resource type)
+      let builtAny = false;
       for (const base of resource.base) {
         // Skip abstract base types — they don't have tables
         if (base === 'Resource' || base === 'DomainResource') {
+          continue;
+        }
+
+        const impl = this.buildImpl(resource, base);
+        if (!impl) {
           continue;
         }
 
@@ -375,6 +474,12 @@ export class SearchParameterRegistry {
           this.byResource.set(base, resourceMap);
         }
         resourceMap.set(impl.code, impl);
+        builtAny = true;
+      }
+
+      if (!builtAny) {
+        skipped++;
+        continue;
       }
 
       indexed++;
@@ -472,7 +577,7 @@ export class SearchParameterRegistry {
   /**
    * Build a SearchParameterImpl from a raw SearchParameter resource.
    */
-  private buildImpl(resource: SearchParameterResource): SearchParameterImpl | null {
+  private buildImpl(resource: SearchParameterResource, resourceType: string): SearchParameterImpl | null {
     const { code, type, base, expression } = resource;
 
     if (!code || !type || !base) {
@@ -483,7 +588,7 @@ export class SearchParameterRegistry {
     const targets = resource.target ?? [];
     const strategy = resolveStrategy(code, type, expr);
     const columnName = codeToColumnName(code);
-    const array = resolveIsArray(type, strategy, expr, targets);
+    const array = resolveIsArray(type, strategy, expr, targets, resourceType);
     const columnType = resolveColumnType(type, array);
 
     return {
