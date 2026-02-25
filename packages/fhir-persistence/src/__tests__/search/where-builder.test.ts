@@ -382,13 +382,13 @@ describe('buildWhereClause', () => {
 describe('buildWhereClause — metadata params', () => {
   const registry = new SearchParameterRegistry();
 
-  it('_tag generates token-column array overlap on __tagText', () => {
+  it('_tag generates token-column array overlap on ___tagText', () => {
     const params: ParsedSearchParam[] = [
       { code: '_tag', values: ['http://example.com|urgent'] },
     ];
     const result = buildWhereClause(params, registry, 'Patient');
     expect(result).not.toBeNull();
-    expect(result!.sql).toBe('"__tagText" && ARRAY[$1]::text[]');
+    expect(result!.sql).toBe('"___tagText" && ARRAY[$1]::text[]');
     expect(result!.values).toEqual(['http://example.com|urgent']);
   });
 
@@ -398,7 +398,7 @@ describe('buildWhereClause — metadata params', () => {
     ];
     const result = buildWhereClause(params, registry, 'Patient');
     expect(result).not.toBeNull();
-    expect(result!.sql).toBe('NOT ("__tagText" && ARRAY[$1]::text[])');
+    expect(result!.sql).toBe('NOT ("___tagText" && ARRAY[$1]::text[])');
   });
 
   it('_tag with multiple values', () => {
@@ -407,17 +407,17 @@ describe('buildWhereClause — metadata params', () => {
     ];
     const result = buildWhereClause(params, registry, 'Patient');
     expect(result).not.toBeNull();
-    expect(result!.sql).toBe('"__tagText" && ARRAY[$1, $2]::text[]');
+    expect(result!.sql).toBe('"___tagText" && ARRAY[$1, $2]::text[]');
     expect(result!.values).toEqual(['http://a.com|x', 'http://b.com|y']);
   });
 
-  it('_security generates token-column array overlap on __securityText', () => {
+  it('_security generates token-column array overlap on ___securityText', () => {
     const params: ParsedSearchParam[] = [
       { code: '_security', values: ['http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R'] },
     ];
     const result = buildWhereClause(params, registry, 'Patient');
     expect(result).not.toBeNull();
-    expect(result!.sql).toBe('"__securityText" && ARRAY[$1]::text[]');
+    expect(result!.sql).toBe('"___securityText" && ARRAY[$1]::text[]');
   });
 
   it('_profile generates array overlap on _profile TEXT[]', () => {
@@ -470,7 +470,7 @@ describe('buildWhereClause — metadata params', () => {
     ];
     const result = buildWhereClause(params, registry2, 'Patient');
     expect(result).not.toBeNull();
-    expect(result!.sql).toContain('"__tagText" && ARRAY[$1]::text[]');
+    expect(result!.sql).toContain('"___tagText" && ARRAY[$1]::text[]');
     expect(result!.sql).toContain('"id" = $2');
     expect(result!.sql).toContain('"__genderText" && ARRAY[$3]::text[]');
     expect(result!.values).toEqual(['http://example.com|urgent', 'abc', 'male']);

@@ -167,7 +167,7 @@ describe('Phase 19 — trigram indexes in schema', () => {
     const tableSet = buildResourceTableSet('Patient', sdRegistry, spRegistry);
 
     const indexNames = tableSet.main.indexes.map(i => i.name);
-    expect(indexNames).toContain('Patient___tagText_trgm_idx');
-    expect(indexNames).toContain('Patient___securityText_trgm_idx');
+    expect(indexNames).toContain('Patient____tagText_trgm_idx');
+    expect(indexNames).toContain('Patient___sharedTokensText_trgm_idx');
   });
 });

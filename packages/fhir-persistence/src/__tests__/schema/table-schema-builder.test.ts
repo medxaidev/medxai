@@ -625,18 +625,18 @@ describe('TableSchemaBuilder — Schema Correctness (reference array & lookup-ta
     expect(colNames).not.toContain('name'); // no direct column
   });
 
-  it('Account: patient is TEXT[] (multi-target via .where() expression)', () => {
+  it('Account: patient is TEXT (single-target .where() expression — matches Medplum)', () => {
     const impl = spRegistry.getImpl('Account', 'patient');
     expect(impl).toBeDefined();
     expect(impl!.strategy).toBe('column');
-    expect(impl!.columnType).toBe('TEXT[]');
-    expect(impl!.array).toBe(true);
+    expect(impl!.columnType).toBe('TEXT');
+    expect(impl!.array).toBe(false);
     const tableSet = buildResourceTableSet('Account', sdRegistry, spRegistry);
     const col = tableSet.main.columns.find((c) => c.name === 'patient');
     expect(col).toBeDefined();
-    expect(col!.type).toBe('TEXT[]');
+    expect(col!.type).toBe('TEXT');
     const idx = tableSet.main.indexes.find((i) => i.name === 'Account_patient_idx');
-    expect(idx!.indexType).toBe('gin');
+    expect(idx!.indexType).toBe('btree');
   });
 
   it('Account: subject is TEXT[] (multi-target reference)', () => {

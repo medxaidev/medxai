@@ -430,7 +430,7 @@ describe('DDLGenerator — Snapshot Tests', () => {
 
     // All should be valid SQL-ish
     for (const stmt of statements) {
-      expect(stmt).toMatch(/^CREATE (EXTENSION|TABLE|UNIQUE )?INDEX IF NOT EXISTS|^CREATE TABLE IF NOT EXISTS|^CREATE EXTENSION IF NOT EXISTS/);
+      expect(stmt).toMatch(/^CREATE (EXTENSION|TABLE|UNIQUE )?INDEX IF NOT EXISTS|^CREATE TABLE IF NOT EXISTS|^CREATE EXTENSION IF NOT EXISTS|^CREATE OR REPLACE FUNCTION/);
       expect(stmt).toMatch(/;$/);
     }
   });

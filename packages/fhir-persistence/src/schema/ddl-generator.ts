@@ -154,12 +154,25 @@ export function generateCreateReferencesTable(table: ReferencesTableSchema): str
 
 /**
  * Generate a `CREATE INDEX IF NOT EXISTS` statement.
+ *
+ * Supports:
+ * - `opClass` — operator class appended to each column key (e.g., `gin_trgm_ops`)
+ * - `expression` — functional expression to index instead of plain columns
+ *   (e.g., `to_tsvector('simple'::regconfig, family)`)
  */
 export function generateCreateIndex(index: IndexSchema, tableName: string): string {
   const unique = index.unique ? 'UNIQUE ' : '';
-  const cols = index.columns.map((c) => `"${c}"`).join(', ');
 
-  let sql = `CREATE ${unique}INDEX IF NOT EXISTS "${index.name}"\n  ON "${tableName}" USING ${index.indexType} (${cols})`;
+  let indexExpr: string;
+  if (index.expression) {
+    indexExpr = index.expression;
+  } else if (index.opClass) {
+    indexExpr = index.columns.map((c) => `"${c}" ${index.opClass}`).join(', ');
+  } else {
+    indexExpr = index.columns.map((c) => `"${c}"`).join(', ');
+  }
+
+  let sql = `CREATE ${unique}INDEX IF NOT EXISTS "${index.name}"\n  ON "${tableName}" USING ${index.indexType} (${indexExpr})`;
 
   if (index.include && index.include.length > 0) {
     const includeCols = index.include.map((c) => `"${c}"`).join(', ');
@@ -278,6 +291,11 @@ export function generateSchemaDDL(schema: SchemaDefinition): string[] {
   // Extensions required for trigram and btree_gin indexes (matches Medplum)
   tableStatements.push('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
   tableStatements.push('CREATE EXTENSION IF NOT EXISTS btree_gin;');
+
+  // Helper function used by trigram indexes on token text arrays (matches Medplum)
+  tableStatements.push(
+    `CREATE OR REPLACE FUNCTION token_array_to_text(arr text[]) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT array_to_string(arr, ' ') $$;`,
+  );
 
   // Global lookup tables first
   if (schema.globalLookupTables) {

@@ -10,12 +10,12 @@ exports[`DDLGenerator — Snapshot Tests > Binary DDL snapshot 1`] = `
   "__version" INTEGER NOT NULL,
   "_source" TEXT,
   "_profile" TEXT[],
-  "__tag" UUID[],
-  "__tagText" TEXT[],
-  "__tagSort" TEXT,
-  "__security" UUID[],
-  "__securityText" TEXT[],
-  "__securitySort" TEXT,
+  "___tag" UUID[],
+  "___tagText" TEXT[],
+  "___tagSort" TEXT,
+  "___security" UUID[],
+  "___securityText" TEXT[],
+  "___securitySort" TEXT,
   "__sharedTokens" UUID[],
   "__sharedTokensText" TEXT[],
   CONSTRAINT "Binary_pk" PRIMARY KEY ("id")
@@ -61,11 +61,11 @@ CREATE INDEX IF NOT EXISTS "Binary_reindex_idx"
 CREATE INDEX IF NOT EXISTS "Binary___sharedTokens_idx"
   ON "Binary" USING gin ("__sharedTokens");
 
-CREATE INDEX IF NOT EXISTS "Binary___tagText_trgm_idx"
-  ON "Binary" USING gin ("__tagText");
+CREATE INDEX IF NOT EXISTS "Binary____tagText_trgm_idx"
+  ON "Binary" USING gin (token_array_to_text("___tagText") gin_trgm_ops);
 
-CREATE INDEX IF NOT EXISTS "Binary___securityText_trgm_idx"
-  ON "Binary" USING gin ("__securityText");
+CREATE INDEX IF NOT EXISTS "Binary___sharedTokensText_trgm_idx"
+  ON "Binary" USING gin (token_array_to_text("__sharedTokensText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Binary_History_id_idx"
   ON "Binary_History" USING btree ("id");
@@ -88,12 +88,12 @@ exports[`DDLGenerator — Snapshot Tests > Observation DDL snapshot 1`] = `
   "__version" INTEGER NOT NULL,
   "_source" TEXT,
   "_profile" TEXT[],
-  "__tag" UUID[],
-  "__tagText" TEXT[],
-  "__tagSort" TEXT,
-  "__security" UUID[],
-  "__securityText" TEXT[],
-  "__securitySort" TEXT,
+  "___tag" UUID[],
+  "___tagText" TEXT[],
+  "___tagSort" TEXT,
+  "___security" UUID[],
+  "___securityText" TEXT[],
+  "___securitySort" TEXT,
   "compartments" UUID[] NOT NULL,
   "basedOn" TEXT[],
   "__category" UUID[],
@@ -290,49 +290,49 @@ CREATE INDEX IF NOT EXISTS "Observation___sharedTokens_idx"
   ON "Observation" USING gin ("__sharedTokens");
 
 CREATE INDEX IF NOT EXISTS "Observation___categoryText_trgm_idx"
-  ON "Observation" USING gin ("__categoryText");
+  ON "Observation" USING gin (token_array_to_text("__categoryText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___codeText_trgm_idx"
-  ON "Observation" USING gin ("__codeText");
+  ON "Observation" USING gin (token_array_to_text("__codeText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___comboCodeText_trgm_idx"
-  ON "Observation" USING gin ("__comboCodeText");
+  ON "Observation" USING gin (token_array_to_text("__comboCodeText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___comboDataAbsentReasonText_trgm_idx"
-  ON "Observation" USING gin ("__comboDataAbsentReasonText");
+  ON "Observation" USING gin (token_array_to_text("__comboDataAbsentReasonText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___comboValueConceptText_trgm_idx"
-  ON "Observation" USING gin ("__comboValueConceptText");
+  ON "Observation" USING gin (token_array_to_text("__comboValueConceptText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___componentCodeText_trgm_idx"
-  ON "Observation" USING gin ("__componentCodeText");
+  ON "Observation" USING gin (token_array_to_text("__componentCodeText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___componentDataAbsentReasonText_trgm_idx"
-  ON "Observation" USING gin ("__componentDataAbsentReasonText");
+  ON "Observation" USING gin (token_array_to_text("__componentDataAbsentReasonText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___componentValueConceptText_trgm_idx"
-  ON "Observation" USING gin ("__componentValueConceptText");
+  ON "Observation" USING gin (token_array_to_text("__componentValueConceptText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___dataAbsentReasonText_trgm_idx"
-  ON "Observation" USING gin ("__dataAbsentReasonText");
+  ON "Observation" USING gin (token_array_to_text("__dataAbsentReasonText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___identifierText_trgm_idx"
-  ON "Observation" USING gin ("__identifierText");
+  ON "Observation" USING gin (token_array_to_text("__identifierText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___methodText_trgm_idx"
-  ON "Observation" USING gin ("__methodText");
+  ON "Observation" USING gin (token_array_to_text("__methodText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___statusText_trgm_idx"
-  ON "Observation" USING gin ("__statusText");
+  ON "Observation" USING gin (token_array_to_text("__statusText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation___valueConceptText_trgm_idx"
-  ON "Observation" USING gin ("__valueConceptText");
+  ON "Observation" USING gin (token_array_to_text("__valueConceptText") gin_trgm_ops);
 
-CREATE INDEX IF NOT EXISTS "Observation___tagText_trgm_idx"
-  ON "Observation" USING gin ("__tagText");
+CREATE INDEX IF NOT EXISTS "Observation____tagText_trgm_idx"
+  ON "Observation" USING gin (token_array_to_text("___tagText") gin_trgm_ops);
 
-CREATE INDEX IF NOT EXISTS "Observation___securityText_trgm_idx"
-  ON "Observation" USING gin ("__securityText");
+CREATE INDEX IF NOT EXISTS "Observation___sharedTokensText_trgm_idx"
+  ON "Observation" USING gin (token_array_to_text("__sharedTokensText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Observation_History_id_idx"
   ON "Observation_History" USING btree ("id");
@@ -355,12 +355,12 @@ exports[`DDLGenerator — Snapshot Tests > Patient DDL snapshot 1`] = `
   "__version" INTEGER NOT NULL,
   "_source" TEXT,
   "_profile" TEXT[],
-  "__tag" UUID[],
-  "__tagText" TEXT[],
-  "__tagSort" TEXT,
-  "__security" UUID[],
-  "__securityText" TEXT[],
-  "__securitySort" TEXT,
+  "___tag" UUID[],
+  "___tagText" TEXT[],
+  "___tagSort" TEXT,
+  "___security" UUID[],
+  "___securityText" TEXT[],
+  "___securitySort" TEXT,
   "compartments" UUID[] NOT NULL,
   "__active" UUID[],
   "__activeText" TEXT[],
@@ -513,25 +513,25 @@ CREATE INDEX IF NOT EXISTS "Patient___sharedTokens_idx"
   ON "Patient" USING gin ("__sharedTokens");
 
 CREATE INDEX IF NOT EXISTS "Patient___activeText_trgm_idx"
-  ON "Patient" USING gin ("__activeText");
+  ON "Patient" USING gin (token_array_to_text("__activeText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Patient___deceasedText_trgm_idx"
-  ON "Patient" USING gin ("__deceasedText");
+  ON "Patient" USING gin (token_array_to_text("__deceasedText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Patient___genderText_trgm_idx"
-  ON "Patient" USING gin ("__genderText");
+  ON "Patient" USING gin (token_array_to_text("__genderText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Patient___identifierText_trgm_idx"
-  ON "Patient" USING gin ("__identifierText");
+  ON "Patient" USING gin (token_array_to_text("__identifierText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Patient___languageText_trgm_idx"
-  ON "Patient" USING gin ("__languageText");
+  ON "Patient" USING gin (token_array_to_text("__languageText") gin_trgm_ops);
 
-CREATE INDEX IF NOT EXISTS "Patient___tagText_trgm_idx"
-  ON "Patient" USING gin ("__tagText");
+CREATE INDEX IF NOT EXISTS "Patient____tagText_trgm_idx"
+  ON "Patient" USING gin (token_array_to_text("___tagText") gin_trgm_ops);
 
-CREATE INDEX IF NOT EXISTS "Patient___securityText_trgm_idx"
-  ON "Patient" USING gin ("__securityText");
+CREATE INDEX IF NOT EXISTS "Patient___sharedTokensText_trgm_idx"
+  ON "Patient" USING gin (token_array_to_text("__sharedTokensText") gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS "Patient_History_id_idx"
   ON "Patient_History" USING btree ("id");

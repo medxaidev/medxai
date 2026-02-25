@@ -96,6 +96,19 @@ export interface IndexSchema {
 
   /** INCLUDE columns for covering indexes. */
   include?: string[];
+
+  /**
+   * Operator class for the index (e.g., `'gin_trgm_ops'` for trigram GIN).
+   * Applied to all columns in the index.
+   */
+  opClass?: string;
+
+  /**
+   * Functional expression to index instead of a plain column.
+   * When set, `columns` is ignored and this SQL expression is used directly.
+   * Example: `"to_tsvector('simple'::regconfig, family)"`
+   */
+  expression?: string;
 }
 
 // =============================================================================

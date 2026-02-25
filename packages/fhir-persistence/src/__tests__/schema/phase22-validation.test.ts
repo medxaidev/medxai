@@ -128,7 +128,7 @@ describe('Phase 22 — DDL cross-validation for all resource types', () => {
     // Every statement should be a CREATE TABLE or CREATE INDEX
     for (const stmt of stmts) {
       expect(
-        stmt.startsWith('CREATE TABLE') || stmt.startsWith('CREATE INDEX') || stmt.startsWith('CREATE UNIQUE INDEX') || stmt.startsWith('CREATE EXTENSION'),
+        stmt.startsWith('CREATE TABLE') || stmt.startsWith('CREATE INDEX') || stmt.startsWith('CREATE UNIQUE INDEX') || stmt.startsWith('CREATE EXTENSION') || stmt.startsWith('CREATE OR REPLACE FUNCTION'),
         `Invalid DDL: ${stmt.slice(0, 80)}`,
       ).toBe(true);
     }

@@ -604,7 +604,7 @@ describe('Row Indexer — buildSearchColumns (multiple impls)', () => {
 // =============================================================================
 
 describe('buildMetadataColumns', () => {
-  it('extracts meta.tag → __tag, __tagText, __tagSort', () => {
+  it('extracts meta.tag → ___tag, ___tagText, ___tagSort', () => {
     const resource = {
       resourceType: 'Patient',
       meta: {
@@ -612,12 +612,12 @@ describe('buildMetadataColumns', () => {
       },
     };
     const cols = buildMetadataColumns(resource);
-    expect(cols.__tag).toHaveLength(1);
-    expect(cols.__tagText).toEqual(['http://example.com|urgent']);
-    expect(cols.__tagSort).toBe('http://example.com|urgent');
+    expect(cols.___tag).toHaveLength(1);
+    expect(cols.___tagText).toEqual(['http://example.com|urgent']);
+    expect(cols.___tagSort).toBe('http://example.com|urgent');
   });
 
-  it('extracts meta.security → __security, __securityText, __securitySort', () => {
+  it('extracts meta.security → ___security, ___securityText, ___securitySort', () => {
     const resource = {
       resourceType: 'Patient',
       meta: {
@@ -625,16 +625,16 @@ describe('buildMetadataColumns', () => {
       },
     };
     const cols = buildMetadataColumns(resource);
-    expect(cols.__security).toHaveLength(1);
-    expect(cols.__securityText).toEqual(['http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R']);
-    expect(cols.__securitySort).toBe('http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R');
+    expect(cols.___security).toHaveLength(1);
+    expect(cols.___securityText).toEqual(['http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R']);
+    expect(cols.___securitySort).toBe('http://terminology.hl7.org/CodeSystem/v3-Confidentiality|R');
   });
 
-  it('no meta.tag → no __tag columns', () => {
+  it('no meta.tag → no ___tag columns', () => {
     const resource = { resourceType: 'Patient', meta: { lastUpdated: '2026-01-01' } };
     const cols = buildMetadataColumns(resource);
-    expect(cols.__tag).toBeUndefined();
-    expect(cols.__tagText).toBeUndefined();
+    expect(cols.___tag).toBeUndefined();
+    expect(cols.___tagText).toBeUndefined();
   });
 
   it('multiple tags → arrays with all values', () => {
@@ -648,9 +648,9 @@ describe('buildMetadataColumns', () => {
       },
     };
     const cols = buildMetadataColumns(resource);
-    expect(cols.__tag).toHaveLength(2);
-    expect(cols.__tagText).toEqual(['http://a.com|x', 'http://b.com|y']);
-    expect(cols.__tagSort).toBe('http://a.com|x');
+    expect(cols.___tag).toHaveLength(2);
+    expect(cols.___tagText).toEqual(['http://a.com|x', 'http://b.com|y']);
+    expect(cols.___tagSort).toBe('http://a.com|x');
   });
 
   it('tag with system|code → correct text format', () => {
@@ -659,7 +659,7 @@ describe('buildMetadataColumns', () => {
       meta: { tag: [{ system: 'http://example.com', code: 'urgent' }] },
     };
     const cols = buildMetadataColumns(resource);
-    expect(cols.__tagText).toEqual(['http://example.com|urgent']);
+    expect(cols.___tagText).toEqual(['http://example.com|urgent']);
   });
 
   it('tag with code only (no system) → no system prefix', () => {
@@ -668,7 +668,7 @@ describe('buildMetadataColumns', () => {
       meta: { tag: [{ code: 'local-tag' }] },
     };
     const cols = buildMetadataColumns(resource);
-    expect(cols.__tagText).toEqual(['local-tag']);
+    expect(cols.___tagText).toEqual(['local-tag']);
   });
 
   it('empty meta → empty result', () => {

@@ -274,8 +274,8 @@ function resolveIsArray(
     // Array if:
     // - expression contains a union (multiple paths): e.g. "A.x | B.y"
     // - multiple target resource types
-    // - expression uses .where() filter on a collection: e.g. "Account.subject.where(...)"
-    if (expression.includes('|') || targets.length > 1 || expression.includes('.where(')) {
+    // Note: .where() alone does NOT imply array — Medplum uses TEXT for single-target refs
+    if (expression.includes('|') || targets.length > 1) {
       return true;
     }
     return false;

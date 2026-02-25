@@ -56,14 +56,14 @@ function buildFixedMainColumns(): ColumnSchema[] {
     { name: '__version', type: 'INTEGER', notNull: true, primaryKey: false },
     { name: '_source', type: 'TEXT', notNull: false, primaryKey: false },
     { name: '_profile', type: 'TEXT[]', notNull: false, primaryKey: false },
-    // Metadata token columns — _tag (meta.tag)
-    { name: '__tag', type: 'UUID[]', notNull: false, primaryKey: false },
-    { name: '__tagText', type: 'TEXT[]', notNull: false, primaryKey: false },
-    { name: '__tagSort', type: 'TEXT', notNull: false, primaryKey: false },
-    // Metadata token columns — _security (meta.security)
-    { name: '__security', type: 'UUID[]', notNull: false, primaryKey: false },
-    { name: '__securityText', type: 'TEXT[]', notNull: false, primaryKey: false },
-    { name: '__securitySort', type: 'TEXT', notNull: false, primaryKey: false },
+    // Metadata token columns — _tag (meta.tag) — triple-underscore matches Medplum
+    { name: '___tag', type: 'UUID[]', notNull: false, primaryKey: false },
+    { name: '___tagText', type: 'TEXT[]', notNull: false, primaryKey: false },
+    { name: '___tagSort', type: 'TEXT', notNull: false, primaryKey: false },
+    // Metadata token columns — _security (meta.security) — triple-underscore matches Medplum
+    { name: '___security', type: 'UUID[]', notNull: false, primaryKey: false },
+    { name: '___securityText', type: 'TEXT[]', notNull: false, primaryKey: false },
+    { name: '___securitySort', type: 'TEXT', notNull: false, primaryKey: false },
   ];
 }
 
@@ -354,9 +354,12 @@ function buildHumanNameTable(): GlobalLookupTableSchema {
       { name: `${tableName}_name_idx`, columns: ['name'], indexType: 'btree', unique: false },
       { name: `${tableName}_given_idx`, columns: ['given'], indexType: 'btree', unique: false },
       { name: `${tableName}_family_idx`, columns: ['family'], indexType: 'btree', unique: false },
-      { name: `${tableName}_nameTrgm_idx`, columns: ['name'], indexType: 'gin', unique: false },
-      { name: `${tableName}_givenTrgm_idx`, columns: ['given'], indexType: 'gin', unique: false },
-      { name: `${tableName}_familyTrgm_idx`, columns: ['family'], indexType: 'gin', unique: false },
+      { name: `${tableName}_nameTrgm_idx`, columns: ['name'], indexType: 'gin', unique: false, opClass: 'gin_trgm_ops' },
+      { name: `${tableName}_givenTrgm_idx`, columns: ['given'], indexType: 'gin', unique: false, opClass: 'gin_trgm_ops' },
+      { name: `${tableName}_familyTrgm_idx`, columns: ['family'], indexType: 'gin', unique: false, opClass: 'gin_trgm_ops' },
+      { name: `${tableName}_name_idx_tsv`, columns: ['name'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, name)` },
+      { name: `${tableName}_given_idx_tsv`, columns: ['given'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, given)` },
+      { name: `${tableName}_family_idx_tsv`, columns: ['family'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, family)` },
     ],
   };
 }
@@ -377,7 +380,17 @@ function buildAddressTable(): GlobalLookupTableSchema {
     indexes: [
       { name: `${tableName}_resourceId_idx`, columns: ['resourceId'], indexType: 'btree', unique: false },
       { name: `${tableName}_address_idx`, columns: ['address'], indexType: 'btree', unique: false },
+      { name: `${tableName}_address_idx_tsv`, columns: ['address'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, address)` },
       { name: `${tableName}_city_idx`, columns: ['city'], indexType: 'btree', unique: false },
+      { name: `${tableName}_city_idx_tsv`, columns: ['city'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, city)` },
+      { name: `${tableName}_country_idx`, columns: ['country'], indexType: 'btree', unique: false },
+      { name: `${tableName}_country_idx_tsv`, columns: ['country'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, country)` },
+      { name: `${tableName}_postalCode_idx`, columns: ['postalCode'], indexType: 'btree', unique: false },
+      { name: `${tableName}_postalCode_idx_tsv`, columns: ['postalCode'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, "postalCode")` },
+      { name: `${tableName}_state_idx`, columns: ['state'], indexType: 'btree', unique: false },
+      { name: `${tableName}_state_idx_tsv`, columns: ['state'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, state)` },
+      { name: `${tableName}_use_idx`, columns: ['use'], indexType: 'btree', unique: false },
+      { name: `${tableName}_use_idx_tsv`, columns: ['use'], indexType: 'gin', unique: false, expression: `to_tsvector('simple'::regconfig, use)` },
     ],
   };
 }
@@ -394,6 +407,7 @@ function buildContactPointTable(): GlobalLookupTableSchema {
     ],
     indexes: [
       { name: `${tableName}_resourceId_idx`, columns: ['resourceId'], indexType: 'btree', unique: false },
+      { name: `${tableName}_system_idx`, columns: ['system'], indexType: 'btree', unique: false },
       { name: `${tableName}_value_idx`, columns: ['value'], indexType: 'btree', unique: false },
     ],
   };
@@ -458,30 +472,33 @@ function buildSharedTokenIndexes(resourceType: string): IndexSchema[] {
 function buildTrigramIndexes(resourceType: string, impls: SearchParameterImpl[]): IndexSchema[] {
   const indexes: IndexSchema[] = [];
 
+  // Trigram on token-column text arrays using token_array_to_text() — matches Medplum
   for (const impl of impls) {
     if (impl.strategy !== 'token-column') continue;
-
     indexes.push({
       name: `${resourceType}___${impl.columnName}Text_trgm_idx`,
       columns: [`__${impl.columnName}Text`],
       indexType: 'gin',
       unique: false,
+      expression: `token_array_to_text("__${impl.columnName}Text") gin_trgm_ops`,
     });
   }
 
-  // Also add trigram for fixed metadata token text columns
+  // Trigram on fixed metadata token text columns (triple underscore) — matches Medplum
   indexes.push(
     {
-      name: `${resourceType}___tagText_trgm_idx`,
-      columns: ['__tagText'],
+      name: `${resourceType}____tagText_trgm_idx`,
+      columns: ['___tagText'],
       indexType: 'gin',
       unique: false,
+      expression: `token_array_to_text("___tagText") gin_trgm_ops`,
     },
     {
-      name: `${resourceType}___securityText_trgm_idx`,
-      columns: ['__securityText'],
+      name: `${resourceType}___sharedTokensText_trgm_idx`,
+      columns: ['__sharedTokensText'],
       indexType: 'gin',
       unique: false,
+      expression: `token_array_to_text("__sharedTokensText") gin_trgm_ops`,
     },
   );
 

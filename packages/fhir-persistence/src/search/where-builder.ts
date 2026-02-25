@@ -836,7 +836,7 @@ function resolveImpl(
         resourceTypes: [resourceType],
         expression: 'meta.tag',
         strategy: 'token-column',
-        columnName: 'tag',
+        columnName: '_tag',
         columnType: 'UUID[]',
         array: true,
       };
@@ -847,7 +847,7 @@ function resolveImpl(
         resourceTypes: [resourceType],
         expression: 'meta.security',
         strategy: 'token-column',
-        columnName: 'security',
+        columnName: '_security',
         columnType: 'UUID[]',
         array: true,
       };

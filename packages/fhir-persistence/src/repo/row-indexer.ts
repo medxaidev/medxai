@@ -446,20 +446,20 @@ export function buildSharedTokenColumns(
     allTexts.push(...(searchCols["__identifierText"] as string[]));
   }
 
-  // Collect from _tag (metadata columns)
-  if (Array.isArray(metadataCols["__tag"])) {
-    allHashes.push(...(metadataCols["__tag"] as string[]));
+  // Collect from _tag (metadata columns — triple underscore)
+  if (Array.isArray(metadataCols["___tag"])) {
+    allHashes.push(...(metadataCols["___tag"] as string[]));
   }
-  if (Array.isArray(metadataCols["__tagText"])) {
-    allTexts.push(...(metadataCols["__tagText"] as string[]));
+  if (Array.isArray(metadataCols["___tagText"])) {
+    allTexts.push(...(metadataCols["___tagText"] as string[]));
   }
 
-  // Collect from _security (metadata columns)
-  if (Array.isArray(metadataCols["__security"])) {
-    allHashes.push(...(metadataCols["__security"] as string[]));
+  // Collect from _security (metadata columns — triple underscore)
+  if (Array.isArray(metadataCols["___security"])) {
+    allHashes.push(...(metadataCols["___security"] as string[]));
   }
-  if (Array.isArray(metadataCols["__securityText"])) {
-    allTexts.push(...(metadataCols["__securityText"] as string[]));
+  if (Array.isArray(metadataCols["___securityText"])) {
+    allTexts.push(...(metadataCols["___securityText"] as string[]));
   }
 
   const result: SearchColumnValues = {};
@@ -480,8 +480,8 @@ export function buildSharedTokenColumns(
  * Build metadata search column values from a FHIR resource's `meta` element.
  *
  * Extracts `meta.tag` and `meta.security` into the fixed metadata columns:
- * - `__tag UUID[]`, `__tagText TEXT[]`, `__tagSort TEXT`
- * - `__security UUID[]`, `__securityText TEXT[]`, `__securitySort TEXT`
+ * - `___tag UUID[]`, `___tagText TEXT[]`, `___tagSort TEXT` (triple underscore — matches Medplum)
+ * - `___security UUID[]`, `___securityText TEXT[]`, `___securitySort TEXT`
  *
  * These columns exist on every main table and are independent of the
  * SearchParameterRegistry (they apply to all resource types).
@@ -505,11 +505,11 @@ export function buildMetadataColumns(
       tokens.push(...extractTokenValues(tag));
     }
     if (tokens.length > 0) {
-      columns["__tag"] = tokens.map((t) => hashToken(t.system, t.code));
-      columns["__tagText"] = tokens.map((t) =>
+      columns["___tag"] = tokens.map((t) => hashToken(t.system, t.code));
+      columns["___tagText"] = tokens.map((t) =>
         t.system ? `${t.system}|${t.code}` : t.code,
       );
-      columns["__tagSort"] = (columns["__tagText"] as string[])[0] ?? null;
+      columns["___tagSort"] = (columns["___tagText"] as string[])[0] ?? null;
     }
   }
 
@@ -520,12 +520,12 @@ export function buildMetadataColumns(
       tokens.push(...extractTokenValues(sec));
     }
     if (tokens.length > 0) {
-      columns["__security"] = tokens.map((t) => hashToken(t.system, t.code));
-      columns["__securityText"] = tokens.map((t) =>
+      columns["___security"] = tokens.map((t) => hashToken(t.system, t.code));
+      columns["___securityText"] = tokens.map((t) =>
         t.system ? `${t.system}|${t.code}` : t.code,
       );
-      columns["__securitySort"] =
-        (columns["__securityText"] as string[])[0] ?? null;
+      columns["___securitySort"] =
+        (columns["___securityText"] as string[])[0] ?? null;
     }
   }
 
