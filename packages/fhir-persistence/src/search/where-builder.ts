@@ -220,16 +220,48 @@ function buildMissingFragment(
 }
 
 // =============================================================================
-// Section 3b: Lookup-Table Strategy (sort-column search)
+// Section 3b: Lookup-Table Strategy (global table JOIN search)
 // =============================================================================
+
+/**
+ * Map search param codes to their global lookup table and column.
+ *
+ * Matches Medplum's production design:
+ * - HumanName: name/given/family columns
+ * - Address: address/city/country/postalCode/state/use columns
+ * - ContactPoint: system/value columns
+ */
+const LOOKUP_TABLE_MAP: Record<string, { table: string; column: string }> = {
+  // HumanName
+  name: { table: 'HumanName', column: 'name' },
+  given: { table: 'HumanName', column: 'given' },
+  family: { table: 'HumanName', column: 'family' },
+  phonetic: { table: 'HumanName', column: 'name' },
+  // Address
+  address: { table: 'Address', column: 'address' },
+  'address-city': { table: 'Address', column: 'city' },
+  'address-country': { table: 'Address', column: 'country' },
+  'address-postalcode': { table: 'Address', column: 'postalCode' },
+  'address-state': { table: 'Address', column: 'state' },
+  'address-use': { table: 'Address', column: 'use' },
+  // ContactPoint
+  telecom: { table: 'ContactPoint', column: 'value' },
+  email: { table: 'ContactPoint', column: 'value' },
+  phone: { table: 'ContactPoint', column: 'value' },
+};
 
 /**
  * Build a WHERE fragment for lookup-table strategy parameters.
  *
- * Searches the `__<name>Sort` column which stores a concatenated text
- * representation (e.g., "Smith John" for HumanName, "123 Main St" for Address).
+ * Generates an EXISTS subquery against the appropriate global lookup table:
+ * ```sql
+ * EXISTS (SELECT 1 FROM "HumanName" __lookup
+ *   WHERE __lookup."resourceId" = "id" AND LOWER(__lookup."family") LIKE $1)
+ * ```
  *
- * Supports the same string modifiers:
+ * Falls back to `__<name>Sort` column search if no mapping exists.
+ *
+ * Supports string modifiers:
  * - No modifier → case-insensitive prefix match (ILIKE 'value%')
  * - `:exact` → exact match (`= $N`)
  * - `:contains` → contains match (ILIKE '%value%')
@@ -239,18 +271,54 @@ function buildLookupTableFragment(
   param: ParsedSearchParam,
   startIndex: number,
 ): WhereFragment {
-  const sortColumn = quoteColumn(`__${impl.columnName}Sort`);
+  const mapping = LOOKUP_TABLE_MAP[impl.code];
+
+  // Fallback to sort-column search if no global table mapping
+  if (!mapping) {
+    const sortColumn = quoteColumn(`__${impl.columnName}Sort`);
+    if (param.modifier === 'exact') {
+      return buildOrFragment(sortColumn, '=', param.values, startIndex);
+    }
+    if (param.modifier === 'contains') {
+      return buildLikeFragment(sortColumn, param.values, startIndex, '%', '%');
+    }
+    return buildLikeFragment(sortColumn, param.values, startIndex, '', '%');
+  }
+
+  // Build EXISTS subquery against global lookup table
+  const { table, column } = mapping;
+  const colRef = `__lookup."${column}"`;
 
   if (param.modifier === 'exact') {
-    return buildOrFragment(sortColumn, '=', param.values, startIndex);
+    // Exact: direct equality
+    if (param.values.length === 1) {
+      const sql = `EXISTS (SELECT 1 FROM "${table}" __lookup WHERE __lookup."resourceId" = "id" AND ${colRef} = $${startIndex})`;
+      return { sql, values: [param.values[0]] };
+    }
+    const conditions = param.values.map((_, i) => `${colRef} = $${startIndex + i}`);
+    const sql = `EXISTS (SELECT 1 FROM "${table}" __lookup WHERE __lookup."resourceId" = "id" AND (${conditions.join(' OR ')}))`;
+    return { sql, values: [...param.values] };
   }
 
   if (param.modifier === 'contains') {
-    return buildLikeFragment(sortColumn, param.values, startIndex, '%', '%');
+    // Contains: ILIKE '%value%'
+    if (param.values.length === 1) {
+      const sql = `EXISTS (SELECT 1 FROM "${table}" __lookup WHERE __lookup."resourceId" = "id" AND LOWER(${colRef}) LIKE $${startIndex})`;
+      return { sql, values: [`%${param.values[0].toLowerCase()}%`] };
+    }
+    const conditions = param.values.map((_, i) => `LOWER(${colRef}) LIKE $${startIndex + i}`);
+    const sql = `EXISTS (SELECT 1 FROM "${table}" __lookup WHERE __lookup."resourceId" = "id" AND (${conditions.join(' OR ')}))`;
+    return { sql, values: param.values.map(v => `%${v.toLowerCase()}%`) };
   }
 
-  // Default: prefix match
-  return buildLikeFragment(sortColumn, param.values, startIndex, '', '%');
+  // Default: prefix match (ILIKE 'value%')
+  if (param.values.length === 1) {
+    const sql = `EXISTS (SELECT 1 FROM "${table}" __lookup WHERE __lookup."resourceId" = "id" AND LOWER(${colRef}) LIKE $${startIndex})`;
+    return { sql, values: [`${param.values[0].toLowerCase()}%`] };
+  }
+  const conditions = param.values.map((_, i) => `LOWER(${colRef}) LIKE $${startIndex + i}`);
+  const sql = `EXISTS (SELECT 1 FROM "${table}" __lookup WHERE __lookup."resourceId" = "id" AND (${conditions.join(' OR ')}))`;
+  return { sql, values: param.values.map(v => `${v.toLowerCase()}%`) };
 }
 
 // =============================================================================

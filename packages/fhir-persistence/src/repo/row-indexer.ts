@@ -12,6 +12,7 @@
 
 import { createHash } from "node:crypto";
 import type { SearchParameterImpl } from "../registry/search-parameter-registry.js";
+import type { LookupTableType } from "../schema/table-schema.js";
 import type { FhirResource } from "./types.js";
 
 // =============================================================================
@@ -529,4 +530,203 @@ export function buildMetadataColumns(
   }
 
   return columns;
+}
+
+// =============================================================================
+// Section 8: Global Lookup Table Row Extraction
+// =============================================================================
+
+/**
+ * A row to be inserted into one of the 4 global lookup tables.
+ */
+export interface LookupTableRow {
+  /** Which global table: HumanName, Address, ContactPoint, or Identifier. */
+  table: LookupTableType;
+
+  /** Column name → value map for the lookup table row. */
+  values: Record<string, unknown>;
+}
+
+/**
+ * Extract rows for global lookup tables from a FHIR resource.
+ *
+ * Scans the resource for HumanName, Address, ContactPoint, and Identifier
+ * values and decomposes them into individual rows matching Medplum's schema:
+ *
+ * - `HumanName` → { resourceId, name, given, family }
+ * - `Address`   → { resourceId, address, city, country, postalCode, state, use }
+ * - `ContactPoint` → { resourceId, system, value, use }
+ * - `Identifier` → { resourceId, system, value }
+ *
+ * @param resource - The FHIR resource (must have `id`).
+ * @param impls - SearchParameterImpl list for this resource type.
+ * @returns Array of LookupTableRow to insert into global tables.
+ */
+export function buildLookupTableRows(
+  resource: FhirResource & { id: string },
+  impls: SearchParameterImpl[],
+): LookupTableRow[] {
+  const rows: LookupTableRow[] = [];
+  const resourceId = resource.id;
+  const resourceType = resource.resourceType;
+
+  for (const impl of impls) {
+    if (impl.strategy !== "lookup-table") continue;
+
+    const path = extractPropertyPath(impl.expression, resourceType);
+    if (!path) continue;
+
+    const values = getNestedValues(resource, path);
+    if (values.length === 0) continue;
+
+    for (const val of values) {
+      if (val === null || val === undefined) continue;
+      const lookupRows = extractLookupRows(resourceId, impl.code, val);
+      rows.push(...lookupRows);
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Extract lookup table rows from a single value based on the search param code.
+ */
+function extractLookupRows(
+  resourceId: string,
+  code: string,
+  value: unknown,
+): LookupTableRow[] {
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  // HumanName detection: has family or given
+  if (code === "name" || code === "given" || code === "family" || code === "phonetic") {
+    if (typeof obj.family === "string" || Array.isArray(obj.given)) {
+      return extractHumanNameRows(resourceId, obj);
+    }
+  }
+
+  // Address detection
+  if (
+    code === "address" ||
+    code === "address-city" ||
+    code === "address-country" ||
+    code === "address-postalcode" ||
+    code === "address-state" ||
+    code === "address-use"
+  ) {
+    if (
+      Array.isArray(obj.line) ||
+      typeof obj.city === "string" ||
+      typeof obj.state === "string" ||
+      typeof obj.postalCode === "string" ||
+      typeof obj.country === "string"
+    ) {
+      return extractAddressRows(resourceId, obj);
+    }
+  }
+
+  // ContactPoint detection (telecom)
+  if (code === "telecom" || code === "email" || code === "phone") {
+    if (typeof obj.value === "string") {
+      return extractContactPointRows(resourceId, obj);
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Extract HumanName rows. Each HumanName produces one row with:
+ * - name: concatenation of all name parts
+ * - given: given names joined
+ * - family: family name
+ */
+function extractHumanNameRows(
+  resourceId: string,
+  obj: Record<string, unknown>,
+): LookupTableRow[] {
+  const family = typeof obj.family === "string" ? obj.family : null;
+  const givenArr = Array.isArray(obj.given)
+    ? (obj.given as unknown[]).filter((g): g is string => typeof g === "string")
+    : [];
+  const given = givenArr.length > 0 ? givenArr.join(" ") : null;
+
+  // Build the composite "name" string (Medplum concatenates all parts)
+  const nameParts: string[] = [];
+  if (family) nameParts.push(family);
+  if (givenArr.length > 0) nameParts.push(...givenArr);
+  if (typeof obj.text === "string") nameParts.push(obj.text);
+  if (Array.isArray(obj.prefix)) {
+    for (const p of obj.prefix) {
+      if (typeof p === "string") nameParts.push(p);
+    }
+  }
+  if (Array.isArray(obj.suffix)) {
+    for (const s of obj.suffix) {
+      if (typeof s === "string") nameParts.push(s);
+    }
+  }
+  const name = nameParts.length > 0 ? nameParts.join(" ") : null;
+
+  return [
+    {
+      table: "HumanName",
+      values: { resourceId, name, given, family },
+    },
+  ];
+}
+
+/**
+ * Extract Address rows. Each Address produces one row with decomposed fields.
+ */
+function extractAddressRows(
+  resourceId: string,
+  obj: Record<string, unknown>,
+): LookupTableRow[] {
+  const lines = Array.isArray(obj.line)
+    ? (obj.line as unknown[]).filter((l): l is string => typeof l === "string")
+    : [];
+  const city = typeof obj.city === "string" ? obj.city : null;
+  const country = typeof obj.country === "string" ? obj.country : null;
+  const postalCode = typeof obj.postalCode === "string" ? obj.postalCode : null;
+  const state = typeof obj.state === "string" ? obj.state : null;
+  const use = typeof obj.use === "string" ? obj.use : null;
+
+  const addressParts: string[] = [...lines];
+  if (city) addressParts.push(city);
+  if (state) addressParts.push(state);
+  if (postalCode) addressParts.push(postalCode);
+  if (country) addressParts.push(country);
+  const address = addressParts.length > 0 ? addressParts.join(" ") : null;
+
+  return [
+    {
+      table: "Address",
+      values: { resourceId, address, city, country, postalCode, state, use },
+    },
+  ];
+}
+
+/**
+ * Extract ContactPoint rows. Each ContactPoint produces one row.
+ */
+function extractContactPointRows(
+  resourceId: string,
+  obj: Record<string, unknown>,
+): LookupTableRow[] {
+  const system = typeof obj.system === "string" ? obj.system : null;
+  const value = typeof obj.value === "string" ? obj.value : null;
+  const use = typeof obj.use === "string" ? obj.use : null;
+
+  return [
+    {
+      table: "ContactPoint",
+      values: { resourceId, system, value, use },
+    },
+  ];
 }

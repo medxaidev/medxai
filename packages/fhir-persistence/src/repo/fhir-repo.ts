@@ -51,6 +51,7 @@ import {
   buildTypeHistorySQL,
 } from "./sql-builder.js";
 import { extractReferences } from "./reference-indexer.js";
+import { buildLookupTableRows } from "./row-indexer.js";
 import { ResourceCache } from "../cache/resource-cache.js";
 import type { ResourceCacheConfig } from "../cache/resource-cache.js";
 
@@ -153,6 +154,57 @@ export class FhirRepository implements ResourceRepository {
     }
   }
 
+  /**
+   * Write global lookup table rows for a resource (HumanName, Address, ContactPoint, Identifier).
+   * Deletes existing rows first (replace strategy), then inserts new rows.
+   */
+  private async writeLookupRows(
+    client: { query: (text: string, values?: unknown[]) => Promise<unknown> },
+    resource: PersistedResource,
+  ): Promise<void> {
+    if (!this.registry) return;
+
+    const impls = this.registry.getForResource(resource.resourceType);
+    const rows = buildLookupTableRows(resource as FhirResource & { id: string }, impls);
+
+    // Delete existing lookup rows for this resource across all 4 tables
+    await this.deleteLookupRows(client, resource.id);
+
+    // Insert new rows
+    for (const row of rows) {
+      const cols = Object.keys(row.values);
+      const vals = Object.values(row.values);
+      // Skip rows where all non-resourceId values are null
+      const hasData = vals.some((v, i) => i > 0 && v !== null);
+      if (!hasData) continue;
+
+      const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
+      const colNames = cols.map((c) => `"${c}"`).join(", ");
+      const sql = `INSERT INTO "${row.table}" (${colNames}) VALUES (${placeholders})`;
+      await client.query(sql, vals);
+    }
+  }
+
+  /**
+   * Delete all lookup table rows for a resource across all 4 global tables.
+   */
+  private async deleteLookupRows(
+    client: { query: (text: string, values?: unknown[]) => Promise<unknown> },
+    resourceId: string,
+  ): Promise<void> {
+    const tables = ["HumanName", "Address", "ContactPoint", "Identifier"];
+    for (const table of tables) {
+      try {
+        await client.query(
+          `DELETE FROM "${table}" WHERE "resourceId" = $1`,
+          [resourceId],
+        );
+      } catch {
+        // Table may not exist yet — skip silently
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Create
   // ---------------------------------------------------------------------------
@@ -190,6 +242,9 @@ export class FhirRepository implements ResourceRepository {
 
       // Write reference rows
       await this.writeReferences(client, persisted);
+
+      // Write global lookup table rows (HumanName, Address, ContactPoint, Identifier)
+      await this.writeLookupRows(client, persisted);
     });
 
     return persisted;
@@ -298,6 +353,9 @@ export class FhirRepository implements ResourceRepository {
 
       // Update reference rows (delete old, write new)
       await this.writeReferences(client, persisted);
+
+      // Update global lookup table rows
+      await this.writeLookupRows(client, persisted);
     });
 
     // Invalidate cache after successful update
@@ -341,6 +399,9 @@ export class FhirRepository implements ResourceRepository {
 
       // Delete reference rows for deleted resource
       await this.deleteReferences(client, resourceType, id);
+
+      // Delete global lookup table rows
+      await this.deleteLookupRows(client, id);
     });
 
     // Invalidate cache after successful delete

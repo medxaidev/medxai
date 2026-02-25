@@ -29,7 +29,8 @@ import type {
   MainTableSchema,
   HistoryTableSchema,
   ReferencesTableSchema,
-  LookupTableSchema,
+  GlobalLookupTableSchema,
+  LookupTableType,
   ResourceTableSet,
   SchemaDefinition,
 } from './table-schema.js';
@@ -313,66 +314,105 @@ function buildSearchIndexes(resourceType: string, impls: SearchParameterImpl[]):
 }
 
 // =============================================================================
-// Section 3b: Lookup Table Generation
+// Section 3b: Global Lookup Table Generation (Medplum-style)
 // =============================================================================
 
 /**
- * Build lookup sub-tables for a resource type.
+ * Build the 4 global shared lookup tables matching Medplum's production design.
  *
- * For each `lookup-table` strategy param, generates a sub-table with:
- * - `resourceId UUID NOT NULL`
- * - `index INT NOT NULL`
- * - `value TEXT NOT NULL`
- * - `system TEXT` (for identifier-like params)
- * - Composite PK: `(resourceId, index)`
- * - btree index on `value`
+ * These tables are shared across ALL resource types and store decomposed
+ * complex FHIR types for precise search via JOINs:
+ * - `HumanName` — name/given/family from Patient.name, Practitioner.name, etc.
+ * - `Address` — address/city/country/postalCode/state/use
+ * - `ContactPoint` — system/value/use from telecom fields
+ * - `Identifier` — system/value from identifier fields
+ *
+ * Each table has Medplum-style indexes: btree + trigram (gin_trgm_ops)
+ * for efficient prefix, exact, and substring search.
  */
-function buildLookupTables(
-  resourceType: string,
-  impls: SearchParameterImpl[],
-): LookupTableSchema[] {
-  const tables: LookupTableSchema[] = [];
+export function buildGlobalLookupTables(): GlobalLookupTableSchema[] {
+  return [
+    buildHumanNameTable(),
+    buildAddressTable(),
+    buildContactPointTable(),
+    buildIdentifierTable(),
+  ];
+}
 
-  for (const impl of impls) {
-    if (impl.strategy !== 'lookup-table') continue;
-
-    // Capitalize first letter for table name: name → Name
-    const paramName = impl.code.charAt(0).toUpperCase() + impl.code.slice(1);
-    const tableName = `${resourceType}_${paramName}`;
-
-    const columns: ColumnSchema[] = [
+function buildHumanNameTable(): GlobalLookupTableSchema {
+  const tableName: LookupTableType = 'HumanName';
+  return {
+    tableName,
+    columns: [
       { name: 'resourceId', type: 'UUID', notNull: true, primaryKey: false },
-      { name: 'index', type: 'INTEGER', notNull: true, primaryKey: false },
-      { name: 'value', type: 'TEXT', notNull: true, primaryKey: false },
+      { name: 'name', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'given', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'family', type: 'TEXT', notNull: false, primaryKey: false },
+    ],
+    indexes: [
+      { name: `${tableName}_resourceId_idx`, columns: ['resourceId'], indexType: 'btree', unique: false },
+      { name: `${tableName}_name_idx`, columns: ['name'], indexType: 'btree', unique: false },
+      { name: `${tableName}_given_idx`, columns: ['given'], indexType: 'btree', unique: false },
+      { name: `${tableName}_family_idx`, columns: ['family'], indexType: 'btree', unique: false },
+      { name: `${tableName}_nameTrgm_idx`, columns: ['name'], indexType: 'gin', unique: false },
+      { name: `${tableName}_givenTrgm_idx`, columns: ['given'], indexType: 'gin', unique: false },
+      { name: `${tableName}_familyTrgm_idx`, columns: ['family'], indexType: 'gin', unique: false },
+    ],
+  };
+}
+
+function buildAddressTable(): GlobalLookupTableSchema {
+  const tableName: LookupTableType = 'Address';
+  return {
+    tableName,
+    columns: [
+      { name: 'resourceId', type: 'UUID', notNull: true, primaryKey: false },
+      { name: 'address', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'city', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'country', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'postalCode', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'state', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'use', type: 'TEXT', notNull: false, primaryKey: false },
+    ],
+    indexes: [
+      { name: `${tableName}_resourceId_idx`, columns: ['resourceId'], indexType: 'btree', unique: false },
+      { name: `${tableName}_address_idx`, columns: ['address'], indexType: 'btree', unique: false },
+      { name: `${tableName}_city_idx`, columns: ['city'], indexType: 'btree', unique: false },
+    ],
+  };
+}
+
+function buildContactPointTable(): GlobalLookupTableSchema {
+  const tableName: LookupTableType = 'ContactPoint';
+  return {
+    tableName,
+    columns: [
+      { name: 'resourceId', type: 'UUID', notNull: true, primaryKey: false },
       { name: 'system', type: 'TEXT', notNull: false, primaryKey: false },
-    ];
+      { name: 'value', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'use', type: 'TEXT', notNull: false, primaryKey: false },
+    ],
+    indexes: [
+      { name: `${tableName}_resourceId_idx`, columns: ['resourceId'], indexType: 'btree', unique: false },
+      { name: `${tableName}_value_idx`, columns: ['value'], indexType: 'btree', unique: false },
+    ],
+  };
+}
 
-    const indexes: IndexSchema[] = [
-      {
-        name: `${tableName}_value_idx`,
-        columns: ['value'],
-        indexType: 'btree',
-        unique: false,
-      },
-      {
-        name: `${tableName}_resourceId_idx`,
-        columns: ['resourceId'],
-        indexType: 'btree',
-        unique: false,
-      },
-    ];
-
-    tables.push({
-      tableName,
-      resourceType,
-      searchParamCode: impl.code,
-      columns,
-      indexes,
-      compositePrimaryKey: ['resourceId', 'index'],
-    });
-  }
-
-  return tables;
+function buildIdentifierTable(): GlobalLookupTableSchema {
+  const tableName: LookupTableType = 'Identifier';
+  return {
+    tableName,
+    columns: [
+      { name: 'resourceId', type: 'UUID', notNull: true, primaryKey: false },
+      { name: 'system', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'value', type: 'TEXT', notNull: false, primaryKey: false },
+    ],
+    indexes: [
+      { name: `${tableName}_resourceId_idx`, columns: ['resourceId'], indexType: 'btree', unique: false },
+      { name: `${tableName}_value_idx`, columns: ['value'], indexType: 'btree', unique: false },
+    ],
+  };
 }
 
 // =============================================================================
@@ -529,15 +569,11 @@ export function buildResourceTableSet(
     compositePrimaryKey: ['resourceId', 'targetId', 'code'],
   };
 
-  // --- Lookup tables ---
-  const lookupTables = buildLookupTables(resourceType, searchImpls);
-
   return {
     resourceType,
     main,
     history,
     references,
-    ...(lookupTables.length > 0 ? { lookupTables } : {}),
   };
 }
 
@@ -571,5 +607,6 @@ export function buildSchemaDefinition(
     version,
     generatedAt: new Date().toISOString(),
     tableSets: buildAllResourceTableSets(sdRegistry, spRegistry),
+    globalLookupTables: buildGlobalLookupTables(),
   };
 }

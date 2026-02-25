@@ -329,9 +329,9 @@ describe('deleteResource — soft delete semantics (A-12 ~ A-14)', () => {
     repo = new FhirRepository(mockDb as any);
   });
 
-  it('A-12: calls DB four times inside transaction (SELECT FOR UPDATE + UPSERT + History INSERT + DELETE refs)', async () => {
+  it('A-12: calls DB eight times inside transaction (SELECT FOR UPDATE + UPSERT + History INSERT + DELETE refs + 4x DELETE lookup)', async () => {
     await repo.deleteResource('Patient', existing.id);
-    expect(mockClient.query).toHaveBeenCalledTimes(4);
+    expect(mockClient.query).toHaveBeenCalledTimes(8);
   });
 
   it('A-12b: first call is SELECT FOR UPDATE', async () => {

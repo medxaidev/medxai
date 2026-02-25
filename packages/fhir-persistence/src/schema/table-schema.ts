@@ -190,32 +190,48 @@ export interface ReferencesTableSchema {
 }
 
 // =============================================================================
-// Section 5b: Lookup Table Schema
+// Section 5b: Global Lookup Table Schema (Medplum-style)
 // =============================================================================
 
 /**
- * Schema for a lookup sub-table (e.g., `Patient_Name`, `Patient_Address`).
+ * The 4 global lookup table types, matching Medplum's production design.
  *
- * Stores decomposed complex types (HumanName, Address, ContactPoint)
- * for precise search via JOINs.
+ * Each is a shared table across ALL resource types, storing decomposed
+ * complex FHIR types for precise search via JOINs.
  */
-export interface LookupTableSchema {
-  /** Table name (e.g., `'Patient_Name'`). */
-  tableName: string;
+export type LookupTableType = 'HumanName' | 'Address' | 'ContactPoint' | 'Identifier';
 
-  /** FHIR resource type name. */
-  resourceType: string;
-
-  /** Search parameter code (e.g., `'name'`, `'address'`). */
-  searchParamCode: string;
+/**
+ * Schema for a global shared lookup table (e.g., `HumanName`, `Address`).
+ *
+ * Matches Medplum's production-verified design where a single table
+ * stores data from ALL resource types that use that complex type.
+ *
+ * - `HumanName` — stores name/given/family from Patient.name, Practitioner.name, etc.
+ * - `Address` — stores address/city/country/postalCode/state/use
+ * - `ContactPoint` — stores system/value/use from telecom fields
+ * - `Identifier` — stores system/value from identifier fields
+ */
+export interface GlobalLookupTableSchema {
+  /** Table name (e.g., `'HumanName'`, `'Address'`). */
+  tableName: LookupTableType;
 
   /** All columns. */
   columns: ColumnSchema[];
 
   /** All indexes. */
   indexes: IndexSchema[];
+}
 
-  /** Composite primary key column names. */
+/**
+ * @deprecated Use GlobalLookupTableSchema instead. Kept for backward compatibility.
+ */
+export interface LookupTableSchema {
+  tableName: string;
+  resourceType: string;
+  searchParamCode: string;
+  columns: ColumnSchema[];
+  indexes: IndexSchema[];
   compositePrimaryKey: string[];
 }
 
@@ -226,7 +242,9 @@ export interface LookupTableSchema {
 /**
  * Complete table set for a single FHIR resource type.
  *
- * Contains 3 core tables (main, history, references) plus optional lookup sub-tables.
+ * Contains 3 core tables (main, history, references).
+ * Lookup tables are now global (shared across all resource types)
+ * and stored at the SchemaDefinition level.
  */
 export interface ResourceTableSet {
   /** FHIR resource type (e.g., `'Patient'`). */
@@ -241,7 +259,9 @@ export interface ResourceTableSet {
   /** References table (outgoing references). */
   references: ReferencesTableSchema;
 
-  /** Lookup sub-tables for complex type search (HumanName, Address, etc.). */
+  /**
+   * @deprecated Per-resource lookup tables removed. Use SchemaDefinition.globalLookupTables.
+   */
   lookupTables?: LookupTableSchema[];
 }
 
@@ -259,4 +279,10 @@ export interface SchemaDefinition {
 
   /** Table sets for all resource types. */
   tableSets: ResourceTableSet[];
+
+  /**
+   * Global lookup tables shared across all resource types.
+   * Matches Medplum's production design: HumanName, Address, ContactPoint, Identifier.
+   */
+  globalLookupTables: GlobalLookupTableSchema[];
 }

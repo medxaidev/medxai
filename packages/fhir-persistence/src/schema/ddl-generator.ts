@@ -22,6 +22,7 @@ import type {
   HistoryTableSchema,
   ReferencesTableSchema,
   LookupTableSchema,
+  GlobalLookupTableSchema,
   ResourceTableSet,
   SchemaDefinition,
 } from './table-schema.js';
@@ -209,16 +210,6 @@ export function generateResourceDDL(tableSet: ResourceTableSet): string[] {
     statements.push(generateCreateIndex(idx, tableSet.references.tableName));
   }
 
-  // Lookup tables + their indexes
-  if (tableSet.lookupTables) {
-    for (const lookup of tableSet.lookupTables) {
-      statements.push(generateCreateLookupTable(lookup));
-      for (const idx of lookup.indexes) {
-        statements.push(generateCreateIndex(idx, lookup.tableName));
-      }
-    }
-  }
-
   return statements;
 }
 
@@ -251,10 +242,31 @@ export function generateCreateLookupTable(table: LookupTableSchema): string {
 // =============================================================================
 
 /**
+ * Generate a `CREATE TABLE IF NOT EXISTS` statement for a global lookup table.
+ */
+export function generateCreateGlobalLookupTable(table: GlobalLookupTableSchema): string {
+  const lines: string[] = [];
+
+  lines.push(`CREATE TABLE IF NOT EXISTS "${table.tableName}" (`);
+
+  const entries: string[] = [];
+  for (const col of table.columns) {
+    entries.push(columnDDL(col));
+  }
+
+  lines.push(entries.join(',\n'));
+  lines.push(');');
+
+  return lines.join('\n');
+}
+
+/**
  * Generate all DDL statements for a complete schema definition.
  *
- * Returns all CREATE TABLEs first, then all CREATE INDEXes,
- * for optimal execution order (tables must exist before indexes).
+ * Order:
+ * 1. Global lookup tables (HumanName, Address, ContactPoint, Identifier)
+ * 2. Resource tables (main, history, references)
+ * 3. All indexes (global lookup + resource tables)
  *
  * @param schema - The complete schema definition.
  * @returns Array of SQL DDL statements.
@@ -263,20 +275,28 @@ export function generateSchemaDDL(schema: SchemaDefinition): string[] {
   const tableStatements: string[] = [];
   const indexStatements: string[] = [];
 
+  // Extensions required for trigram and btree_gin indexes (matches Medplum)
+  tableStatements.push('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+  tableStatements.push('CREATE EXTENSION IF NOT EXISTS btree_gin;');
+
+  // Global lookup tables first
+  if (schema.globalLookupTables) {
+    for (const lookup of schema.globalLookupTables) {
+      tableStatements.push(generateCreateGlobalLookupTable(lookup));
+    }
+    for (const lookup of schema.globalLookupTables) {
+      for (const idx of lookup.indexes) {
+        indexStatements.push(generateCreateIndex(idx, lookup.tableName));
+      }
+    }
+  }
+
+  // Resource tables
   for (const tableSet of schema.tableSets) {
-    // Tables
     tableStatements.push(generateCreateMainTable(tableSet.main));
     tableStatements.push(generateCreateHistoryTable(tableSet.history));
     tableStatements.push(generateCreateReferencesTable(tableSet.references));
 
-    // Lookup tables
-    if (tableSet.lookupTables) {
-      for (const lookup of tableSet.lookupTables) {
-        tableStatements.push(generateCreateLookupTable(lookup));
-      }
-    }
-
-    // Indexes
     for (const idx of tableSet.main.indexes) {
       indexStatements.push(generateCreateIndex(idx, tableSet.main.tableName));
     }
@@ -285,13 +305,6 @@ export function generateSchemaDDL(schema: SchemaDefinition): string[] {
     }
     for (const idx of tableSet.references.indexes) {
       indexStatements.push(generateCreateIndex(idx, tableSet.references.tableName));
-    }
-    if (tableSet.lookupTables) {
-      for (const lookup of tableSet.lookupTables) {
-        for (const idx of lookup.indexes) {
-          indexStatements.push(generateCreateIndex(idx, lookup.tableName));
-        }
-      }
     }
   }
 
