@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS "Binary__source_idx"
 CREATE INDEX IF NOT EXISTS "Binary_profile_idx"
   ON "Binary" USING gin ("_profile");
 
-CREATE INDEX IF NOT EXISTS "Binary_version_idx"
+CREATE INDEX IF NOT EXISTS "Binary___version_idx"
   ON "Binary" USING btree ("__version");
 
 CREATE INDEX IF NOT EXISTS "Binary_reindex_idx"
@@ -111,7 +111,7 @@ exports[`DDLGenerator — Snapshot Tests > Observation DDL snapshot 1`] = `
   "__comboValueConcept" UUID[],
   "__comboValueConceptText" TEXT[],
   "__comboValueConceptSort" TEXT,
-  "comboValueQuantity" DOUBLE PRECISION,
+  "comboValueQuantity" DOUBLE PRECISION[],
   "__componentCode" UUID[],
   "__componentCodeText" TEXT[],
   "__componentCodeSort" TEXT,
@@ -186,7 +186,7 @@ CREATE INDEX IF NOT EXISTS "Observation__source_idx"
 CREATE INDEX IF NOT EXISTS "Observation_profile_idx"
   ON "Observation" USING gin ("_profile");
 
-CREATE INDEX IF NOT EXISTS "Observation_version_idx"
+CREATE INDEX IF NOT EXISTS "Observation___version_idx"
   ON "Observation" USING btree ("__version");
 
 CREATE INDEX IF NOT EXISTS "Observation_reindex_idx"
@@ -215,7 +215,7 @@ CREATE INDEX IF NOT EXISTS "Observation___comboValueConcept_idx"
   ON "Observation" USING gin ("__comboValueConcept");
 
 CREATE INDEX IF NOT EXISTS "Observation_comboValueQuantity_idx"
-  ON "Observation" USING btree ("comboValueQuantity");
+  ON "Observation" USING gin ("comboValueQuantity");
 
 CREATE INDEX IF NOT EXISTS "Observation___componentCode_idx"
   ON "Observation" USING gin ("__componentCode");
@@ -430,7 +430,7 @@ CREATE INDEX IF NOT EXISTS "Patient__source_idx"
 CREATE INDEX IF NOT EXISTS "Patient_profile_idx"
   ON "Patient" USING gin ("_profile");
 
-CREATE INDEX IF NOT EXISTS "Patient_version_idx"
+CREATE INDEX IF NOT EXISTS "Patient___version_idx"
   ON "Patient" USING btree ("__version");
 
 CREATE INDEX IF NOT EXISTS "Patient_reindex_idx"

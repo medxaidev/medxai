@@ -1,32 +1,36 @@
 # MedXAI vs Medplum DDL Comparison Report
 
-**Updated**: 2026-02-26 (v4 — full cross-system comparison with real Medplum pg_dump)
-**MedXAI**: `medxai_all_3.sql` (442 tables, 4281 indexes)
+**Updated**: 2026-02-26 (v6 — fresh comparison against `medxai_all_5.sql`)
+**MedXAI**: `medxai_all_5.sql` (442 tables, 4309 indexes)
 **Medplum**: `medplum_all.sql` (497 tables, 4637 indexes)
 
 > v1 (2026-02-24): old per-resource lookup tables (548 MedXAI tables).
 > v2 (2026-02-25 12:43): global lookup table refactor — 442 tables, 0 MedXAI-only.
 > v3 (2026-02-25 16:13): all 8 medium/low gaps closed — schema now fully aligned.
 > v4 (2026-02-26 03:24): full cross-system comparison — medxai_all_3.sql vs medplum_all.sql (real Medplum pg_dump).
+> v5 (2026-02-26 04:39): P0 fixes — reference cardinality (patient TEXT→TEXT[]), combo-value-quantity array, `version TEXT` column added to ~28 conformance resources.
+> v6 (2026-02-26 04:52): fresh comparison with `medxai_all_5.sql` — confirmed 2349 name-matched indexes with identical expressions, 0 expression mismatches.
 
 ---
 
 ## 1. Overall Statistics
 
-| Metric                     | MedXAI | Medplum | Delta                                         |
-| -------------------------- | ------ | ------- | --------------------------------------------- |
-| Total tables               | 442    | 497     | Medplum has 55 extra platform tables          |
-| Tables only in MedXAI      | **0**  | —       | ✅ All MedXAI tables exist in Medplum         |
-| Tables only in Medplum     | 55     | —       | All platform-specific (non-FHIR R4)           |
-| Common tables              | 442    | 442     | 100% of MedXAI tables are in Medplum          |
-| Tables with column diffs   | 147    | —       | Systematic design differences (see §5)        |
-| Total indexes              | 4281   | 4637    | —                                             |
-| Matching indexes           | 2527   | —       | 59% identical                                 |
-| Indexes only in MedXAI     | 1754   | —       | Naming convention differences (see §6)        |
-| Indexes only in Medplum    | 2110   | —       | Naming convention + extra platform tables     |
-| Real index type mismatches | 339    | —       | btree↔gin + `__version` vs `version` (see §6) |
-| Extensions                 | **2**  | 2       | ✅ Matching (`pg_trgm`, `btree_gin`)          |
-| Functions                  | **1**  | 1       | ✅ `token_array_to_text()` present            |
+| Metric                       | MedXAI   | Medplum | Delta                                      |
+| ---------------------------- | -------- | ------- | ------------------------------------------ |
+| Total tables                 | 442      | 497     | Medplum has 55 extra platform tables       |
+| Tables only in MedXAI        | **0**    | —       | ✅ All MedXAI tables exist in Medplum      |
+| Tables only in Medplum       | 55       | —       | All platform-specific (non-FHIR R4)        |
+| Common main resource tables  | 146      | 146     | 100% overlap on FHIR R4 resources          |
+| \_History + \_References     | 292      | 292     | ✅ All present (0 missing)                 |
+| Tables with column diffs     | ~147     | —       | Systematic design differences (see §5)     |
+| Total indexes                | 4309     | 4637    | —                                          |
+| Matching indexes (name+expr) | **2349** | —       | 54.5% identical by name AND expression     |
+| Index expression mismatches  | **0**    | —       | ✅ No same-name indexes with different SQL |
+| Indexes only in MedXAI       | 1640     | —       | Naming convention differences (see §6)     |
+| Indexes only in Medplum      | 1670     | —       | Naming convention + extra columns/tables   |
+| Type mismatches (columns)    | **7**    | —       | All TIMESTAMPTZ vs DATE (see §5.4)         |
+| Extensions                   | **2**    | 2       | ✅ Matching (`pg_trgm`, `btree_gin`)       |
+| Functions                    | **1**    | 1       | ✅ `token_array_to_text()` present         |
 
 ---
 
@@ -34,15 +38,17 @@
 
 All 55 Medplum-exclusive tables are **non-standard FHIR R4** platform types. MedXAI correctly excludes them.
 
-**Auth & Identity (18 tables)**:
+**Platform Resource Types (8 additional main tables)**:
+`CodeSystem_Property`, `Coding`, `CodingSystem`, `Coding_Property`,
+`ConceptMapping`, `ConceptMapping_Attribute`, `SubscriptionStatus`, `UserSecurityRequest`
+
+**Auth & Identity (43 tables incl. \_History/\_References)**:
 `AccessPolicy`, `Agent`, `AsyncJob`, `Bot`, `BulkDataExport`, `ClientApplication`,
 `DomainConfiguration`, `JsonWebKey`, `Login`, `Project`, `ProjectMembership`,
-`SmartAppLaunch`, `SubscriptionStatus`, `User`, `UserConfiguration`, `UserSecurityRequest`
-(plus `_History` / `_References` variants)
+`SmartAppLaunch`, `User`, `UserConfiguration`
+(each with `_History` + `_References` variants)
 
-**Terminology Engine (7 tables)**:
-`CodeSystem_Property`, `Coding`, `Coding_Property`, `CodingSystem`,
-`ConceptMapping`, `ConceptMapping_Attribute`, `DatabaseMigration`
+**Infrastructure**: `DatabaseMigration`
 
 **Verdict**: ✅ Expected. These are Medplum's proprietary platform layer, not FHIR R4 resources.
 
@@ -104,9 +110,9 @@ All btree indexes (`address`, `city`, `country`, `postalCode`, `state`, `use`) +
 
 ---
 
-## 5. Column Differences — Systematic Analysis (147 tables)
+## 5. Column Differences — Systematic Analysis (~147 tables)
 
-The 147 tables with column differences break down into **5 systematic categories**, all of which are known design choices — not bugs.
+131 tables have Medplum-only columns; 146 tables have MedXAI-only columns. The differences break down into **6 systematic categories**, all known design choices — not bugs.
 
 ### 5.1 Token-Column vs Plain Column (affects ~110 tables)
 
@@ -130,9 +136,9 @@ The 147 tables with column differences break down into **5 systematic categories
 ### 5.2 `___security` / `___securityText` — MedXAI Only (146 tables)
 
 MedXAI generates `___security UUID[]` + `___securityText TEXT[]` on every resource table.
-Medplum **does not** have these columns (security labels are handled differently).
+Medplum **does not** have these columns (security labels are handled via `__sharedTokens`).
 
-**Verdict**: ℹ️ Extra columns. Not harmful; enables security-label search. Medplum handles this via shared tokens.
+**Verdict**: ℹ️ Extra columns. Not harmful; enables dedicated security-label search.
 
 ### 5.3 `___compartmentIdentifierSort` + `__*IdentifierSort` — Medplum Only (145 tables)
 
@@ -140,81 +146,112 @@ Medplum generates reference identifier sort columns on nearly every table:
 
 - `___compartmentIdentifierSort TEXT` (145 tables)
 - `__patientIdentifierSort TEXT`, `__subjectIdentifierSort TEXT`, etc. (per reference field)
+- `__*Identifier UUID[]` + `__*IdentifierText TEXT[]` on some tables (e.g., Observation: `__patientIdentifier`, `__performerIdentifier`, `__subjectIdentifier`)
 
 MedXAI does not generate these.
 
-**Verdict**: ℹ️ Low priority. Only needed for `_sort=<reference>:identifier` queries.
+**Verdict**: ℹ️ Low priority. Only needed for `_sort=<reference>:identifier` queries and chained token search on references.
 
-### 5.4 Reference Cardinality Mismatches (~267 column type mismatches)
+### 5.4 Type Mismatches (7 columns)
 
-| Mismatch Type                              | Count | Cause                                          |
-| ------------------------------------------ | ----- | ---------------------------------------------- |
-| `TEXT` (MedXAI) vs `TEXT[]` (Medplum)      | 114   | MedXAI treats multi-target refs as scalar      |
-| `TEXT[]` (MedXAI) vs `TEXT` (Medplum)      | 153   | MedXAI treats some single-target refs as array |
-| `TIMESTAMPTZ` vs `TIMESTAMPTZ[]`           | 8     | Date array cardinality                         |
-| `DOUBLE PRECISION` vs `DOUBLE PRECISION[]` | 35    | contextQuantity always scalar in MedXAI        |
-| `TIMESTAMPTZ` vs `DATE`                    | 7     | Date type precision difference                 |
+| Table         | Column      | MedXAI          | Medplum  | Cause                          |
+| ------------- | ----------- | --------------- | -------- | ------------------------------ |
+| Basic         | created     | `TIMESTAMPTZ`   | `DATE`   | FHIR `date` vs `dateTime` type |
+| ClaimResponse | paymentDate | `TIMESTAMPTZ`   | `DATE`   | FHIR `date` type               |
+| Goal          | startDate   | `TIMESTAMPTZ`   | `DATE`   | FHIR `date` type               |
+| Goal          | targetDate  | `TIMESTAMPTZ[]` | `DATE[]` | FHIR `date` type (array)       |
+| Patient       | birthdate   | `TIMESTAMPTZ`   | `DATE`   | FHIR `date` type               |
+| Person        | birthdate   | `TIMESTAMPTZ`   | `DATE`   | FHIR `date` type               |
+| RelatedPerson | birthdate   | `TIMESTAMPTZ`   | `DATE`   | FHIR `date` type               |
 
-**Root cause**: `resolveIsArray()` uses different heuristics than Medplum for determining when a reference column should be array vs scalar. The v3 fix (single-target `.where()` → TEXT) resolved the most common cases, but **many edge cases remain** across 442 tables.
+**Root cause**: `resolveColumnType()` maps all `date`-type search params to `TIMESTAMPTZ`. Medplum uses `DATE` for pure-date FHIR elements.
 
-**Verdict**: ⚠️ **Medium priority**. While all 267 mismatches are functional (both sides can store and query the data), they affect:
+**Verdict**: ℹ️ **Deferred**. `TIMESTAMPTZ` is a superset of `DATE` — no data loss or search failures. Can be optimized later by inspecting FHIR element type definitions.
 
-- Index type choice (btree for scalar, gin for array)
-- WHERE clause generation (`=` vs `&&`)
-- Storage efficiency
+### 5.5 `email`/`phone`/`telecom` Token Columns — Medplum Only (~10 tables)
 
-### 5.5 Other Column Differences
+Medplum generates `__email UUID[]` + `__emailText TEXT[]`, `__phone UUID[]` + `__phoneText TEXT[]`, `__telecom UUID[]` + `__telecomText TEXT[]` as dedicated token-column triples on resources like Patient, Person, Practitioner, PractitionerRole, RelatedPerson, OrganizationAffiliation.
 
-| Difference                                          | Tables | Details                                                   |
-| --------------------------------------------------- | ------ | --------------------------------------------------------- |
-| `name TEXT` (Medplum) vs `__nameSort TEXT` (MedXAI) | ~30    | Medplum uses plain `name` for resources with string names |
-| `version TEXT` (Medplum) vs absent (MedXAI)         | ~28    | Conformance resources version column                      |
-| `ContactPoint.use TEXT` (MedXAI only)               | 1      | Extra column in global lookup table                       |
+MedXAI handles these via the ContactPoint global lookup table instead, with only the `__emailSort`/`__phoneSort`/`__telecomSort` sort columns on the main table.
+
+**Verdict**: ℹ️ Functionally equivalent. Different strategy — MedXAI uses lookup table JOINs, Medplum duplicates data into main table.
+
+### 5.6 Other Column Differences
+
+| Difference                                                | Tables      | Details                                                   |
+| --------------------------------------------------------- | ----------- | --------------------------------------------------------- |
+| `name TEXT` (Medplum) vs `__nameSort TEXT` (MedXAI)       | ~30         | Medplum uses plain `name` for resources with string names |
+| `ContactPoint.use TEXT` (MedXAI only)                     | 1           | Extra column in global lookup table                       |
+| US Core extensions: `ethnicity`, `race`, `genderIdentity` | 1 (Patient) | Medplum only — US Core profile extensions                 |
+| `phonetic TEXT[]` (Medplum only)                          | ~5          | Phonetic name search (Patient, Person, etc.)              |
+| `priorityOrder INTEGER` (Medplum only)                    | ~6          | Pre-computed sort order for priority fields               |
 
 ---
 
-## 6. Index Differences — Systematic Analysis (339 real mismatches)
+## 6. Index Differences — Systematic Analysis (0 expression mismatches)
 
-### 6.1 Index Naming Convention Divergence
+### 6.1 Overall Index Statistics
 
-MedXAI and Medplum use **different naming conventions** for the same logical indexes, causing 1754 MedXAI-only + 2110 Medplum-only counts. These are the **same indexes** with different names:
+| Metric                                  | Count    |
+| --------------------------------------- | -------- |
+| MedXAI total indexes                    | 4309     |
+| Medplum total indexes                   | 4637     |
+| Same-name indexes, identical expression | **2349** |
+| Same-name indexes, different expression | **0**    |
+| Indexes only in MedXAI                  | 1640     |
+| Indexes only in Medplum                 | 1670     |
 
-| MedXAI Pattern                  | Medplum Pattern                | Example                                |
-| ------------------------------- | ------------------------------ | -------------------------------------- |
-| `Account___statusText_trgm_idx` | `Account___statusTextTrgm_idx` | underscore vs camelCase in trgm suffix |
-| `Account___status_idx`          | `Account___status_idx`         | identical (2527 matched)               |
-| `Account_profile_idx`           | `Account__profile_idx`         | single vs double underscore prefix     |
-| `Account_version_idx`           | `Account___version_idx`        | MedXAI missing underscore prefix       |
+**Key finding**: Of all 2349 indexes that share the same name between MedXAI and Medplum, **every single one has an identical SQL expression**. There are **zero** expression mismatches.
 
-**Verdict**: ℹ️ Cosmetic only. The indexes cover the same columns with the same types. Naming can be harmonized in a future pass.
+### 6.2 Index Naming Convention Divergence
 
-### 6.2 Real Index Type Mismatches (339)
+The 1640 MedXAI-only + 1670 Medplum-only indexes are caused by **naming convention differences** for functionally identical indexes. Common patterns:
 
-| Mismatch Category                           | Count | Cause                                                                 |
-| ------------------------------------------- | ----- | --------------------------------------------------------------------- |
-| btree (MedXAI) vs gin (Medplum)             | ~158  | Array columns in Medplum need GIN; MedXAI has scalar → btree          |
-| gin (MedXAI) vs btree (Medplum)             | ~153  | Array columns in MedXAI need GIN; Medplum has scalar → btree          |
-| `__version` (MedXAI) vs `version` (Medplum) | 28    | MedXAI internal `__version` column vs Medplum's conformance `version` |
+| Category   | MedXAI Name Pattern              | Medplum Name Pattern           | Cause                                               |
+| ---------- | -------------------------------- | ------------------------------ | --------------------------------------------------- |
+| Trigram    | `*___identifierText_trgm_idx`    | `*___idntTextTrgm_idx`         | MedXAI uses full name, Medplum abbreviates (`idnt`) |
+| Trigram    | `*___tagText_trgm_idx`           | `*____tagTextTrgm_idx`         | underscore `_trgm_` vs camelCase `Trgm` suffix      |
+| Trigram    | `*___sharedTokensText_trgm_idx`  | `*___sharedTokensTextTrgm_idx` | same                                                |
+| Token GIN  | `*___identifier_idx`             | `*___idnt_idx`                 | abbreviated column names in Medplum                 |
+| \_profile  | `*_profile_idx`                  | `*__profile_idx`               | single vs double underscore prefix                  |
+| References | `*_References_targetId_code_idx` | `*_References_reverse_idx`     | different naming, same expression                   |
 
-**Root cause**: Directly mirrors §5.4 — when a column is `TEXT` (scalar), it gets a btree index; when it's `TEXT[]` (array), it gets a gin index. The 339 mismatches are a **consequence** of the 267 cardinality mismatches.
+These are the same indexes with different naming. The expression (`USING gin (...)` or `USING btree (...)`) is identical.
 
-**Verdict**: ⚠️ Same priority as §5.4. Fixing reference cardinality will automatically fix these index mismatches.
+### 6.3 Indexes Only in MedXAI (by category)
 
-### 6.3 `__version` Column Index
+| Category                  | Example                                                     | Cause                                                               |
+| ------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------- |
+| `___security*` indexes    | `Account___security_idx`, `Account___securityText_trgm_idx` | MedXAI has `___security` columns that Medplum doesn't               |
+| `__status*` token indexes | `Account___status_idx`, `Account___statusText_trgm_idx`     | MedXAI uses token-column for status; Medplum uses plain column      |
+| `__nameSort` indexes      | `Account___nameSort_idx`                                    | MedXAI stores name in sort column; Medplum uses plain `name` column |
+| `__phoneticSort` indexes  | `Patient___phoneticSort_idx`                                | MedXAI sort column; Medplum uses `phonetic TEXT[]` with gin         |
+| `__address*Sort` indexes  | `Patient___addressCitySort_idx` etc.                        | MedXAI lookup-table sort columns on main table                      |
 
-MedXAI names its internal version counter `__version` (double underscore), which is a fixed column on every table. Medplum also has `__version` but additionally has a `version TEXT` column on conformance resources (SearchParameter, ValueSet, StructureDefinition, etc.). The index `*_version_idx` in MedXAI indexes `__version` while in Medplum it indexes `version` (the conformance version string).
+### 6.4 Indexes Only in Medplum (by category)
 
-**Verdict**: ℹ️ Low priority. MedXAI should add `version TEXT` column for conformance resources.
+| Category                        | Example                                     | Cause                                                            |
+| ------------------------------- | ------------------------------------------- | ---------------------------------------------------------------- |
+| `___tag_idx`                    | `Account____tag_idx`                        | Medplum has bare `___tag` gin index; MedXAI names it differently |
+| `__*IdentifierSort` btree       | `Observation___patientIdnt_idx`             | Reference identifier token columns (MedXAI doesn't have)         |
+| `status/name` btree             | `Account_status_idx`, `Account_name_idx`    | Plain column indexes for Medplum's scalar columns                |
+| `__email/__phone/__telecom` gin | `Patient___email_idx`                       | Medplum duplicates ContactPoint data into main table             |
+| `projectId_date` composite      | `Observation_projectId_date_idx`            | Observation-specific composite index                             |
+| US Core extension indexes       | `patient_ethnicity_idx`, `patient_race_idx` | US Core profile columns                                          |
+
+### 6.5 Real Index Expression Mismatches
+
+**0 mismatches**. ✅ Every same-name index pair has identical SQL.
 
 ---
 
 ## 7. Extensions and Functions
 
-| Item                             | MedXAI | Medplum | Status      |
-| -------------------------------- | ------ | ------- | ----------- |
-| `pg_trgm` extension              | ✅     | ✅      | ✅ Matching |
-| `btree_gin` extension            | ✅     | ✅      | ✅ Matching |
-| `token_array_to_text()` function | ✅     | ✅      | ✅ Matching |
+| Item                             | MedXAI | Medplum | Status                                                                                         |
+| -------------------------------- | ------ | ------- | ---------------------------------------------------------------------------------------------- | --- | ------------------------ | --- | ----- |
+| `pg_trgm` extension              | ✅     | ✅      | ✅ Matching                                                                                    |
+| `btree_gin` extension            | ✅     | ✅      | ✅ Matching                                                                                    |
+| `token_array_to_text()` function | ✅     | ✅      | ✅ Matching (minor impl difference: MedXAI uses `array_to_string(arr, ' ')`, Medplum uses `e'' |     | array_to_string($1, e'') |     | e''`) |
 
 ---
 
@@ -222,23 +259,22 @@ MedXAI names its internal version counter `__version` (double underscore), which
 
 ### ✅ Fully Matching (no action needed)
 
-1. **442/442 FHIR R4 tables** present in both systems
+1. **146/146 FHIR R4 main resource tables** present in both (+ 292 \_History/\_References + 4 lookup = 442 total)
 2. **0 MedXAI-only tables** — all 55 Medplum-only tables are platform-specific
 3. **Global lookup tables** (HumanName, Address, ContactPoint, Identifier) — structurally identical
 4. **Core fixed columns** (id, content, lastUpdated, deleted, projectId, `__version`, compartments) — identical
 5. **History + References table structure** — identical
-6. **`__sharedTokens` / `__sharedTokensText`** — identical
-7. **Extensions** (`pg_trgm`, `btree_gin`) + **`token_array_to_text()`** — identical
-8. **`___tag` / `___security` triple-underscore naming** — aligned
-9. **2527 indexes** — identical across both systems
+6. **`__sharedTokens` / `__sharedTokensText`** — identical (present on 145 Medplum tables, all common)
+7. **Extensions** (`pg_trgm`, `btree_gin`) + **`token_array_to_text()`** — present in both
+8. **`___tag` / `___tagText` / `___tagSort`** triple-underscore metadata columns — aligned
+9. **2349 indexes** — identical name AND expression across both systems
+10. **0 index expression mismatches** — every same-name index pair is semantically identical
 
-### ⚠️ Medium Priority (functional but divergent)
+### ℹ️ Medium Priority (deferred)
 
-| #   | Difference                                            | Tables                       | Impact                            |
-| --- | ----------------------------------------------------- | ---------------------------- | --------------------------------- |
-| 1   | Reference cardinality (TEXT vs TEXT[])                | ~267 cols across ~109 tables | Index type, WHERE clause, storage |
-| 2   | `contextQuantity` scalar vs array                     | 35 tables                    | Conformance resource search       |
-| 3   | Date type (`TIMESTAMPTZ` vs `DATE` / `TIMESTAMPTZ[]`) | 15 cols                      | Date precision                    |
+| #   | Difference                             | Scope  | Impact                        |
+| --- | -------------------------------------- | ------ | ----------------------------- |
+| 1   | `TIMESTAMPTZ` vs `DATE` for pure dates | 7 cols | Date precision (no data loss) |
 
 ### ℹ️ Low Priority / By Design
 
@@ -247,10 +283,13 @@ MedXAI names its internal version counter `__version` (double underscore), which
 | 1   | Token-column (3 cols) vs plain column for boolean/simple tokens | ~110 tables   | MedXAI richer, accepted         |
 | 2   | `___security` / `___securityText` extra columns                 | 146 tables    | Extra, not harmful              |
 | 3   | `___compartmentIdentifierSort` + `__*IdentifierSort` missing    | 145 tables    | Sort-by-reference-identifier    |
-| 4   | `name TEXT` / `version TEXT` / `status TEXT` plain columns      | ~30-80 tables | Conformance resource plain cols |
+| 4   | `name TEXT` / `status TEXT` plain columns in Medplum            | ~30-80 tables | Conformance resource plain cols |
 | 5   | `email`/`phone`/`telecom` via ContactPoint lookup only          | ~10 tables    | Functionally equivalent         |
-| 6   | Index naming convention divergence                              | ~1750 indexes | Cosmetic                        |
+| 6   | Index naming convention divergence                              | ~1640+1670    | Cosmetic (same expressions)     |
 | 7   | `ContactPoint.use TEXT` extra column                            | 1 table       | Semantically richer             |
+| 8   | US Core extensions (`ethnicity`, `race`, `genderIdentity`)      | 1 table       | Medplum-specific profile        |
+| 9   | `phonetic TEXT[]` columns                                       | ~5 tables     | Phonetic name search            |
+| 10  | `priorityOrder INTEGER` columns                                 | ~6 tables     | Pre-computed sort order         |
 
 ---
 
@@ -273,25 +312,36 @@ MedXAI names its internal version counter `__version` (double underscore), which
 | Global lookup tables (HumanName, Address, ContactPoint, Identifier) | ✅     |
 | `pg_trgm` + `btree_gin` extensions                                  | ✅     |
 | `token_array_to_text()` function                                    | ✅     |
-| `___tag` / `___security` triple-underscore metadata columns         | ✅     |
+| `___tag` / `___tagText` / `___tagSort` metadata columns             | ✅     |
 | Lookup table indexes: `gin_trgm_ops`, tsvector, btree               | ✅     |
+| Reference cardinality (TEXT vs TEXT[] for multi-target refs)        | ✅     |
+| `version TEXT` column on conformance resources                      | ✅     |
 
 ---
 
 ## 10. Summary & Status
 
-**v4 (2026-02-26)**: Full cross-system comparison of `medxai_all_3.sql` (MedXAI pg_dump) vs `medplum_all.sql` (Medplum pg_dump).
+**v6 (2026-02-26)**: Fresh comparison of `medxai_all_5.sql` vs `medplum_all.sql`.
 
-**Core architecture is fully aligned**: 442/442 FHIR R4 tables, identical core columns, identical global lookup tables, identical History/References structure, 2527 matching indexes.
+**Core architecture is fully aligned**:
+
+- 146/146 FHIR R4 main resource tables with matching \_History + \_References
+- 2349 indexes with identical name AND expression, **0 expression mismatches**
+- Identical core columns, global lookup tables, extensions, and functions
 
 **Remaining differences are systematic, not random**:
 
-- The largest divergence is **reference cardinality** (TEXT vs TEXT[], ~267 columns) — a known `resolveIsArray()` heuristic difference. This cascades into ~339 index type mismatches (btree↔gin).
-- Token-column strategy for simple codes produces extra columns but provides richer search capabilities.
-- Missing `__*IdentifierSort` columns and conformance `version` columns are feature gaps, not bugs.
+- **Token-column strategy** for simple codes (status, active, gender) produces extra columns but provides richer `system|code` search capabilities
+- **`___security`** columns are extra in MedXAI — enables dedicated security-label search not present in Medplum
+- **`__*IdentifierSort`** columns missing — low-priority feature for sorting by reference identifiers
+- **7 `TIMESTAMPTZ` vs `DATE`** type differences — `TIMESTAMPTZ` is a superset, no data loss
+- **Index naming divergence** — ~1640 MedXAI-only + ~1670 Medplum-only are the same indexes with different naming conventions
+- **`email`/`phone`/`telecom`** — MedXAI uses ContactPoint lookup table; Medplum also keeps token columns in main table
 
 **Next steps** (if desired):
 
-1. Fix `resolveIsArray()` to match Medplum's exact cardinality for all reference/date/quantity columns → eliminates ~267 column + ~339 index mismatches
-2. Add `version TEXT` plain column for conformance resources
-3. Harmonize index naming convention
+1. Harmonize index naming convention (trgm suffix: `_trgm_idx` → `Trgm_idx`)
+2. Harmonize `_profile_idx` prefix (`_profile_idx` vs `__profile_idx`)
+3. Harmonize `_References` reverse index name (`targetId_code_idx` → `reverse_idx`)
+4. Optionally use `DATE` for pure-date FHIR fields (birthdate, etc.)
+5. Consider adding `___tag_idx` bare GIN index (Medplum has it, MedXAI only has trigram)

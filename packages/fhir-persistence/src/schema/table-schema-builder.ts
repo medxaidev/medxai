@@ -137,7 +137,7 @@ function buildFixedMainIndexes(resourceType: string): IndexSchema[] {
       unique: false,
     },
     {
-      name: `${resourceType}_version_idx`,
+      name: `${resourceType}___version_idx`,
       columns: ['__version'],
       indexType: 'btree',
       unique: false,

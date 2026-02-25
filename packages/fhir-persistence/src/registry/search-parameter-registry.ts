@@ -131,7 +131,18 @@ const IGNORED_SEARCH_PARAMS = new Set([
   '_compartment',
   '_source',
   '_version',
-  'version',
+]);
+
+/**
+ * Search parameters that should override the default strategy.
+ *
+ * `version` is type=token in FHIR R4, but Medplum stores it as a plain
+ * TEXT column (not token-column) because canonical versions are simple
+ * strings like "1.0.0". Also avoids name collision with the internal
+ * `__version INTEGER` fixed column.
+ */
+const STRATEGY_OVERRIDES = new Map<string, { strategy: SearchStrategy; type: SearchParamType }>([
+  ['version', { strategy: 'column', type: 'string' }],
 ]);
 
 /**
@@ -259,7 +270,8 @@ function resolveColumnType(type: SearchParamType, array: boolean): SearchColumnT
  * Given "AllergyIntolerance.patient | CarePlan.subject.where(resolve() is Patient)",
  * for resourceType "AllergyIntolerance" returns "AllergyIntolerance.patient".
  */
-function getExpressionForResourceType(resourceType: string, expression: string): string | undefined {
+function getExpressionsForResourceType(resourceType: string, expression: string): string[] {
+  const results: string[] = [];
   const parts = expression.split('|').map(s => s.trim());
   for (const part of parts) {
     if (part.startsWith(resourceType + '.') || part.startsWith('(' + resourceType + '.')) {
@@ -268,14 +280,14 @@ function getExpressionForResourceType(resourceType: string, expression: string):
       if (result.startsWith('(') && result.endsWith(')')) {
         result = result.slice(1, -1);
       }
-      return result;
+      results.push(result);
     }
   }
   // Single expression without union
-  if (!expression.includes('|') && expression.startsWith(resourceType + '.')) {
-    return expression;
+  if (results.length === 0 && !expression.includes('|') && expression.startsWith(resourceType + '.')) {
+    results.push(expression);
   }
-  return undefined;
+  return results;
 }
 
 /**
@@ -343,39 +355,43 @@ function resolveIsArray(
     return false;
   }
 
-  // Get the expression fragment for this specific resource type
-  const rtExpr = getExpressionForResourceType(resourceType, expression);
-  if (!rtExpr) {
+  // Get ALL expression fragments for this specific resource type
+  // (e.g., combo-value-quantity has both Observation.value and Observation.component.value)
+  const rtExprs = getExpressionsForResourceType(resourceType, expression);
+  if (rtExprs.length === 0) {
     return false;
   }
 
-  // Strip FHIRPath functions with potentially nested parentheses:
-  // .where(resolve() is Patient), .as(Type), .resolve(), .ofType(Type)
-  let cleaned = stripBalancedCall(rtExpr, '.where');
-  cleaned = stripBalancedCall(cleaned, '.as');
-  cleaned = stripBalancedCall(cleaned, '.ofType');
-  cleaned = cleaned.replace(/\.resolve\(\)/g, '');
-  // Strip FHIRPath infix 'as Type' syntax: (Observation.value as Quantity)
-  cleaned = cleaned.replace(/\s+as\s+\w+/g, '');
+  // If ANY expression fragment traverses an array path, the column is array
+  for (const rtExpr of rtExprs) {
+    // Strip FHIRPath functions with potentially nested parentheses:
+    // .where(resolve() is Patient), .as(Type), .resolve(), .ofType(Type)
+    let cleaned = stripBalancedCall(rtExpr, '.where');
+    cleaned = stripBalancedCall(cleaned, '.as');
+    cleaned = stripBalancedCall(cleaned, '.ofType');
+    cleaned = cleaned.replace(/\.resolve\(\)/g, '');
+    // Strip FHIRPath infix 'as Type' syntax: (Observation.value as Quantity)
+    cleaned = cleaned.replace(/\s+as\s+\w+/g, '');
 
-  // Check for [0] indexer — makes result NOT array
-  const hasIndexer = cleaned.includes('[0]');
-  cleaned = cleaned.replace(/\[0\]/g, '');
+    // Check for [0] indexer — makes result NOT array
+    const hasIndexer = cleaned.includes('[0]');
+    cleaned = cleaned.replace(/\[0\]/g, '');
 
-  // Walk each segment of the path
-  const segments = cleaned.split('.');
-  if (segments.length < 2) return false;
+    // Walk each segment of the path
+    const segments = cleaned.split('.');
+    if (segments.length < 2) continue;
 
-  let currentPath = segments[0]; // ResourceType
-  for (let i = 1; i < segments.length; i++) {
-    const seg = segments[i];
-    if (!seg) continue;
-    currentPath += '.' + seg;
+    let currentPath = segments[0]; // ResourceType
+    for (let i = 1; i < segments.length; i++) {
+      const seg = segments[i];
+      if (!seg) continue;
+      currentPath += '.' + seg;
 
-    if (ARRAY_ELEMENT_PATHS.has(currentPath)) {
-      // If the last segment had [0] indexer, it's not array
-      if (hasIndexer) return false;
-      return true;
+      if (ARRAY_ELEMENT_PATHS.has(currentPath)) {
+        // If the expression had [0] indexer, this fragment is not array
+        if (hasIndexer) break;
+        return true;
+      }
     }
   }
 
@@ -586,14 +602,18 @@ export class SearchParameterRegistry {
 
     const expr = expression ?? '';
     const targets = resource.target ?? [];
-    const strategy = resolveStrategy(code, type, expr);
+
+    // Check for strategy override (e.g., 'version' → column/string)
+    const override = STRATEGY_OVERRIDES.get(code);
+    const effectiveType = override?.type ?? type;
+    const strategy = override?.strategy ?? resolveStrategy(code, effectiveType, expr);
     const columnName = codeToColumnName(code);
-    const array = resolveIsArray(type, strategy, expr, targets, resourceType);
-    const columnType = resolveColumnType(type, array);
+    const array = resolveIsArray(effectiveType, strategy, expr, targets, resourceType);
+    const columnType = resolveColumnType(effectiveType, array);
 
     return {
       code,
-      type,
+      type: effectiveType,
       resourceTypes: [...base],
       expression: expression ?? '',
       strategy,

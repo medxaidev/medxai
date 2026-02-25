@@ -226,7 +226,7 @@ describe('TableSchemaBuilder — Fixed Indexes', () => {
     expect(idxNames).toContain('Patient_projectId_idx');
     expect(idxNames).toContain('Patient__source_idx');
     expect(idxNames).toContain('Patient_profile_idx');
-    expect(idxNames).toContain('Patient_version_idx');
+    expect(idxNames).toContain('Patient___version_idx');
     expect(idxNames).toContain('Patient_reindex_idx');
     expect(idxNames).toContain('Patient_compartments_idx');
   });
@@ -625,18 +625,18 @@ describe('TableSchemaBuilder — Schema Correctness (reference array & lookup-ta
     expect(colNames).not.toContain('name'); // no direct column
   });
 
-  it('Account: patient is TEXT (single-target .where() expression — matches Medplum)', () => {
+  it('Account: patient is TEXT[] (array — Account.subject is max=* and .where() is properly stripped)', () => {
     const impl = spRegistry.getImpl('Account', 'patient');
     expect(impl).toBeDefined();
     expect(impl!.strategy).toBe('column');
-    expect(impl!.columnType).toBe('TEXT');
-    expect(impl!.array).toBe(false);
+    expect(impl!.columnType).toBe('TEXT[]');
+    expect(impl!.array).toBe(true);
     const tableSet = buildResourceTableSet('Account', sdRegistry, spRegistry);
     const col = tableSet.main.columns.find((c) => c.name === 'patient');
     expect(col).toBeDefined();
-    expect(col!.type).toBe('TEXT');
+    expect(col!.type).toBe('TEXT[]');
     const idx = tableSet.main.indexes.find((i) => i.name === 'Account_patient_idx');
-    expect(idx!.indexType).toBe('btree');
+    expect(idx!.indexType).toBe('gin');
   });
 
   it('Account: subject is TEXT[] (multi-target reference)', () => {
