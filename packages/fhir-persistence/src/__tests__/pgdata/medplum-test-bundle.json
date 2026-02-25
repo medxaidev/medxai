@@ -1,0 +1,2629 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67",
+      "resource": {
+        "resourceType": "Organization",
+        "name": "Central Hospital-572632d5",
+        "identifier": [
+          {
+            "system": "http://example.com/org",
+            "value": "ORG-001-572632d5"
+          }
+        ],
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+                "code": "prov"
+              }
+            ]
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "555-0100"
+          }
+        ],
+        "address": [
+          {
+            "line": [
+              "100 Main St"
+            ],
+            "city": "Springfield",
+            "state": "IL",
+            "postalCode": "62701",
+            "country": "US"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Organization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:bf58c445-2950-4db5-a7d9-23771dc77ff3",
+      "resource": {
+        "resourceType": "Organization",
+        "name": "East Wing Lab-572632d5",
+        "identifier": [
+          {
+            "system": "http://example.com/org",
+            "value": "ORG-002-572632d5"
+          }
+        ],
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+                "code": "dept"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Organization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d43033b3-e200-48fd-837d-510a6fa90d2d",
+      "resource": {
+        "resourceType": "Organization",
+        "name": "Pharmacy Services-572632d5",
+        "identifier": [
+          {
+            "system": "http://example.com/org",
+            "value": "ORG-003-572632d5"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Organization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e5edb70f-c0d6-4d2c-8958-0f73c7260ece",
+      "resource": {
+        "resourceType": "Organization",
+        "name": "Insurance Corp-572632d5",
+        "identifier": [
+          {
+            "system": "http://example.com/org",
+            "value": "ORG-004-572632d5"
+          }
+        ],
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+                "code": "ins"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Organization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:1fb5480b-258e-4e20-a039-995789332297",
+      "resource": {
+        "resourceType": "Organization",
+        "name": "Specialty Clinic-572632d5",
+        "identifier": [
+          {
+            "system": "http://example.com/org",
+            "value": "ORG-005-572632d5"
+          }
+        ],
+        "address": [
+          {
+            "line": [
+              "200 Oak Ave"
+            ],
+            "city": "Shelbyville",
+            "state": "IL",
+            "postalCode": "62702",
+            "country": "US"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Organization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:51e159f5-2351-4dba-bc6c-82fbcd14071a",
+      "resource": {
+        "resourceType": "Practitioner",
+        "name": [
+          {
+            "family": "Smith-572632d5",
+            "given": [
+              "John",
+              "A"
+            ],
+            "prefix": [
+              "Dr."
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/npi",
+            "value": "NPI-001-572632d5"
+          }
+        ],
+        "gender": "male",
+        "birthDate": "1975-03-15",
+        "telecom": [
+          {
+            "system": "email",
+            "value": "john.smith-572632d5@hospital.com"
+          }
+        ],
+        "address": [
+          {
+            "line": [
+              "100 Main St"
+            ],
+            "city": "Springfield",
+            "state": "IL",
+            "postalCode": "62701",
+            "country": "US"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Practitioner"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:cf4df74c-2907-4bb5-a036-61cdafae1fa1",
+      "resource": {
+        "resourceType": "Practitioner",
+        "name": [
+          {
+            "family": "Johnson-572632d5",
+            "given": [
+              "Emily"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/npi",
+            "value": "NPI-002-572632d5"
+          }
+        ],
+        "gender": "female"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Practitioner"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:1c502e5c-b154-4da5-96f4-123a41aff20c",
+      "resource": {
+        "resourceType": "Practitioner",
+        "name": [
+          {
+            "family": "Williams-572632d5",
+            "given": [
+              "Robert"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/npi",
+            "value": "NPI-003-572632d5"
+          }
+        ],
+        "gender": "male"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Practitioner"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:1585ef46-32f5-4404-8e5c-c7137a6af9be",
+      "resource": {
+        "resourceType": "Practitioner",
+        "name": [
+          {
+            "family": "Brown-572632d5",
+            "given": [
+              "Sarah"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/npi",
+            "value": "NPI-004-572632d5"
+          }
+        ],
+        "gender": "female"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Practitioner"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7f784205-616a-4d88-a80b-ef281a7f46f1",
+      "resource": {
+        "resourceType": "Practitioner",
+        "name": [
+          {
+            "family": "Davis-572632d5",
+            "given": [
+              "Michael",
+              "J"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/npi",
+            "value": "NPI-005-572632d5"
+          }
+        ],
+        "gender": "male",
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "555-0200"
+          },
+          {
+            "system": "email",
+            "value": "michael.davis-572632d5@hospital.com"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Practitioner"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f1691be0-4c75-4f88-840e-dd91968fc307",
+      "resource": {
+        "resourceType": "PractitionerRole",
+        "practitioner": {
+          "reference": "urn:uuid:51e159f5-2351-4dba-bc6c-82fbcd14071a"
+        },
+        "organization": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        },
+        "code": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "59058001",
+                "display": "GP-572632d5"
+              }
+            ]
+          }
+        ],
+        "active": true
+      },
+      "request": {
+        "method": "POST",
+        "url": "PractitionerRole"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:591d255a-df8d-445f-91cd-e3caa96d47c7",
+      "resource": {
+        "resourceType": "PractitionerRole",
+        "practitioner": {
+          "reference": "urn:uuid:cf4df74c-2907-4bb5-a036-61cdafae1fa1"
+        },
+        "organization": {
+          "reference": "urn:uuid:bf58c445-2950-4db5-a7d9-23771dc77ff3"
+        },
+        "code": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "61246008",
+                "display": "Lab-572632d5"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "PractitionerRole"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0228a87b-1076-41c5-b6e2-b009b4051340",
+      "resource": {
+        "resourceType": "PractitionerRole",
+        "practitioner": {
+          "reference": "urn:uuid:1c502e5c-b154-4da5-96f4-123a41aff20c"
+        },
+        "organization": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        },
+        "code": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "304292004",
+                "display": "Surgeon-572632d5"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "PractitionerRole"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:32693043-4aa8-4d38-a0c4-61d9a1da5c36",
+      "resource": {
+        "resourceType": "PractitionerRole",
+        "practitioner": {
+          "reference": "urn:uuid:1585ef46-32f5-4404-8e5c-c7137a6af9be"
+        },
+        "organization": {
+          "reference": "urn:uuid:d43033b3-e200-48fd-837d-510a6fa90d2d"
+        },
+        "code": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "46255001",
+                "display": "Pharmacist-572632d5"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "PractitionerRole"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a9e22028-9db8-4ff7-b98c-1f9584ab3226",
+      "resource": {
+        "resourceType": "PractitionerRole",
+        "practitioner": {
+          "reference": "urn:uuid:7f784205-616a-4d88-a80b-ef281a7f46f1"
+        },
+        "organization": {
+          "reference": "urn:uuid:1fb5480b-258e-4e20-a039-995789332297"
+        },
+        "code": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "309343006",
+                "display": "Specialist-572632d5"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "PractitionerRole"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123",
+      "resource": {
+        "resourceType": "Patient",
+        "active": true,
+        "gender": "male",
+        "birthDate": "1985-06-15",
+        "name": [
+          {
+            "use": "official",
+            "family": "Doe-572632d5",
+            "given": [
+              "John",
+              "Michael"
+            ]
+          },
+          {
+            "use": "nickname",
+            "given": [
+              "Johnny"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/mrn",
+            "value": "MRN-001-572632d5"
+          },
+          {
+            "system": "http://example.com/ssn",
+            "value": "SSN-001-572632d5"
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "555-1001",
+            "use": "home"
+          },
+          {
+            "system": "email",
+            "value": "john.doe-572632d5@example.com",
+            "use": "work"
+          }
+        ],
+        "address": [
+          {
+            "use": "home",
+            "line": [
+              "123 Elm St",
+              "Apt 4B"
+            ],
+            "city": "Springfield",
+            "state": "IL",
+            "postalCode": "62701",
+            "country": "US"
+          }
+        ],
+        "managingOrganization": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        },
+        "generalPractitioner": [
+          {
+            "reference": "urn:uuid:51e159f5-2351-4dba-bc6c-82fbcd14071a"
+          }
+        ],
+        "meta": {
+          "tag": [
+            {
+              "system": "http://example.com/tags",
+              "code": "vip-572632d5"
+            }
+          ]
+        },
+        "maritalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+              "code": "M",
+              "display": "Married"
+            }
+          ]
+        },
+        "communication": [
+          {
+            "language": {
+              "coding": [
+                {
+                  "system": "urn:ietf:bcp:47",
+                  "code": "en"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c",
+      "resource": {
+        "resourceType": "Patient",
+        "active": true,
+        "gender": "female",
+        "birthDate": "1990-11-22",
+        "name": [
+          {
+            "use": "official",
+            "family": "Smith-572632d5",
+            "given": [
+              "Jane",
+              "Elizabeth"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/mrn",
+            "value": "MRN-002-572632d5"
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "555-1002"
+          }
+        ],
+        "address": [
+          {
+            "use": "home",
+            "line": [
+              "456 Oak Ave"
+            ],
+            "city": "Chicago",
+            "state": "IL",
+            "postalCode": "60601",
+            "country": "US"
+          }
+        ],
+        "managingOrganization": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9",
+      "resource": {
+        "resourceType": "Patient",
+        "active": true,
+        "gender": "male",
+        "birthDate": "1978-01-30",
+        "name": [
+          {
+            "use": "official",
+            "family": "Williams-572632d5",
+            "given": [
+              "Robert"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/mrn",
+            "value": "MRN-003-572632d5"
+          }
+        ],
+        "address": [
+          {
+            "line": [
+              "789 Pine Rd"
+            ],
+            "city": "Shelbyville",
+            "state": "IL",
+            "postalCode": "62702",
+            "country": "US"
+          },
+          {
+            "use": "work",
+            "line": [
+              "100 Main St"
+            ],
+            "city": "Springfield",
+            "state": "IL"
+          }
+        ],
+        "generalPractitioner": [
+          {
+            "reference": "urn:uuid:1c502e5c-b154-4da5-96f4-123a41aff20c"
+          }
+        ],
+        "meta": {
+          "tag": [
+            {
+              "system": "http://example.com/tags",
+              "code": "urgent-572632d5"
+            },
+            {
+              "system": "http://example.com/tags",
+              "code": "flagged-572632d5"
+            }
+          ],
+          "security": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-Confidentiality",
+              "code": "R"
+            }
+          ]
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:09b38fd1-6a6d-4077-beca-eee6dcea37ed",
+      "resource": {
+        "resourceType": "Patient",
+        "active": false,
+        "gender": "female",
+        "birthDate": "2005-08-10",
+        "name": [
+          {
+            "use": "official",
+            "family": "Davis-572632d5",
+            "given": [
+              "Alice"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/mrn",
+            "value": "MRN-004-572632d5"
+          }
+        ],
+        "deceasedBoolean": false
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:ff1aeb96-e299-4a9e-ac36-58be91ca81a0",
+      "resource": {
+        "resourceType": "Patient",
+        "active": true,
+        "gender": "other",
+        "birthDate": "2000-03-01",
+        "name": [
+          {
+            "use": "official",
+            "family": "Garcia-572632d5",
+            "given": [
+              "Alex",
+              "M"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/mrn",
+            "value": "MRN-005-572632d5"
+          }
+        ],
+        "telecom": [
+          {
+            "system": "email",
+            "value": "alex.garcia-572632d5@example.com"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:77afcb2c-e777-44b3-8361-a20284f9b608",
+      "resource": {
+        "resourceType": "Patient",
+        "active": true,
+        "gender": "male",
+        "birthDate": "1960-12-25",
+        "name": [
+          {
+            "use": "official",
+            "family": "Wilson-572632d5",
+            "given": [
+              "George"
+            ]
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/mrn",
+            "value": "MRN-006-572632d5"
+          }
+        ],
+        "deceasedDateTime": "2025-01-15T10:30:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb",
+      "resource": {
+        "resourceType": "Patient",
+        "active": true,
+        "gender": "female",
+        "birthDate": "1995-07-04",
+        "name": [
+          {
+            "use": "official",
+            "family": "Martinez-572632d5",
+            "given": [
+              "Sofia",
+              "Isabella"
+            ]
+          },
+          {
+            "use": "maiden",
+            "family": "Lopez-572632d5"
+          }
+        ],
+        "identifier": [
+          {
+            "system": "http://example.com/mrn",
+            "value": "MRN-007-572632d5"
+          },
+          {
+            "system": "http://example.com/passport",
+            "value": "PP-007-572632d5"
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "555-1007",
+            "use": "mobile"
+          },
+          {
+            "system": "phone",
+            "value": "555-1008",
+            "use": "home"
+          },
+          {
+            "system": "email",
+            "value": "sofia-572632d5@example.com"
+          }
+        ],
+        "address": [
+          {
+            "use": "home",
+            "line": [
+              "1000 Maple Dr"
+            ],
+            "city": "Capital City",
+            "state": "CA",
+            "postalCode": "90001",
+            "country": "US"
+          },
+          {
+            "use": "temp",
+            "city": "TempCity",
+            "state": "NY"
+          }
+        ],
+        "contact": [
+          {
+            "relationship": [
+              {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0131",
+                    "code": "N"
+                  }
+                ]
+              }
+            ],
+            "name": {
+              "family": "EmergencyContact-572632d5",
+              "given": [
+                "Carlos"
+              ]
+            },
+            "telecom": [
+              {
+                "system": "phone",
+                "value": "555-9999"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2",
+      "resource": {
+        "resourceType": "Encounter",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "Ambulatory-572632d5"
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "urn:uuid:51e159f5-2351-4dba-bc6c-82fbcd14071a"
+            }
+          }
+        ],
+        "period": {
+          "start": "2025-01-10T08:00:00Z",
+          "end": "2025-01-10T09:00:00Z"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "308335008",
+                "display": "OPD-572632d5"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Encounter"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f761ea4a-d90f-479b-b58f-acd7b5d08308",
+      "resource": {
+        "resourceType": "Encounter",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "IMP"
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        },
+        "period": {
+          "start": "2025-02-01T10:00:00Z",
+          "end": "2025-02-05T14:00:00Z"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Encounter"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c6116506-9537-44ca-a29c-6da8e6b12e73",
+      "resource": {
+        "resourceType": "Encounter",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB"
+        },
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "urn:uuid:cf4df74c-2907-4bb5-a036-61cdafae1fa1"
+            }
+          }
+        ],
+        "period": {
+          "start": "2025-03-15T14:00:00Z"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Encounter"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:087da91a-7c1d-43a0-9e49-229aeb6231ac",
+      "resource": {
+        "resourceType": "Encounter",
+        "status": "in-progress",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "EMER"
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:24ac4112-cb4c-4c06-8414-c6884e743b67"
+        },
+        "period": {
+          "start": "2026-02-25T10:00:00Z"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Encounter"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:13634781-2382-4118-a4bc-f94cfcf28a90",
+      "resource": {
+        "resourceType": "Encounter",
+        "status": "planned",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB"
+        },
+        "subject": {
+          "reference": "urn:uuid:09b38fd1-6a6d-4077-beca-eee6dcea37ed"
+        },
+        "period": {
+          "start": "2026-03-01T09:00:00Z"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Encounter"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b",
+      "resource": {
+        "resourceType": "Encounter",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB"
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:1fb5480b-258e-4e20-a039-995789332297"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "urn:uuid:7f784205-616a-4d88-a80b-ef281a7f46f1"
+            }
+          }
+        ],
+        "period": {
+          "start": "2025-06-01T11:00:00Z",
+          "end": "2025-06-01T12:00:00Z"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Encounter"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:40625347-da1b-4360-a75c-ed0045e21d82",
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+              "code": "confirmed"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "44054006",
+              "display": "Type2DM-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        },
+        "onsetDateTime": "2020-01-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Condition"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:1b1f98e9-4dc5-42ce-97d2-805f4b8e6904",
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+              "code": "confirmed"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "38341003",
+              "display": "Hypertension-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "onsetDateTime": "2018-06-15"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Condition"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:88d8f286-f169-40e2-9af4-a004ce8a37e5",
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "resolved"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "195662009",
+              "display": "Pneumonia-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "encounter": {
+          "reference": "urn:uuid:c6116506-9537-44ca-a29c-6da8e6b12e73"
+        },
+        "onsetDateTime": "2025-03-10",
+        "abatementDateTime": "2025-03-25"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Condition"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:5a908076-139d-4fe0-b57f-c87c87cac3fe",
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "73211009",
+              "display": "DiabetesI-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "onsetDateTime": "2010-05-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Condition"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f233119d-47ae-4f18-95ea-bd7674bc5999",
+      "resource": {
+        "resourceType": "Condition",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "195967001",
+              "display": "Asthma-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "encounter": {
+          "reference": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b"
+        },
+        "onsetDateTime": "2015-08-20"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Condition"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:84f61a70-f98a-4253-a6ab-6e792ed8f247",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "BodyWeight-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        },
+        "valueQuantity": {
+          "value": 75.5,
+          "unit": "kg",
+          "system": "http://unitsofmeasure.org",
+          "code": "kg"
+        },
+        "effectiveDateTime": "2025-01-10T08:30:00Z",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b4f31ff2-6648-4037-89e9-454f4bb84eac",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8867-4",
+              "display": "HeartRate-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        },
+        "valueQuantity": {
+          "value": 72,
+          "unit": "/min",
+          "system": "http://unitsofmeasure.org",
+          "code": "/min"
+        },
+        "effectiveDateTime": "2025-01-10T08:30:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:38538b7e-e7b1-4add-97e3-a77e464a27b4",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9",
+              "display": "BP-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:f761ea4a-d90f-479b-b58f-acd7b5d08308"
+        },
+        "component": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "http://loinc.org",
+                  "code": "8480-6"
+                }
+              ]
+            },
+            "valueQuantity": {
+              "value": 120,
+              "unit": "mmHg"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "http://loinc.org",
+                  "code": "8462-4"
+                }
+              ]
+            },
+            "valueQuantity": {
+              "value": 80,
+              "unit": "mmHg"
+            }
+          }
+        ],
+        "effectiveDateTime": "2025-02-01T10:30:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:ca88a5e4-3124-47e4-92ff-1b0f2c2d4acd",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "Glucose-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "encounter": {
+          "reference": "urn:uuid:c6116506-9537-44ca-a29c-6da8e6b12e73"
+        },
+        "valueQuantity": {
+          "value": 95,
+          "unit": "mg/dL"
+        },
+        "effectiveDateTime": "2025-03-15T14:30:00Z",
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "N",
+                "display": "Normal"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0af0379e-61f1-4303-8fc9-38ebf91ba195",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7",
+              "display": "Hemoglobin-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "valueQuantity": {
+          "value": 14.2,
+          "unit": "g/dL"
+        },
+        "effectiveDateTime": "2025-04-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7703c34a-e9b5-46cd-a5bb-2028ae4ca397",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "preliminary",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2",
+              "display": "WBC-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "encounter": {
+          "reference": "urn:uuid:087da91a-7c1d-43a0-9e49-229aeb6231ac"
+        },
+        "valueQuantity": {
+          "value": 8500,
+          "unit": "/uL"
+        },
+        "effectiveDateTime": "2026-02-25T10:30:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c0eebe8e-b086-4ed2-a8b8-a354e9879f77",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "39156-5",
+              "display": "BMI-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "encounter": {
+          "reference": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b"
+        },
+        "valueQuantity": {
+          "value": 22.1,
+          "unit": "kg/m2"
+        },
+        "effectiveDateTime": "2025-06-01T11:30:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7f49f9c6-a1d3-45b2-94de-c271918d04e7",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8310-5",
+              "display": "BodyTemp-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "valueQuantity": {
+          "value": 37.2,
+          "unit": "Cel"
+        },
+        "effectiveDateTime": "2025-06-01T11:35:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Observation"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:cc9f5297-6da4-487f-93a8-809e1051224b",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "58410-2",
+              "display": "CBC-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        },
+        "result": [
+          {
+            "reference": "urn:uuid:84f61a70-f98a-4253-a6ab-6e792ed8f247"
+          },
+          {
+            "reference": "urn:uuid:b4f31ff2-6648-4037-89e9-454f4bb84eac"
+          }
+        ],
+        "effectiveDateTime": "2025-01-10T09:00:00Z",
+        "issued": "2025-01-10T10:00:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "DiagnosticReport"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:4a29d264-26df-4a09-a454-41a6cb295f17",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "24323-8",
+              "display": "CMP-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:f761ea4a-d90f-479b-b58f-acd7b5d08308"
+        },
+        "result": [
+          {
+            "reference": "urn:uuid:38538b7e-e7b1-4add-97e3-a77e464a27b4"
+          }
+        ],
+        "effectiveDateTime": "2025-02-01T11:00:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "DiagnosticReport"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0167b5d8-37d2-4206-bd38-cc901c98eb42",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2339-0",
+              "display": "GlucoseReport-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "result": [
+          {
+            "reference": "urn:uuid:ca88a5e4-3124-47e4-92ff-1b0f2c2d4acd"
+          }
+        ],
+        "effectiveDateTime": "2025-03-15T15:00:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "DiagnosticReport"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:fcb817fd-78e6-487a-9dd8-263f0ab01d37",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "status": "preliminary",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "58410-2",
+              "display": "CBC2-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "result": [
+          {
+            "reference": "urn:uuid:0af0379e-61f1-4303-8fc9-38ebf91ba195"
+          },
+          {
+            "reference": "urn:uuid:7703c34a-e9b5-46cd-a5bb-2028ae4ca397"
+          }
+        ],
+        "effectiveDateTime": "2026-02-25T11:00:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "DiagnosticReport"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:bb6ba354-e35c-4614-9d53-5a55bea95250",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "55399-0",
+              "display": "Vitals-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "encounter": {
+          "reference": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b"
+        },
+        "result": [
+          {
+            "reference": "urn:uuid:c0eebe8e-b086-4ed2-a8b8-a354e9879f77"
+          },
+          {
+            "reference": "urn:uuid:7f49f9c6-a1d3-45b2-94de-c271918d04e7"
+          }
+        ],
+        "effectiveDateTime": "2025-06-01T12:00:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "DiagnosticReport"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:fee57c20-63f4-4b94-a4a5-cd83e46ab6f2",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationReference": {
+          "reference": "urn:uuid:1b9e717a-64e0-4e0d-9bb6-b6533e421f40"
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        },
+        "requester": {
+          "reference": "urn:uuid:51e159f5-2351-4dba-bc6c-82fbcd14071a"
+        },
+        "authoredOn": "2025-01-10",
+        "dosageInstruction": [
+          {
+            "text": "Take 500mg PRN-572632d5",
+            "timing": {
+              "repeat": {
+                "frequency": 3,
+                "period": 1,
+                "periodUnit": "d"
+              }
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "MedicationRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f5b4941a-b938-4a7a-885d-90778ca739bb",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationReference": {
+          "reference": "urn:uuid:14bf50e6-e36c-4a29-8c98-902cc592423d"
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "requester": {
+          "reference": "urn:uuid:51e159f5-2351-4dba-bc6c-82fbcd14071a"
+        },
+        "authoredOn": "2025-02-01",
+        "dosageInstruction": [
+          {
+            "text": "250mg TID-572632d5"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "MedicationRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:ab148951-8b11-4bec-a9dc-2cc0760417d8",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationReference": {
+          "reference": "urn:uuid:e34ef661-053f-43ff-a77d-08abf4802d3c"
+        },
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "requester": {
+          "reference": "urn:uuid:cf4df74c-2907-4bb5-a036-61cdafae1fa1"
+        },
+        "authoredOn": "2025-03-15"
+      },
+      "request": {
+        "method": "POST",
+        "url": "MedicationRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7bea306f-2630-43df-b0ce-5fcf07c50266",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "stopped",
+        "intent": "order",
+        "medicationReference": {
+          "reference": "urn:uuid:d4994ab9-27ee-4cd9-8b86-087302febe88"
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "requester": {
+          "reference": "urn:uuid:1c502e5c-b154-4da5-96f4-123a41aff20c"
+        },
+        "authoredOn": "2025-04-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "MedicationRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:52a38c3d-00a6-4217-b8da-3e21cdbdbd6b",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "plan",
+        "medicationReference": {
+          "reference": "urn:uuid:41a754e2-81c9-49f2-9daa-df6133a058aa"
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "encounter": {
+          "reference": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b"
+        },
+        "requester": {
+          "reference": "urn:uuid:7f784205-616a-4d88-a80b-ef281a7f46f1"
+        },
+        "authoredOn": "2025-06-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "MedicationRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:1b9e717a-64e0-4e0d-9bb6-b6533e421f40",
+      "resource": {
+        "resourceType": "Medication",
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "1049502",
+              "display": "Acetaminophen-572632d5"
+            }
+          ]
+        },
+        "status": "active"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Medication"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:14bf50e6-e36c-4a29-8c98-902cc592423d",
+      "resource": {
+        "resourceType": "Medication",
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "197361",
+              "display": "Amoxicillin-572632d5"
+            }
+          ]
+        },
+        "status": "active",
+        "manufacturer": {
+          "reference": "urn:uuid:d43033b3-e200-48fd-837d-510a6fa90d2d"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Medication"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e34ef661-053f-43ff-a77d-08abf4802d3c",
+      "resource": {
+        "resourceType": "Medication",
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "310965",
+              "display": "Lisinopril-572632d5"
+            }
+          ]
+        },
+        "status": "active"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Medication"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d4994ab9-27ee-4cd9-8b86-087302febe88",
+      "resource": {
+        "resourceType": "Medication",
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "860975",
+              "display": "Metformin-572632d5"
+            }
+          ]
+        },
+        "status": "active"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Medication"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:41a754e2-81c9-49f2-9daa-df6133a058aa",
+      "resource": {
+        "resourceType": "Medication",
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "198440",
+              "display": "Omeprazole-572632d5"
+            }
+          ]
+        },
+        "status": "inactive"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Medication"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e2b61012-bf2e-4124-9a32-bebc04bb5d77",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification",
+              "code": "confirmed"
+            }
+          ]
+        },
+        "type": "allergy",
+        "category": [
+          "medication"
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "387458008",
+              "display": "Aspirin-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "onsetDateTime": "2015-01-01",
+        "reaction": [
+          {
+            "manifestation": [
+              {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "271807003",
+                    "display": "Rash"
+                  }
+                ]
+              }
+            ],
+            "severity": "moderate"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "AllergyIntolerance"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:87b3b5d4-1145-4cb5-9874-75b61c3eb32b",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "type": "allergy",
+        "category": [
+          "food"
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "91935009",
+              "display": "Peanut-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "AllergyIntolerance"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:6ffbf47b-dc25-45b8-961c-e7e9398b6927",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "type": "intolerance",
+        "category": [
+          "medication"
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "372687004",
+              "display": "Penicillin-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "AllergyIntolerance"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:2c324363-0f81-4fd8-abc0-3eff1930c988",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+              "code": "resolved"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "264295007",
+              "display": "Latex-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "AllergyIntolerance"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:14ccbf80-01c0-41b2-a999-47fe444ae26d",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "type": "allergy",
+        "category": [
+          "environment"
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "256259004",
+              "display": "Pollen-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "AllergyIntolerance"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:01b53ffc-fc03-41b9-8961-94a497b154fd",
+      "resource": {
+        "resourceType": "Procedure",
+        "status": "completed",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "80146002",
+              "display": "Appendectomy-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:f761ea4a-d90f-479b-b58f-acd7b5d08308"
+        },
+        "performedDateTime": "2025-02-03T14:00:00Z",
+        "performer": [
+          {
+            "actor": {
+              "reference": "urn:uuid:1c502e5c-b154-4da5-96f4-123a41aff20c"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Procedure"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7104b039-1670-4f68-8d07-de5440d05769",
+      "resource": {
+        "resourceType": "Procedure",
+        "status": "completed",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "232717009",
+              "display": "Coronography-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "performedPeriod": {
+          "start": "2025-02-04T08:00:00Z",
+          "end": "2025-02-04T10:00:00Z"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Procedure"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:9b0fbe23-dcba-4d62-9354-dc389e8e24d5",
+      "resource": {
+        "resourceType": "Procedure",
+        "status": "completed",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "36969009",
+              "display": "BloodDraw-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "encounter": {
+          "reference": "urn:uuid:c6116506-9537-44ca-a29c-6da8e6b12e73"
+        },
+        "performedDateTime": "2025-03-15T14:15:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Procedure"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:38e9ee44-fd7b-45d7-8aeb-ecc8f329e4f0",
+      "resource": {
+        "resourceType": "Procedure",
+        "status": "in-progress",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "418891003",
+              "display": "Dressing-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "encounter": {
+          "reference": "urn:uuid:087da91a-7c1d-43a0-9e49-229aeb6231ac"
+        },
+        "performedDateTime": "2026-02-25T11:00:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Procedure"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0c0c36aa-126b-4215-81de-de593db9f5e6",
+      "resource": {
+        "resourceType": "Procedure",
+        "status": "completed",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "274025005",
+              "display": "EKG-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "encounter": {
+          "reference": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b"
+        },
+        "performedDateTime": "2025-06-01T11:45:00Z"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Procedure"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:2fea62f8-6894-4c8e-bbf5-3c3a2c7ad1a9",
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "status": "active",
+        "intent": "order",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "26604007",
+              "display": "FBC-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        },
+        "requester": {
+          "reference": "urn:uuid:51e159f5-2351-4dba-bc6c-82fbcd14071a"
+        },
+        "authoredOn": "2025-01-10"
+      },
+      "request": {
+        "method": "POST",
+        "url": "ServiceRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:cbc8a608-baf3-44ab-bac5-11e16bcbc109",
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "status": "completed",
+        "intent": "order",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "77477000",
+              "display": "CTScan-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:f761ea4a-d90f-479b-b58f-acd7b5d08308"
+        },
+        "authoredOn": "2025-02-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "ServiceRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:80a005c1-52d1-42f9-ac6d-6c0205aa565a",
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "status": "active",
+        "intent": "order",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "104001",
+              "display": "Excision-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "authoredOn": "2025-03-15"
+      },
+      "request": {
+        "method": "POST",
+        "url": "ServiceRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:fc0d8a0b-95a7-4dfb-b611-6bd279332b07",
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "status": "active",
+        "intent": "order",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "252275004",
+              "display": "Imaging-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "encounter": {
+          "reference": "urn:uuid:087da91a-7c1d-43a0-9e49-229aeb6231ac"
+        },
+        "authoredOn": "2026-02-25"
+      },
+      "request": {
+        "method": "POST",
+        "url": "ServiceRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:9cfd603a-56b0-4465-bd55-8064cd04acae",
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "status": "active",
+        "intent": "plan",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "409063005",
+              "display": "Counseling-572632d5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "authoredOn": "2025-06-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "ServiceRequest"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0c2e2fac-10d2-45c5-90e7-673401e14255",
+      "resource": {
+        "resourceType": "CarePlan",
+        "status": "active",
+        "intent": "plan",
+        "title": "DM Management-572632d5",
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        },
+        "addresses": [
+          {
+            "reference": "urn:uuid:40625347-da1b-4360-a75c-ed0045e21d82"
+          }
+        ],
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://hl7.org/fhir/us/core/CodeSystem/careplan-category",
+                "code": "assess-plan"
+              }
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "CarePlan"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:20248c77-e724-47c0-b16e-4a91a6923aa2",
+      "resource": {
+        "resourceType": "CarePlan",
+        "status": "active",
+        "intent": "plan",
+        "title": "HTN Management-572632d5",
+        "subject": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "addresses": [
+          {
+            "reference": "urn:uuid:1b1f98e9-4dc5-42ce-97d2-805f4b8e6904"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "CarePlan"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:20bd1ebe-12ed-425d-8472-b4f190f71a5d",
+      "resource": {
+        "resourceType": "CarePlan",
+        "status": "completed",
+        "intent": "plan",
+        "title": "Pneumonia Recovery-572632d5",
+        "subject": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "addresses": [
+          {
+            "reference": "urn:uuid:88d8f286-f169-40e2-9af4-a004ce8a37e5"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "CarePlan"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a9cd35c2-6644-43a5-a93b-5a20fa7471b2",
+      "resource": {
+        "resourceType": "CarePlan",
+        "status": "active",
+        "intent": "plan",
+        "title": "DM1 Care-572632d5",
+        "subject": {
+          "reference": "urn:uuid:ae7c3276-0df9-4d34-abd0-d0ba0c0c92f9"
+        },
+        "addresses": [
+          {
+            "reference": "urn:uuid:5a908076-139d-4fe0-b57f-c87c87cac3fe"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "CarePlan"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:195f4679-2781-4493-9739-2b7de5ee0983",
+      "resource": {
+        "resourceType": "CarePlan",
+        "status": "active",
+        "intent": "plan",
+        "title": "Asthma Action-572632d5",
+        "subject": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "encounter": {
+          "reference": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b"
+        },
+        "addresses": [
+          {
+            "reference": "urn:uuid:f233119d-47ae-4f18-95ea-bd7674bc5999"
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "CarePlan"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:209467f3-129e-470b-9c36-07aa4495745d",
+      "resource": {
+        "resourceType": "Immunization",
+        "status": "completed",
+        "vaccineCode": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/cvx",
+              "code": "208",
+              "display": "COVID19-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "occurrenceDateTime": "2025-01-15T09:00:00Z",
+        "encounter": {
+          "reference": "urn:uuid:3eeb5f53-870f-46a9-8011-59e25978e9d2"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Immunization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:7d165fe5-fc0e-4328-b5cc-ad84bdbe0c93",
+      "resource": {
+        "resourceType": "Immunization",
+        "status": "completed",
+        "vaccineCode": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/cvx",
+              "code": "141",
+              "display": "Influenza-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:fd5c01b4-effb-4f5d-ba3c-f5eea6929123"
+        },
+        "occurrenceDateTime": "2025-10-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Immunization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:8fae6d03-9fb8-45ef-bcc3-ff435f55eac3",
+      "resource": {
+        "resourceType": "Immunization",
+        "status": "completed",
+        "vaccineCode": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/cvx",
+              "code": "08",
+              "display": "HepB-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:9cff0cb6-5469-464a-8da1-2629143ee77c"
+        },
+        "occurrenceDateTime": "2025-04-01"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Immunization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:fcb6a488-0b20-4a74-b48e-bdba9711e59c",
+      "resource": {
+        "resourceType": "Immunization",
+        "status": "not-done",
+        "vaccineCode": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/cvx",
+              "code": "03",
+              "display": "MMR-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:09b38fd1-6a6d-4077-beca-eee6dcea37ed"
+        },
+        "occurrenceDateTime": "2025-05-01",
+        "statusReason": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActReason",
+              "code": "MEDPREC"
+            }
+          ]
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Immunization"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e1cb9b0b-0d92-4811-8f8e-4116e6392807",
+      "resource": {
+        "resourceType": "Immunization",
+        "status": "completed",
+        "vaccineCode": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/cvx",
+              "code": "113",
+              "display": "Tdap-572632d5"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:41a672e7-aa01-4003-8500-cb69891b59bb"
+        },
+        "occurrenceDateTime": "2025-06-01",
+        "encounter": {
+          "reference": "urn:uuid:7a04a3e6-2a42-41dd-a09f-d0ef4854d55b"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "Immunization"
+      }
+    }
+  ]
+}
