@@ -25,6 +25,7 @@ import {
 import { FHIR_JSON } from "../fhir/response.js";
 import { errorToOutcome } from "../fhir/outcomes.js";
 import { getOperationContext } from "../auth/middleware.js";
+import { getSearchCriteria, parseAccessPolicy } from "../auth/access-policy.js";
 
 // =============================================================================
 // Section 1: Route Parameter Types
@@ -160,6 +161,20 @@ async function handleSearch(
 
   // Extract auth context for project scoping
   const context = getOperationContext(request);
+
+  // Layer 3: Inject AccessPolicy criteria into search
+  if (context?.accessPolicy) {
+    try {
+      const policyResource = await repo.readResource("AccessPolicy", context.accessPolicy);
+      const parsed = parseAccessPolicy(policyResource);
+      if (parsed) {
+        const criteriaParams = getSearchCriteria(resourceType, context, parsed);
+        searchRequest.params.push(...criteriaParams);
+      }
+    } catch {
+      // AccessPolicy not found or unreadable — proceed without criteria
+    }
+  }
 
   // Execute search
   const result = await repo.searchResources(searchRequest, {

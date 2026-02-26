@@ -1,12 +1,13 @@
 /**
  * AccessPolicy Execution Engine
  *
- * Implements the first two layers of Medplum's four-layer AccessPolicy model:
+ * Implements the first three layers of Medplum's four-layer AccessPolicy model:
  *
  * - **Layer 1: supportsInteraction()** — Type-level pre-check (fast reject)
  * - **Layer 2: canPerformInteraction()** — Instance-level check (projectId + readonly)
+ * - **Layer 3: getSearchCriteria()** — Search SQL criteria injection
  *
- * Layers 3 (search SQL filters) and 4 (field-level control) are deferred.
+ * Layer 4 (field-level control) is deferred.
  *
  * @module fhir-server/auth
  */
@@ -16,6 +17,7 @@ import {
   PROTECTED_RESOURCE_TYPES,
   PROJECT_ADMIN_RESOURCE_TYPES,
 } from "@medxai/fhir-persistence";
+import type { ParsedSearchParam } from "@medxai/fhir-persistence";
 import type { OperationContext } from "./middleware.js";
 
 // =============================================================================
@@ -170,6 +172,91 @@ export function buildDefaultAccessPolicy(): ParsedAccessPolicy {
   return {
     resource: [{ resourceType: "*" }],
   };
+}
+
+// =============================================================================
+// Section 4b: Layer 3 — Search Criteria Injection
+// =============================================================================
+
+/**
+ * Layer 3: Extract search criteria from the AccessPolicy for a resource type.
+ *
+ * Finds the matching policy entry and returns parsed search parameters
+ * from its `criteria` field. These should be injected into the search
+ * request as additional AND conditions.
+ *
+ * @param resourceType - The FHIR resource type being searched.
+ * @param context - The operation context.
+ * @param accessPolicy - The parsed access policy.
+ * @returns Parsed search parameters from criteria, or empty array.
+ */
+export function getSearchCriteria(
+  resourceType: string,
+  context: OperationContext,
+  accessPolicy?: ParsedAccessPolicy,
+): ParsedSearchParam[] {
+  if (!accessPolicy || context.superAdmin) {
+    return [];
+  }
+
+  // Find the matching entry for this resource type + search interaction
+  const entry = accessPolicy.resource.find((e) =>
+    shallowMatchesPolicy(e, resourceType, "search"),
+  );
+
+  if (!entry?.criteria) {
+    return [];
+  }
+
+  return parseCriteriaString(entry.criteria);
+}
+
+/**
+ * Parse a FHIR search criteria string into ParsedSearchParam[].
+ *
+ * The criteria string is in the format:
+ *   `ResourceType?param1=value1&param2=value2`
+ *
+ * @param criteria - The criteria string from AccessPolicy.resource.criteria.
+ * @returns Parsed search parameters.
+ */
+export function parseCriteriaString(criteria: string): ParsedSearchParam[] {
+  const params: ParsedSearchParam[] = [];
+
+  // Strip the ResourceType? prefix if present
+  const qIndex = criteria.indexOf("?");
+  const queryString = qIndex >= 0 ? criteria.slice(qIndex + 1) : criteria;
+
+  if (!queryString) {
+    return params;
+  }
+
+  const pairs = queryString.split("&");
+  for (const pair of pairs) {
+    const eqIndex = pair.indexOf("=");
+    if (eqIndex < 0) continue;
+
+    const rawKey = decodeURIComponent(pair.slice(0, eqIndex));
+    const rawValue = decodeURIComponent(pair.slice(eqIndex + 1));
+
+    if (!rawKey || !rawValue) continue;
+
+    // Parse modifier from key (e.g., "name:exact" → code="name", modifier="exact")
+    const colonIndex = rawKey.indexOf(":");
+    const code = colonIndex >= 0 ? rawKey.slice(0, colonIndex) : rawKey;
+    const modifier = colonIndex >= 0 ? rawKey.slice(colonIndex + 1) : undefined;
+
+    // Split comma-separated values (OR semantics within a single param)
+    const values = rawValue.split(",");
+
+    params.push({
+      code,
+      modifier: modifier as ParsedSearchParam["modifier"],
+      values,
+    });
+  }
+
+  return params;
 }
 
 // =============================================================================

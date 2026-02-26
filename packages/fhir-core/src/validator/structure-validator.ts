@@ -31,6 +31,7 @@ import {
   validateReference,
 } from './validation-rules.js';
 import { validateSlicing } from './slicing-validator.js';
+import { validateInvariants } from './invariant-validator.js';
 
 // =============================================================================
 // Section 1: StructureValidator
@@ -204,6 +205,16 @@ export class StructureValidator {
         // Reference validation
         if (element.types.some((t) => t.code === 'Reference')) {
           validateReference(element, value, issues);
+          this.checkFailFast(opts, issues);
+        }
+      }
+
+      // FHIRPath invariant validation
+      if (!opts.skipInvariants && element.constraints && element.constraints.length > 0) {
+        for (const value of values) {
+          validateInvariants(element, value, resource, issues, {
+            skipInvariants: opts.skipInvariants,
+          });
           this.checkFailFast(opts, issues);
         }
       }

@@ -228,3 +228,21 @@ export {
   handleNewSlicing,
   handleExistingSlicing,
 } from './profile/index.js';
+
+// ─── Validator module ──────────────────────────────────────────────────────
+export type {
+  ValidationOptions,
+  ValidationResult,
+  ValidationIssue,
+  ValidationIssueCode,
+} from './validator/index.js';
+
+export {
+  StructureValidator,
+  createValidationIssue,
+  resolveValidationOptions,
+  hasValidationErrors,
+  extractValues,
+  ProfileNotFoundError,
+  ValidationFailedError,
+} from './validator/index.js';

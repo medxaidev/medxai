@@ -83,10 +83,14 @@ describe("POST /:resourceType (create)", () => {
       payload: { resourceType: "Patient", active: true },
     });
 
-    expect(repo.createResource).toHaveBeenCalledTimes(1);
+    // 2 calls: 1 for the resource, 1 for the fire-and-forget AuditEvent
+    expect(repo.createResource).toHaveBeenCalledTimes(2);
     const arg = repo.createResource.mock.calls[0][0];
     expect(arg.resourceType).toBe("Patient");
     expect(arg.active).toBe(true);
+    // Second call is the AuditEvent
+    const auditArg = repo.createResource.mock.calls[1][0];
+    expect(auditArg.resourceType).toBe("AuditEvent");
   });
 
   it("accepts application/json content type", async () => {

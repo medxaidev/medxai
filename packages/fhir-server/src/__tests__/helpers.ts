@@ -24,7 +24,7 @@ export type MockRepo = ResourceRepository & Record<string, MockFn>;
  */
 export function createMockRepo(): MockRepo {
   return {
-    createResource: vi.fn(),
+    createResource: vi.fn().mockResolvedValue({}),
     readResource: vi.fn(),
     updateResource: vi.fn(),
     deleteResource: vi.fn(),

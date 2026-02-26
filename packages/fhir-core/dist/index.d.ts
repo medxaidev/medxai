@@ -725,6 +725,23 @@ export declare function createMergeContext(profileUrl: string, options?: {
 export declare function createSnapshotIssue(severity: SnapshotIssue['severity'], code: SnapshotIssueCode, message: string, path?: string, details?: string): SnapshotIssue;
 
 /**
+ * Create a {@link ValidationIssue} with the given parameters.
+ *
+ * Convenience factory to reduce boilerplate when recording issues.
+ *
+ * @param severity - Issue severity level.
+ * @param code - Machine-readable issue code.
+ * @param message - Human-readable description.
+ * @param options - Optional path, expression, and diagnostics.
+ * @returns A frozen ValidationIssue object.
+ */
+export declare function createValidationIssue(severity: ValidationIssue['severity'], code: ValidationIssueCode, message: string, options?: {
+    path?: string;
+    expression?: string;
+    diagnostics?: string;
+}): ValidationIssue;
+
+/**
  * Minimal interface for loading a StructureDefinition by canonical URL.
  *
  * This decouples the resolver from the full {@link FhirContext} interface,
@@ -1377,6 +1394,50 @@ export declare function extractChoiceTypeName(choicePath: string, concretePath: 
 export declare function extractSliceName(elementId: string): string | undefined;
 
 /**
+ * fhir-validator — Path Extractor
+ *
+ * Extracts values from FHIR resource instances using element paths.
+ * Handles nested objects, arrays, and choice type (`[x]`) paths.
+ *
+ * This is the core utility that bridges CanonicalProfile element paths
+ * (e.g., `Patient.name.family`) to actual values in a resource JSON object.
+ *
+ * @module fhir-validator
+ */
+/**
+ * Extract values from a resource instance using an element path.
+ *
+ * Navigates the resource object following the dot-separated path segments.
+ * Arrays are automatically expanded — if an intermediate node is an array,
+ * extraction continues into each element.
+ *
+ * @param resource - The resource object to extract from.
+ * @param path - Element path (e.g., `'Patient.name.family'`).
+ * @returns Array of extracted values (empty if path not found).
+ *
+ * @example
+ * ```typescript
+ * const patient = {
+ *   resourceType: 'Patient',
+ *   name: [
+ *     { family: 'Smith', given: ['John', 'James'] },
+ *     { family: 'Doe' },
+ *   ],
+ * };
+ *
+ * extractValues(patient, 'Patient.name')
+ * // → [{ family: 'Smith', given: ['John', 'James'] }, { family: 'Doe' }]
+ *
+ * extractValues(patient, 'Patient.name.family')
+ * // → ['Smith', 'Doe']
+ *
+ * extractValues(patient, 'Patient.name.given')
+ * // → ['John', 'James']
+ * ```
+ */
+export declare function extractValues(resource: Record<string, unknown>, path: string): unknown[];
+
+/**
  * FHIR base64Binary: base64 encoded content (RFC 4648).
  * Regex: `(\s*([0-9a-zA-Z\+\/\=]){4}\s*)+`
  * @see https://hl7.org/fhir/R4/datatypes.html#base64Binary
@@ -1854,6 +1915,14 @@ export declare interface FhirContext {
                    * hasSliceName('Patient.identifier')                // false
                    */
                   export declare function hasSliceName(elementId: string): boolean;
+
+                  /**
+                   * Check whether a validation result has any error-severity issues.
+                   *
+                   * @param issues - The issues to check.
+                   * @returns `true` if any issue has severity `'error'`.
+                   */
+                  export declare function hasValidationErrors(issues: readonly ValidationIssue[]): boolean;
 
                   /**
                    * An identifier intended for computation (e.g., MRN, NPI).
@@ -2641,6 +2710,28 @@ export declare interface FhirContext {
                          }
 
                          /**
+                          * Thrown when the profile required for validation cannot be found or loaded.
+                          *
+                          * This occurs when:
+                          * - The specified `profileUrl` does not exist in the FhirContext
+                          * - The profile exists but has no snapshot
+                          * - No profile URL is specified and none can be inferred from the resource
+                          *
+                          * @example
+                          * ```typescript
+                          * throw new ProfileNotFoundError(
+                          *   'http://example.org/StructureDefinition/UnknownProfile',
+                          * );
+                          * ```
+                          */
+                         export declare class ProfileNotFoundError extends ValidatorError {
+                             readonly name = "ProfileNotFoundError";
+                             /** The canonical URL of the profile that could not be found. */
+                             readonly profileUrl: string;
+                             constructor(profileUrl: string, cause?: Error);
+                         }
+
+                         /**
                           * How a property is represented when serialized.
                           * @see https://hl7.org/fhir/R4/valueset-property-representation.html
                           */
@@ -2689,6 +2780,16 @@ export declare interface FhirContext {
                           * @see https://hl7.org/fhir/R4/valueset-reference-version-rules.html
                           */
                          export declare type ReferenceVersionRules = 'either' | 'independent' | 'specific';
+
+                         /**
+                          * Resolve default validation options.
+                          *
+                          * Fills in missing fields with sensible defaults.
+                          *
+                          * @param options - User-provided options (may be partial).
+                          * @returns Fully resolved options with all fields populated.
+                          */
+                         export declare function resolveValidationOptions(options?: ValidationOptions): Required<ValidationOptions>;
 
                          /**
                           * Abstract base for all FHIR resources.
@@ -3502,156 +3603,454 @@ export declare interface FhirContext {
                                  }
 
                                  /**
-                                  * Get the last segment (tail) of a path.
+                                  * Main validator class for structural validation of FHIR resources.
                                   *
-                                  * @example
-                                  * tailSegment('Patient.name.given')  // 'given'
-                                  * tailSegment('Patient')             // 'Patient'
-                                  */
-                                 export declare function tailSegment(path: string): string;
-
-                                 /**
-                                  * Cursor-based scope for base-driven traversal.
-                                  *
-                                  * Used by the element merger (`processPaths` equivalent) to define
-                                  * the current working range within a list of ElementDefinitions.
-                                  * Both `start` and `end` are inclusive indices.
-                                  *
-                                  * This mirrors HAPI's `baseCursor/baseLimit` and `diffCursor/diffLimit`
-                                  * parameter pairs in `processPaths()`.
+                                  * Validates a resource instance against a {@link CanonicalProfile} by
+                                  * orchestrating all individual validation rules (cardinality, type,
+                                  * fixed/pattern, reference, slicing).
                                   *
                                   * @example
                                   * ```typescript
-                                  * // Scope covering elements[2] through elements[5]
-                                  * const scope: TraversalScope = {
-                                  *   elements: baseSnapshot.element,
-                                  *   start: 2,
-                                  *   end: 5,
-                                  * };
-                                  * ```
+                                  * const validator = new StructureValidator();
                                   *
-                                  * @internal Used by {@link ElementMerger}.
-                                  */
-                                 export declare interface TraversalScope {
-                                     /** The element list being traversed. */
-                                     readonly elements: readonly ElementDefinition[];
-                                     /** Start index (inclusive). */
-                                     readonly start: number;
-                                     /** End index (inclusive). */
-                                     readonly end: number;
-                                 }
-
-                                 /**
-                                  * A resolved type constraint on a canonical element.
+                                  * // Validate with an explicit profile
+                                  * const result = validator.validate(patient, patientProfile);
                                   *
-                                  * Corresponds to a simplified, pre-validated version of
-                                  * `ElementDefinition.type` from the FHIR spec.
-                                  */
-                                 export declare interface TypeConstraint {
-                                     /**
-                                      * The data type or resource name (e.g., `string`, `Reference`, `Patient`).
-                                      *
-                                      * Unlike `ElementDefinitionType.code` (which is a URI), this is the
-                                      * resolved short name used for runtime dispatch.
-                                      */
-                                     code: string;
-                                     /**
-                                      * Profiles that the type must conform to (resolved canonical URLs).
-                                      *
-                                      * Corresponds to `ElementDefinitionType.profile`.
-                                      */
-                                     profiles?: string[];
-                                     /**
-                                      * For Reference/canonical types, profiles that the target must conform to.
-                                      *
-                                      * Corresponds to `ElementDefinitionType.targetProfile`.
-                                      */
-                                     targetProfiles?: string[];
-                                 }
-
-                                 /**
-                                  * Whether a StructureDefinition is a specialization or a constraint.
-                                  * - `specialization`: defines a new type (e.g., Patient specializes DomainResource)
-                                  * - `constraint`: constrains an existing type (e.g., USCorePatient constrains Patient)
-                                  * @see https://hl7.org/fhir/R4/valueset-type-derivation-rule.html
-                                  */
-                                 export declare type TypeDerivationRule = 'specialization' | 'constraint';
-
-                                 /**
-                                  * Thrown when differential elements remain unconsumed after snapshot
-                                  * generation completes.
-                                  *
-                                  * This indicates that the algorithm could not find a matching base
-                                  * element for one or more differential entries. Common causes:
-                                  * - Incorrect path in differential
-                                  * - Slicing mismatch
-                                  * - Unsupported constraint pattern
-                                  *
-                                  * HAPI detects this via the `GENERATED_IN_SNAPSHOT` marker pattern.
-                                  *
-                                  * Only thrown when {@link SnapshotGeneratorOptions.throwOnError} is `true`.
-                                  * Otherwise, each unconsumed element is recorded as an issue.
-                                  *
-                                  * @example
-                                  * ```typescript
-                                  * throw new UnconsumedDifferentialError([
-                                  *   'Patient.nonExistentField',
-                                  *   'Patient.identifier:BadSlice',
-                                  * ]);
+                                  * if (!result.valid) {
+                                  *   for (const issue of result.issues) {
+                                  *     console.error(`${issue.severity}: ${issue.message}`);
+                                  *   }
+                                  * }
                                   * ```
                                   */
-                                 export declare class UnconsumedDifferentialError extends ProfileError {
-                                     readonly name = "UnconsumedDifferentialError";
-                                     /** Paths of the unconsumed differential elements. */
-                                     readonly unconsumedPaths: readonly string[];
-                                     constructor(unconsumedPaths: string[]);
-                                 }
-
-                                 /**
-                                  * Specifies clinical/business/etc. context in which a conformance
-                                  * artifact is applicable.
-                                  * @see https://hl7.org/fhir/R4/metadatatypes.html#UsageContext
-                                  */
-                                 export declare interface UsageContext extends Element {
-                                     /** Type of context being specified (1..1) */
-                                     code: Coding;
+                                 export declare class StructureValidator {
+                                     private readonly options;
+                                     constructor(options?: ValidationOptions);
                                      /**
-                                      * Value that defines the context.
-                                      * Choice type [x]: valueCodeableConcept | valueQuantity | valueRange | valueReference
-                                      * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
-                                      */
-                                     value?: unknown;
-                                 }
+                                      * Validate a resource instance against a CanonicalProfile.
+                                      *
+                                      * @param resource - The FHIR resource to validate.
+                                      * @param profile - The CanonicalProfile to validate against.
+                                      * @param options - Optional per-call overrides for validation options.
+                                      * @returns The validation result with all issues.
+                                      * @throws {@link ProfileNotFoundError} if profile is undefined.
+                                          * @throws {@link ValidationFailedError} if failFast is enabled and an error is found.
+                                              */
+                                          validate(resource: Resource, profile: CanonicalProfile, options?: ValidationOptions): ValidationResult;
+                                          /**
+                                           * Check that the resource type matches the profile type.
+                                           */
+                                          private validateResourceType;
+                                          /**
+                                           * Validate all elements in the profile against the resource.
+                                           */
+                                          private validateElements;
+                                          /**
+                                           * Get all named slice elements for a slicing root path.
+                                           */
+                                          private getSliceElements;
+                                          /**
+                                           * Check if failFast is enabled and there are errors; if so, throw.
+                                           */
+                                          private checkFailFast;
+                                      }
 
-                                 /**
-                                  * Validate that snapshot elements are in correct order.
-                                  *
-                                  * Rules:
-                                  * - Parent elements must appear before their children
-                                  * - Slice elements must appear after their slicing root
-                                  * - No duplicate paths (unless sliced)
-                                  *
-                                  * @param snapshot - The snapshot elements to validate.
-                                  * @param issues - Issue collector for recording problems.
-                                  * @returns `true` if order is valid, `false` if any violations found.
-                                  */
-                                 export declare function validateElementOrder(snapshot: readonly ElementDefinition[], issues: SnapshotIssue[]): boolean;
+                                      /**
+                                       * Get the last segment (tail) of a path.
+                                       *
+                                       * @example
+                                       * tailSegment('Patient.name.given')  // 'given'
+                                       * tailSegment('Patient')             // 'Patient'
+                                       */
+                                      export declare function tailSegment(path: string): string;
 
-                                 /**
-                                  * Validate that a differential slicing definition is compatible with
-                                  * the base slicing definition.
-                                  *
-                                  * Rules:
-                                  * - Discriminators must match (same type and path, in same order)
-                                  * - `ordered` cannot change from `true` to `false`
-                                  * - `rules` cannot relax from `closed` to `open`/`openAtEnd`
-                                  *
-                                  * @param baseSlicing - The base element's slicing definition.
-                                  * @param diffSlicing - The differential element's slicing definition.
-                                  * @param issues - Issue collector for recording incompatibilities.
-                                  * @param path - Element path for issue reporting.
-                                  * @returns `true` if compatible, `false` if incompatible.
-                                  */
-                                 export declare function validateSlicingCompatibility(baseSlicing: ElementDefinitionSlicing, diffSlicing: ElementDefinitionSlicing, issues: SnapshotIssue[], path: string): boolean;
+                                      /**
+                                       * Cursor-based scope for base-driven traversal.
+                                       *
+                                       * Used by the element merger (`processPaths` equivalent) to define
+                                       * the current working range within a list of ElementDefinitions.
+                                       * Both `start` and `end` are inclusive indices.
+                                       *
+                                       * This mirrors HAPI's `baseCursor/baseLimit` and `diffCursor/diffLimit`
+                                       * parameter pairs in `processPaths()`.
+                                       *
+                                       * @example
+                                       * ```typescript
+                                       * // Scope covering elements[2] through elements[5]
+                                       * const scope: TraversalScope = {
+                                       *   elements: baseSnapshot.element,
+                                       *   start: 2,
+                                       *   end: 5,
+                                       * };
+                                       * ```
+                                       *
+                                       * @internal Used by {@link ElementMerger}.
+                                       */
+                                      export declare interface TraversalScope {
+                                          /** The element list being traversed. */
+                                          readonly elements: readonly ElementDefinition[];
+                                          /** Start index (inclusive). */
+                                          readonly start: number;
+                                          /** End index (inclusive). */
+                                          readonly end: number;
+                                      }
 
-                                 export { }
+                                      /**
+                                       * A resolved type constraint on a canonical element.
+                                       *
+                                       * Corresponds to a simplified, pre-validated version of
+                                       * `ElementDefinition.type` from the FHIR spec.
+                                       */
+                                      export declare interface TypeConstraint {
+                                          /**
+                                           * The data type or resource name (e.g., `string`, `Reference`, `Patient`).
+                                           *
+                                           * Unlike `ElementDefinitionType.code` (which is a URI), this is the
+                                           * resolved short name used for runtime dispatch.
+                                           */
+                                          code: string;
+                                          /**
+                                           * Profiles that the type must conform to (resolved canonical URLs).
+                                           *
+                                           * Corresponds to `ElementDefinitionType.profile`.
+                                           */
+                                          profiles?: string[];
+                                          /**
+                                           * For Reference/canonical types, profiles that the target must conform to.
+                                           *
+                                           * Corresponds to `ElementDefinitionType.targetProfile`.
+                                           */
+                                          targetProfiles?: string[];
+                                      }
+
+                                      /**
+                                       * Whether a StructureDefinition is a specialization or a constraint.
+                                       * - `specialization`: defines a new type (e.g., Patient specializes DomainResource)
+                                       * - `constraint`: constrains an existing type (e.g., USCorePatient constrains Patient)
+                                       * @see https://hl7.org/fhir/R4/valueset-type-derivation-rule.html
+                                       */
+                                      export declare type TypeDerivationRule = 'specialization' | 'constraint';
+
+                                      /**
+                                       * Thrown when differential elements remain unconsumed after snapshot
+                                       * generation completes.
+                                       *
+                                       * This indicates that the algorithm could not find a matching base
+                                       * element for one or more differential entries. Common causes:
+                                       * - Incorrect path in differential
+                                       * - Slicing mismatch
+                                       * - Unsupported constraint pattern
+                                       *
+                                       * HAPI detects this via the `GENERATED_IN_SNAPSHOT` marker pattern.
+                                       *
+                                       * Only thrown when {@link SnapshotGeneratorOptions.throwOnError} is `true`.
+                                       * Otherwise, each unconsumed element is recorded as an issue.
+                                       *
+                                       * @example
+                                       * ```typescript
+                                       * throw new UnconsumedDifferentialError([
+                                       *   'Patient.nonExistentField',
+                                       *   'Patient.identifier:BadSlice',
+                                       * ]);
+                                       * ```
+                                       */
+                                      export declare class UnconsumedDifferentialError extends ProfileError {
+                                          readonly name = "UnconsumedDifferentialError";
+                                          /** Paths of the unconsumed differential elements. */
+                                          readonly unconsumedPaths: readonly string[];
+                                          constructor(unconsumedPaths: string[]);
+                                      }
+
+                                      /**
+                                       * Specifies clinical/business/etc. context in which a conformance
+                                       * artifact is applicable.
+                                       * @see https://hl7.org/fhir/R4/metadatatypes.html#UsageContext
+                                       */
+                                      export declare interface UsageContext extends Element {
+                                          /** Type of context being specified (1..1) */
+                                          code: Coding;
+                                          /**
+                                           * Value that defines the context.
+                                           * Choice type [x]: valueCodeableConcept | valueQuantity | valueRange | valueReference
+                                           * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
+                                           */
+                                          value?: unknown;
+                                      }
+
+                                      /**
+                                       * Validate that snapshot elements are in correct order.
+                                       *
+                                       * Rules:
+                                       * - Parent elements must appear before their children
+                                       * - Slice elements must appear after their slicing root
+                                       * - No duplicate paths (unless sliced)
+                                       *
+                                       * @param snapshot - The snapshot elements to validate.
+                                       * @param issues - Issue collector for recording problems.
+                                       * @returns `true` if order is valid, `false` if any violations found.
+                                       */
+                                      export declare function validateElementOrder(snapshot: readonly ElementDefinition[], issues: SnapshotIssue[]): boolean;
+
+                                      /**
+                                       * Validate that a differential slicing definition is compatible with
+                                       * the base slicing definition.
+                                       *
+                                       * Rules:
+                                       * - Discriminators must match (same type and path, in same order)
+                                       * - `ordered` cannot change from `true` to `false`
+                                       * - `rules` cannot relax from `closed` to `open`/`openAtEnd`
+                                       *
+                                       * @param baseSlicing - The base element's slicing definition.
+                                       * @param diffSlicing - The differential element's slicing definition.
+                                       * @param issues - Issue collector for recording incompatibilities.
+                                       * @param path - Element path for issue reporting.
+                                       * @returns `true` if compatible, `false` if incompatible.
+                                       */
+                                      export declare function validateSlicingCompatibility(baseSlicing: ElementDefinitionSlicing, diffSlicing: ElementDefinitionSlicing, issues: SnapshotIssue[], path: string): boolean;
+
+                                      /**
+                                       * Thrown when validation fails and {@link ValidationOptions.failFast} is enabled.
+                                       *
+                                       * Contains the issues accumulated up to the point of failure. This allows
+                                       * callers to inspect the first error(s) that triggered the failure.
+                                       *
+                                       * @example
+                                       * ```typescript
+                                       * try {
+                                       *   await validator.validate(resource, { failFast: true });
+                                       * } catch (err) {
+                                       *   if (err instanceof ValidationFailedError) {
+                                       *     console.error('First error:', err.issues[0].message);
+                                       *   }
+                                       * }
+                                       * ```
+                                       */
+                                      export declare class ValidationFailedError extends ValidatorError {
+                                          readonly name = "ValidationFailedError";
+                                          /** The validation issues accumulated before failure. */
+                                          readonly issues: readonly ValidationIssue[];
+                                          constructor(message: string, issues: readonly ValidationIssue[], cause?: Error);
+                                      }
+
+                                      /**
+                                       * A single issue encountered during validation.
+                                       *
+                                       * Mirrors the concept of FHIR OperationOutcome.issue but scoped to
+                                       * structural validation. Issues are collected during validation and
+                                       * returned in {@link ValidationResult.issues}.
+                                       *
+                                       * @example
+                                       * ```typescript
+                                       * const issue: ValidationIssue = {
+                                       *   severity: 'error',
+                                       *   code: 'CARDINALITY_MIN_VIOLATION',
+                                       *   message: "Element 'Patient.name' requires at least 1 value(s), but found 0",
+                                       *   path: 'Patient.name',
+                                       *   expression: 'Patient.name',
+                                       * };
+                                       * ```
+                                       */
+                                      export declare interface ValidationIssue {
+                                          /** Severity level of the issue. */
+                                          readonly severity: 'error' | 'warning' | 'information';
+                                          /** Machine-readable issue code. */
+                                          readonly code: ValidationIssueCode;
+                                          /** Human-readable description of the issue. */
+                                          readonly message: string;
+                                          /**
+                                           * Element path where the issue occurred (dot-notation).
+                                           *
+                                           * @example `'Patient.name'`, `'Observation.value[x]'`
+                                           */
+                                          readonly path?: string;
+                                          /**
+                                           * FHIRPath expression pointing to the problematic element.
+                                           *
+                                           * Typically identical to `path` for structural validation, but may
+                                           * differ for sliced elements or choice types.
+                                           *
+                                           * @example `'Patient.identifier.where(system="urn:oid:1.2.3")'`
+                                           */
+                                          readonly expression?: string;
+                                          /** Additional diagnostic information for debugging. */
+                                          readonly diagnostics?: string;
+                                      }
+
+                                      /**
+                                       * Machine-readable issue codes for structural validation.
+                                       *
+                                       * Each code corresponds to a specific category of validation failure.
+                                       * Codes are designed to be stable across versions for programmatic
+                                       * consumption.
+                                       */
+                                      export declare type ValidationIssueCode = 
+                                      /** Element has fewer values than the minimum cardinality. */
+                                      'CARDINALITY_MIN_VIOLATION'
+                                      /** Element has more values than the maximum cardinality. */
+                                      | 'CARDINALITY_MAX_VIOLATION'
+                                      /** Value type does not match any of the allowed types. */
+                                      | 'TYPE_MISMATCH'
+                                      /** Choice type field uses an unsupported type suffix. */
+                                      | 'INVALID_CHOICE_TYPE'
+                                      /** A required element (min ≥ 1) is missing from the resource. */
+                                      | 'REQUIRED_ELEMENT_MISSING'
+                                      /** Value does not match the fixed value constraint. */
+                                      | 'FIXED_VALUE_MISMATCH'
+                                      /** Value does not match the pattern value constraint (partial match). */
+                                      | 'PATTERN_VALUE_MISMATCH'
+                                      /** Value does not match any slice discriminator in a closed slicing. */
+                                      | 'SLICING_NO_MATCH'
+                                      /** Slice cardinality violation (too few or too many values in a slice). */
+                                      | 'SLICING_CARDINALITY_VIOLATION'
+                                      /** Ordered slicing constraint violated (values out of order). */
+                                      | 'SLICING_ORDER_VIOLATION'
+                                      /** Reference target does not match any of the allowed target profiles. */
+                                      | 'REFERENCE_TARGET_MISMATCH'
+                                      /** The specified profile could not be found or loaded. */
+                                      | 'PROFILE_NOT_FOUND'
+                                      /** Resource type does not match the profile's type. */
+                                      | 'RESOURCE_TYPE_MISMATCH'
+                                      /** Resource contains an element not defined in the profile. */
+                                      | 'UNKNOWN_ELEMENT'
+                                      /** FHIRPath invariant evaluation is not yet supported (skipped). */
+                                      | 'INVARIANT_NOT_EVALUATED'
+                                      /** FHIRPath invariant constraint evaluated to false. */
+                                      | 'INVARIANT_VIOLATION'
+                                      /** FHIRPath invariant expression failed to evaluate (runtime error). */
+                                      | 'INVARIANT_EVALUATION_ERROR'
+                                      /** Internal validator error (should not happen). */
+                                      | 'INTERNAL_ERROR';
+
+                                      /**
+                                       * Configuration options for structural validation.
+                                       *
+                                       * @example
+                                       * ```typescript
+                                       * const options: ValidationOptions = {
+                                       *   profileUrl: 'http://hl7.org/fhir/StructureDefinition/Patient',
+                                       *   validateSlicing: true,
+                                       *   validateFixed: true,
+                                       *   failFast: false,
+                                       * };
+                                       * ```
+                                       */
+                                      export declare interface ValidationOptions {
+                                          /**
+                                           * Profile URL to validate against.
+                                           *
+                                           * If not specified, the validator will attempt to extract the profile
+                                           * from `resource.meta.profile[0]`. If neither is available, the
+                                           * validator falls back to the base resource type
+                                           * (e.g., `http://hl7.org/fhir/StructureDefinition/{resourceType}`).
+                                           */
+                                          readonly profileUrl?: string;
+                                          /**
+                                           * Whether to validate slicing constraints.
+                                           *
+                                           * When `true` (default), the validator checks that array elements
+                                           * match their declared slices and that closed slicing rules are
+                                           * respected.
+                                           *
+                                           * @default true
+                                           */
+                                          readonly validateSlicing?: boolean;
+                                          /**
+                                           * Whether to validate fixed and pattern value constraints.
+                                           *
+                                           * When `true` (default), the validator checks that element values
+                                           * match any `fixed[x]` or `pattern[x]` constraints declared in
+                                           * the profile.
+                                           *
+                                           * @default true
+                                           */
+                                          readonly validateFixed?: boolean;
+                                          /**
+                                           * Maximum depth for nested validation.
+                                           *
+                                           * Prevents runaway recursion in deeply nested or pathological
+                                           * resource structures.
+                                           *
+                                           * @default 50
+                                           */
+                                          readonly maxDepth?: number;
+                                          /**
+                                           * Whether to stop on the first error or collect all issues.
+                                           *
+                                           * When `true`, the validator throws a {@link ValidationFailedError}
+                                           * on the first error-severity issue. When `false` (default), all
+                                           * issues are collected and returned in the result.
+                                           *
+                                           * @default false
+                                           */
+                                          readonly failFast?: boolean;
+                                          /**
+                                           * Whether to skip FHIRPath invariant validation.
+                                           *
+                                           * When `true`, constraint expressions from the profile are not
+                                           * evaluated. Useful for performance or when FHIRPath evaluation
+                                           * is not needed.
+                                           *
+                                           * @default false
+                                           */
+                                          readonly skipInvariants?: boolean;
+                                      }
+
+                                      /**
+                                       * Result of structural validation.
+                                       *
+                                       * Contains the overall validity status, the validated resource, and
+                                       * all issues encountered during validation.
+                                       *
+                                       * @example
+                                       * ```typescript
+                                       * const result = await validator.validate(patient);
+                                       * if (result.valid) {
+                                       *   console.log('Resource is valid');
+                                       * } else {
+                                       *   for (const issue of result.issues) {
+                                       *     console.error(`${issue.severity}: ${issue.message} (at ${issue.path})`);
+                                       *   }
+                                       * }
+                                       * ```
+                                       */
+                                      export declare interface ValidationResult {
+                                          /**
+                                           * Whether the resource is valid.
+                                           *
+                                           * `true` when no error-severity issues were recorded.
+                                           * Warnings and informational issues do not affect this flag.
+                                           */
+                                          readonly valid: boolean;
+                                          /** The resource that was validated. */
+                                          readonly resource: Resource;
+                                          /** The profile that was validated against. */
+                                          readonly profileUrl: string;
+                                          /** The resolved CanonicalProfile used for validation. */
+                                          readonly profile: CanonicalProfile;
+                                          /** Issues encountered during validation (errors + warnings + info). */
+                                          readonly issues: readonly ValidationIssue[];
+                                      }
+
+                                      /**
+                                       * Base error class for all fhir-validator failures.
+                                       *
+                                       * Provides a stable `name` property and preserves the original `cause`
+                                       * when wrapping lower-level errors.
+                                       *
+                                       * @example
+                                       * ```typescript
+                                       * try {
+                                       *   await validator.validate(resource);
+                                       * } catch (err) {
+                                       *   if (err instanceof ValidatorError) {
+                                       *     // Handle any validator-related error
+                                       *   }
+                                       * }
+                                       * ```
+                                       */
+                                      declare class ValidatorError extends Error {
+                                          readonly name: string;
+                                          constructor(message: string, options?: ErrorOptions);
+                                      }
+
+                                      export { }

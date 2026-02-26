@@ -10,6 +10,8 @@ import {
   canPerformInteraction,
   parseAccessPolicy,
   buildDefaultAccessPolicy,
+  getSearchCriteria,
+  parseCriteriaString,
 } from "../../auth/access-policy.js";
 import type {
   ParsedAccessPolicy,
@@ -252,5 +254,120 @@ describe("buildDefaultAccessPolicy", () => {
     const policy = buildDefaultAccessPolicy();
     expect(policy.resource.length).toBe(1);
     expect(policy.resource[0].resourceType).toBe("*");
+  });
+});
+
+// =============================================================================
+// Layer 3: parseCriteriaString
+// =============================================================================
+
+describe("parseCriteriaString", () => {
+  it("parses ResourceType?param=value format", () => {
+    const params = parseCriteriaString("Patient?organization=Organization/123");
+    expect(params).toHaveLength(1);
+    expect(params[0].code).toBe("organization");
+    expect(params[0].values).toEqual(["Organization/123"]);
+  });
+
+  it("parses multiple params", () => {
+    const params = parseCriteriaString("Observation?subject=Patient/1&status=final");
+    expect(params).toHaveLength(2);
+    expect(params[0].code).toBe("subject");
+    expect(params[0].values).toEqual(["Patient/1"]);
+    expect(params[1].code).toBe("status");
+    expect(params[1].values).toEqual(["final"]);
+  });
+
+  it("parses modifier in key", () => {
+    const params = parseCriteriaString("Patient?name:exact=Zhang");
+    expect(params).toHaveLength(1);
+    expect(params[0].code).toBe("name");
+    expect(params[0].modifier).toBe("exact");
+    expect(params[0].values).toEqual(["Zhang"]);
+  });
+
+  it("parses comma-separated values (OR)", () => {
+    const params = parseCriteriaString("Observation?status=final,amended");
+    expect(params).toHaveLength(1);
+    expect(params[0].values).toEqual(["final", "amended"]);
+  });
+
+  it("handles bare query string without ResourceType? prefix", () => {
+    const params = parseCriteriaString("organization=Organization/abc");
+    expect(params).toHaveLength(1);
+    expect(params[0].code).toBe("organization");
+  });
+
+  it("returns empty array for empty criteria", () => {
+    expect(parseCriteriaString("")).toEqual([]);
+    expect(parseCriteriaString("Patient?")).toEqual([]);
+  });
+
+  it("skips pairs without = separator", () => {
+    const params = parseCriteriaString("Patient?invalidparam&status=final");
+    expect(params).toHaveLength(1);
+    expect(params[0].code).toBe("status");
+  });
+
+  it("decodes URL-encoded values", () => {
+    const params = parseCriteriaString("Patient?name=%E5%BC%A0");
+    expect(params).toHaveLength(1);
+    expect(params[0].values).toEqual(["张"]);
+  });
+});
+
+// =============================================================================
+// Layer 3: getSearchCriteria
+// =============================================================================
+
+describe("getSearchCriteria (Layer 3)", () => {
+  it("returns empty for no policy", () => {
+    const ctx = makeContext();
+    expect(getSearchCriteria("Patient", ctx)).toEqual([]);
+  });
+
+  it("returns empty for superAdmin", () => {
+    const ctx = makeContext({ superAdmin: true });
+    const policy: ParsedAccessPolicy = {
+      resource: [{ resourceType: "Patient", criteria: "Patient?organization=Organization/1" }],
+    };
+    expect(getSearchCriteria("Patient", ctx, policy)).toEqual([]);
+  });
+
+  it("returns parsed criteria params for matching entry", () => {
+    const ctx = makeContext();
+    const policy: ParsedAccessPolicy = {
+      resource: [{ resourceType: "Patient", criteria: "Patient?organization=Organization/1" }],
+    };
+    const params = getSearchCriteria("Patient", ctx, policy);
+    expect(params).toHaveLength(1);
+    expect(params[0].code).toBe("organization");
+    expect(params[0].values).toEqual(["Organization/1"]);
+  });
+
+  it("returns empty when entry has no criteria", () => {
+    const ctx = makeContext();
+    const policy: ParsedAccessPolicy = {
+      resource: [{ resourceType: "Patient" }],
+    };
+    expect(getSearchCriteria("Patient", ctx, policy)).toEqual([]);
+  });
+
+  it("returns empty for non-matching resource type", () => {
+    const ctx = makeContext();
+    const policy: ParsedAccessPolicy = {
+      resource: [{ resourceType: "Patient", criteria: "Patient?organization=Organization/1" }],
+    };
+    expect(getSearchCriteria("Observation", ctx, policy)).toEqual([]);
+  });
+
+  it("uses wildcard entry criteria for regular types", () => {
+    const ctx = makeContext();
+    const policy: ParsedAccessPolicy = {
+      resource: [{ resourceType: "*", criteria: "?_tag=http://example.com|restricted" }],
+    };
+    const params = getSearchCriteria("Patient", ctx, policy);
+    expect(params).toHaveLength(1);
+    expect(params[0].code).toBe("_tag");
   });
 });

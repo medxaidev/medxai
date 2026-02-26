@@ -135,3 +135,12 @@ export {
   executeSearch,
   mapRowsToResources,
 } from './search/index.js';
+
+// ─── Migrations ─────────────────────────────────────────────────────────────
+export { MigrationRunner } from './migrations/index.js';
+export type {
+  Migration,
+  MigrationRecord,
+  MigrationResult,
+  MigrationStatus,
+} from './migrations/index.js';

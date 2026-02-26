@@ -19,6 +19,7 @@ import { FHIR_JSON, buildETag, buildLastModified, buildLocationHeader, parseETag
 import { allOk, badRequest, errorToOutcome } from "../fhir/outcomes.js";
 import type { ResourceValidator } from "../app.js";
 import { getOperationContext } from "../auth/middleware.js";
+import { logAuditEvent } from "../audit/audit-event.js";
 
 // =============================================================================
 // Section 1: Route Parameter Types
@@ -106,6 +107,15 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
             "location",
             buildLocationHeader(baseUrl, resourceType, created.id, created.meta.versionId),
           );
+
+        // Audit: log create event (fire-and-forget)
+        logAuditEvent(repo, {
+          action: "create",
+          resourceType,
+          resourceId: created.id,
+          context,
+        }, context);
+
         return created;
       } catch (err) {
         const { status, outcome } = errorToOutcome(err);
@@ -194,6 +204,15 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
           .header("content-type", FHIR_JSON)
           .header("etag", buildETag(updated.meta.versionId))
           .header("last-modified", buildLastModified(updated.meta.lastUpdated));
+
+        // Audit: log update event (fire-and-forget)
+        logAuditEvent(repo, {
+          action: "update",
+          resourceType,
+          resourceId: id,
+          context,
+        }, context);
+
         return updated;
       } catch (err) {
         const { status, outcome } = errorToOutcome(err);
@@ -211,6 +230,15 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       try {
         const context = getOperationContext(request);
         await repo.deleteResource(resourceType, id, context);
+
+        // Audit: log delete event (fire-and-forget)
+        logAuditEvent(repo, {
+          action: "delete",
+          resourceType,
+          resourceId: id,
+          context,
+        }, context);
+
         reply.header("content-type", FHIR_JSON);
         return allOk(`Deleted ${resourceType}/${id}`);
       } catch (err) {
