@@ -31,6 +31,7 @@ export {
 
 // Implementation
 export { FhirRepository } from './fhir-repo.js';
+export type { TransactionClient } from './fhir-repo.js';
 
 // Builders (for advanced usage / testing)
 export {

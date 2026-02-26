@@ -15,6 +15,7 @@ import type { PersistedResource } from '../../repo/types.js';
 
 function makeMockRepo() {
   const created: PersistedResource[] = [];
+  let createCounter = 0;
 
   const repo = {
     createResource: vi.fn(async (resource: any, options?: any) => {
@@ -32,7 +33,7 @@ function makeMockRepo() {
         meta: { versionId: 'v-updated', lastUpdated: '2026-01-01T00:00:00Z' },
       } as PersistedResource;
     }),
-    deleteResource: vi.fn(async () => {}),
+    deleteResource: vi.fn(async () => { }),
     readResource: vi.fn(async (rt: string, id: string) => {
       return {
         resourceType: rt,
@@ -40,6 +41,28 @@ function makeMockRepo() {
         meta: { versionId: 'v-read', lastUpdated: '2026-01-01T00:00:00Z' },
       } as PersistedResource;
     }),
+    // Transaction support for atomic bundle processing
+    runInTransaction: vi.fn(async (fn: (tx: any) => Promise<any>) => {
+      const mockTx = { query: vi.fn(async () => ({ rows: [] })) };
+      return fn(mockTx);
+    }),
+    _prepareCreate: vi.fn((resource: any, options?: any) => {
+      createCounter++;
+      return {
+        ...resource,
+        id: options?.assignedId ?? `id-${createCounter}`,
+        meta: { versionId: `v-${createCounter}`, lastUpdated: '2026-01-01T00:00:00Z' },
+      } as PersistedResource;
+    }),
+    _executeCreate: vi.fn(async () => { }),
+    _prepareUpdate: vi.fn((resource: any) => {
+      return {
+        ...resource,
+        meta: { versionId: 'v-updated', lastUpdated: '2026-01-01T00:00:00Z' },
+      } as PersistedResource;
+    }),
+    _executeUpdate: vi.fn(async () => { }),
+    _executeDelete: vi.fn(async () => { }),
   } as unknown as FhirRepository;
 
   return { repo, created };
@@ -105,8 +128,8 @@ describe('Phase 21 — transaction bundle', () => {
     expect(response.entry[0].status).toBe('201');
     expect(response.entry[1].status).toBe('201');
 
-    // The second create call should have resolved the urn:uuid
-    const secondCreateCall = (repo.createResource as ReturnType<typeof vi.fn>).mock.calls[1];
+    // The second _prepareCreate call should have resolved the urn:uuid
+    const secondCreateCall = (repo._prepareCreate as ReturnType<typeof vi.fn>).mock.calls[1];
     const obsResource = secondCreateCall[0];
     // The urn should have been replaced
     expect(obsResource.subject.reference).not.toContain('urn:uuid');
@@ -129,7 +152,7 @@ describe('Phase 21 — transaction bundle', () => {
 
     expect(response.entry).toHaveLength(1);
     expect(response.entry[0].status).toBe('204');
-    expect(repo.deleteResource).toHaveBeenCalledWith('Patient', 'pat-1');
+    expect(repo._executeDelete).toHaveBeenCalled();
   });
 
   it('returns error on missing request', async () => {

@@ -15,7 +15,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { FhirResource, PersistedResource } from './types.js';
-import type { FhirRepository } from './fhir-repo.js';
+import type { FhirRepository, TransactionClient } from './fhir-repo.js';
 
 // =============================================================================
 // Section 1: Types
@@ -85,7 +85,11 @@ function parseRequestUrl(url: string): { resourceType: string; id?: string } {
 // =============================================================================
 
 /**
- * Replace all `urn:uuid:` references in a resource JSON with actual IDs.
+ * Replace `urn:uuid:` references in a resource with actual IDs.
+ *
+ * Uses structured deep-walk instead of regex on serialized JSON.
+ * Only replaces values in `.reference` fields (FHIR Reference type)
+ * to avoid accidental replacement in narratives or identifiers.
  */
 function resolveUrnReferences(
   resource: FhirResource,
@@ -93,16 +97,42 @@ function resolveUrnReferences(
 ): FhirResource {
   if (urnMap.size === 0) return resource;
 
-  let json = JSON.stringify(resource);
-  for (const [urn, actualId] of urnMap) {
-    // Replace "urn:uuid:xxx" references with "ResourceType/actualId"
-    json = json.replace(new RegExp(escapeRegex(urn), 'g'), actualId);
-  }
-  return JSON.parse(json) as FhirResource;
+  return deepResolveUrns(structuredClone(resource), urnMap) as FhirResource;
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function deepResolveUrns(
+  obj: unknown,
+  urnMap: Map<string, string>,
+): unknown {
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      obj[i] = deepResolveUrns(obj[i], urnMap);
+    }
+    return obj;
+  }
+
+  const record = obj as Record<string, unknown>;
+
+  // Replace .reference field if it matches a urn:uuid
+  if (typeof record.reference === 'string') {
+    const mapped = urnMap.get(record.reference);
+    if (mapped) {
+      record.reference = mapped;
+    }
+  }
+
+  // Recurse into all fields
+  for (const key of Object.keys(record)) {
+    if (typeof record[key] === 'object' && record[key] !== null) {
+      record[key] = deepResolveUrns(record[key], urnMap);
+    }
+  }
+
+  return record;
 }
 
 // =============================================================================
@@ -112,15 +142,14 @@ function escapeRegex(str: string): string {
 /**
  * Process a transaction bundle — all-or-nothing.
  *
- * All entries are processed sequentially. If any fails, the entire
- * transaction is rolled back (via the repository's transaction support).
+ * All entries are processed within a single database transaction.
+ * If any entry fails, the entire transaction is rolled back automatically.
  */
 export async function processTransaction(
   repo: FhirRepository,
   bundle: Bundle,
 ): Promise<BundleResponse> {
   const entries = bundle.entry ?? [];
-  const responseEntries: BundleResponseEntry[] = [];
   const urnMap = new Map<string, string>();
 
   // Pre-assign IDs for POST entries with urn:uuid fullUrl
@@ -134,12 +163,24 @@ export async function processTransaction(
   }
 
   try {
-    for (const entry of entries) {
-      const result = await processEntry(repo, entry, urnMap);
-      responseEntries.push(result);
-    }
+    const responseEntries = await repo.runInTransaction(async (tx) => {
+      const results: BundleResponseEntry[] = [];
+
+      for (const entry of entries) {
+        const result = await processEntryInTransaction(repo, tx, entry, urnMap);
+        results.push(result);
+      }
+
+      return results;
+    });
+
+    return {
+      resourceType: 'Bundle',
+      type: 'transaction-response',
+      entry: responseEntries,
+    };
   } catch (err) {
-    // Transaction failed — return error response
+    // Transaction failed and rolled back — return error response
     const message = err instanceof Error ? err.message : String(err);
     return {
       resourceType: 'Bundle',
@@ -147,12 +188,6 @@ export async function processTransaction(
       entry: [{ status: '500', error: message }],
     };
   }
-
-  return {
-    resourceType: 'Bundle',
-    type: 'transaction-response',
-    entry: responseEntries,
-  };
 }
 
 // =============================================================================
@@ -190,11 +225,96 @@ export async function processBatch(
 }
 
 // =============================================================================
-// Section 6: Single Entry Processing
+// Section 6: Single Entry Processing (Transaction — shared client)
 // =============================================================================
 
 /**
- * Process a single bundle entry.
+ * Process a single bundle entry within an existing transaction client.
+ *
+ * Uses repo's internal _execute* methods to run SQL against the shared
+ * transaction client, ensuring all entries are atomic.
+ */
+async function processEntryInTransaction(
+  repo: FhirRepository,
+  tx: TransactionClient,
+  entry: BundleEntry,
+  urnMap: Map<string, string>,
+): Promise<BundleResponseEntry> {
+  if (!entry.request) {
+    return { status: '400', error: 'Missing request' };
+  }
+
+  const { method, url } = entry.request;
+  const { resourceType, id } = parseRequestUrl(url);
+
+  switch (method) {
+    case 'POST': {
+      if (!entry.resource) {
+        return { status: '400', error: 'Missing resource for POST' };
+      }
+      const resolved = resolveUrnReferences(entry.resource, urnMap);
+      let assignedId: string | undefined;
+      if (entry.fullUrl?.startsWith('urn:uuid:')) {
+        const mapped = urnMap.get(entry.fullUrl.replace('urn:uuid:', ''));
+        if (mapped) assignedId = mapped;
+      }
+      const persisted = repo._prepareCreate(resolved, { assignedId });
+      await repo._executeCreate(tx, persisted);
+      return { resource: persisted, status: '201' };
+    }
+
+    case 'PUT': {
+      if (!entry.resource) {
+        return { status: '400', error: 'Missing resource for PUT' };
+      }
+      const resolved = resolveUrnReferences(entry.resource, urnMap);
+      if (id) {
+        const toUpdate = { ...resolved, id } as FhirResource;
+        const persisted = repo._prepareUpdate(toUpdate);
+        await repo._executeUpdate(tx, persisted);
+        return { resource: persisted, status: '200' };
+      }
+      return { status: '400', error: 'PUT requires resource ID' };
+    }
+
+    case 'DELETE': {
+      if (!id) {
+        return { status: '400', error: 'DELETE requires resource ID' };
+      }
+      await repo._executeDelete(tx, resourceType, id);
+      return { status: '204' };
+    }
+
+    case 'GET': {
+      if (!id) {
+        return { status: '400', error: 'GET requires resource ID' };
+      }
+      // GET reads via the shared transaction client for consistency
+      const sql = `SELECT "content", "deleted" FROM "${resourceType}" WHERE "id" = $1`;
+      const result = await tx.query(sql, [id]);
+      if (result.rows.length === 0) {
+        return { status: '404', error: `${resourceType}/${id} not found` };
+      }
+      const row = result.rows[0] as { content: string; deleted: boolean };
+      if (row.deleted || !row.content) {
+        return { status: '410', error: `${resourceType}/${id} is deleted` };
+      }
+      const resource = JSON.parse(row.content) as PersistedResource;
+      return { resource, status: '200' };
+    }
+
+    default:
+      return { status: '400', error: `Unsupported method: ${method}` };
+  }
+}
+
+// =============================================================================
+// Section 7: Single Entry Processing (Batch — own transaction)
+// =============================================================================
+
+/**
+ * Process a single bundle entry using the repo's public API.
+ * Each call creates its own transaction (used by batch processing).
  */
 async function processEntry(
   repo: FhirRepository,

@@ -66,7 +66,7 @@ describe('Phase 20 — conditionalCreate', () => {
   });
 
   it('returns existing resource when match found', async () => {
-    const { db } = makeMockDb();
+    const { db, mockClient } = makeMockDb();
     const registry = makeRegistry();
     const repo = new FhirRepository(db, registry);
 
@@ -76,8 +76,8 @@ describe('Phase 20 — conditionalCreate', () => {
       meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' },
     };
 
-    // Search returns 1 result
-    (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    // Search returns 1 result (inside transaction via mockClient)
+    mockClient.query.mockResolvedValueOnce({
       rows: [{ id: 'existing-id', content: JSON.stringify(existingResource), deleted: false }],
     });
 
@@ -136,15 +136,15 @@ describe('Phase 20 — conditionalUpdate', () => {
       meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' },
     };
 
-    // Search returns 1 match
-    (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      rows: [{ id: 'pat-1', content: JSON.stringify(existing), deleted: false }],
-    });
-
-    // FOR UPDATE lock inside updateResource
-    mockClient.query.mockResolvedValueOnce({
-      rows: [{ content: JSON.stringify(existing), deleted: false }],
-    });
+    // Search returns 1 match (inside transaction via mockClient)
+    mockClient.query
+      .mockResolvedValueOnce({
+        rows: [{ id: 'pat-1', content: JSON.stringify(existing), deleted: false }],
+      })
+      // FOR UPDATE lock inside _executeUpdate
+      .mockResolvedValueOnce({
+        rows: [{ content: JSON.stringify(existing), deleted: false }],
+      });
 
     const result = await repo.conditionalUpdate(
       { resourceType: 'Patient', name: [{ family: 'Updated' }] },
@@ -156,14 +156,15 @@ describe('Phase 20 — conditionalUpdate', () => {
   });
 
   it('throws PreconditionFailedError when 2+ matches', async () => {
-    const { db } = makeMockDb();
+    const { db, mockClient } = makeMockDb();
     const registry = makeRegistry();
     const repo = new FhirRepository(db, registry);
 
     const pat1 = { resourceType: 'Patient', id: 'p1', meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' } };
     const pat2 = { resourceType: 'Patient', id: 'p2', meta: { versionId: 'v2', lastUpdated: '2026-01-01T00:00:00Z' } };
 
-    (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    // Search returns 2 matches (inside transaction via mockClient)
+    mockClient.query.mockResolvedValueOnce({
       rows: [
         { id: 'p1', content: JSON.stringify(pat1), deleted: false },
         { id: 'p2', content: JSON.stringify(pat2), deleted: false },
@@ -191,15 +192,15 @@ describe('Phase 20 — conditionalDelete', () => {
 
     const pat1 = { resourceType: 'Patient', id: 'p1', meta: { versionId: 'v1', lastUpdated: '2026-01-01T00:00:00Z' } };
 
-    // Search returns 1 match
-    (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      rows: [{ id: 'p1', content: JSON.stringify(pat1), deleted: false }],
-    });
-
-    // FOR UPDATE lock in deleteResource
-    mockClient.query.mockResolvedValueOnce({
-      rows: [{ deleted: false }],
-    });
+    // Search returns 1 match (inside transaction via mockClient)
+    mockClient.query
+      .mockResolvedValueOnce({
+        rows: [{ id: 'p1', content: JSON.stringify(pat1), deleted: false }],
+      })
+      // FOR UPDATE lock in _executeDelete
+      .mockResolvedValueOnce({
+        rows: [{ deleted: false }],
+      });
 
     const count = await repo.conditionalDelete('Patient', {
       resourceType: 'Patient',

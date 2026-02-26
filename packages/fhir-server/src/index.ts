@@ -9,7 +9,7 @@
 
 // ─── App Factory ────────────────────────────────────────────────────────────
 export { createApp } from "./app.js";
-export type { AppOptions } from "./app.js";
+export type { AppOptions, ResourceValidator, ResourceValidationResult } from "./app.js";
 
 // ─── FHIR Helpers ───────────────────────────────────────────────────────────
 export {

@@ -29,6 +29,8 @@ import type {
 } from "./types.js";
 import type { SearchRequest } from "../search/types.js";
 import { executeSearch } from "../search/search-executor.js";
+import { buildSearchSQL } from "../search/search-sql-builder.js";
+import { mapRowsToResources } from "../search/search-executor.js";
 import {
   ResourceNotFoundError,
   ResourceGoneError,
@@ -59,6 +61,13 @@ import type { ResourceCacheConfig } from "../cache/resource-cache.js";
 // Section 1: FhirRepository Class
 // =============================================================================
 
+/**
+ * A minimal query-capable client — either the pool or a transaction client.
+ */
+export type TransactionClient = {
+  query: (text: string, values?: unknown[]) => Promise<any>;
+};
+
 export class FhirRepository implements ResourceRepository {
   private readonly db: DatabaseClient;
   private readonly registry:
@@ -88,6 +97,16 @@ export class FhirRepository implements ResourceRepository {
    */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Execute a callback within a single database transaction.
+   *
+   * Use this for bundle transaction processing where multiple CRUD
+   * operations must be atomic (all-or-nothing).
+   */
+  async runInTransaction<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
+    return this.db.withTransaction(fn);
   }
 
   // ---------------------------------------------------------------------------
@@ -213,11 +232,22 @@ export class FhirRepository implements ResourceRepository {
     resource: T,
     options?: CreateResourceOptions,
   ): Promise<T & PersistedResource> {
+    const persisted = this._prepareCreate(resource, options);
+    await this.db.withTransaction(async (client) => {
+      await this._executeCreate(client, persisted);
+    });
+    return persisted;
+  }
+
+  /** Prepare a create (build persisted resource) without touching the DB. */
+  _prepareCreate<T extends FhirResource>(
+    resource: T,
+    options?: CreateResourceOptions,
+  ): T & PersistedResource {
     const now = new Date().toISOString();
     const id = options?.assignedId ?? randomUUID();
     const versionId = randomUUID();
-
-    const persisted = {
+    return {
       ...resource,
       id,
       meta: {
@@ -226,28 +256,27 @@ export class FhirRepository implements ResourceRepository {
         lastUpdated: now,
       },
     } as T & PersistedResource;
+  }
 
+  /** Execute a create against a transaction client. */
+  async _executeCreate(
+    client: TransactionClient,
+    persisted: PersistedResource,
+  ): Promise<void> {
     const mainRow = this.buildRow(persisted);
     const historyRow = buildHistoryRow(persisted);
 
-    await this.db.withTransaction(async (client) => {
-      const upsert = buildUpsertSQL(resource.resourceType, mainRow);
-      await client.query(upsert.sql, upsert.values);
+    const upsert = buildUpsertSQL(persisted.resourceType, mainRow);
+    await client.query(upsert.sql, upsert.values);
 
-      const histInsert = buildInsertSQL(
-        `${resource.resourceType}_History`,
-        historyRow,
-      );
-      await client.query(histInsert.sql, histInsert.values);
+    const histInsert = buildInsertSQL(
+      `${persisted.resourceType}_History`,
+      historyRow,
+    );
+    await client.query(histInsert.sql, histInsert.values);
 
-      // Write reference rows
-      await this.writeReferences(client, persisted);
-
-      // Write global lookup table rows (HumanName, Address, ContactPoint, Identifier)
-      await this.writeLookupRows(client, persisted);
-    });
-
-    return persisted;
+    await this.writeReferences(client, persisted);
+    await this.writeLookupRows(client, persisted);
   }
 
   // ---------------------------------------------------------------------------
@@ -290,17 +319,27 @@ export class FhirRepository implements ResourceRepository {
     resource: T,
     options?: UpdateResourceOptions,
   ): Promise<T & PersistedResource> {
-    const resourceType = resource.resourceType;
-    const id = resource.id;
+    const persisted = this._prepareUpdate(resource);
 
+    await this.db.withTransaction(async (client) => {
+      await this._executeUpdate(client, persisted, options);
+    });
+
+    this.cache.invalidate(persisted.resourceType, persisted.id);
+    return persisted;
+  }
+
+  /** Prepare an update (build persisted resource) without touching the DB. */
+  _prepareUpdate<T extends FhirResource>(
+    resource: T,
+  ): T & PersistedResource {
+    const id = resource.id;
     if (!id) {
       throw new Error("Resource must have an id for update");
     }
-
     const now = new Date().toISOString();
     const versionId = randomUUID();
-
-    const persisted = {
+    return {
       ...resource,
       id,
       meta: {
@@ -309,59 +348,62 @@ export class FhirRepository implements ResourceRepository {
         lastUpdated: now,
       },
     } as T & PersistedResource;
+  }
+
+  /** Execute an update against a transaction client. */
+  async _executeUpdate(
+    client: TransactionClient,
+    persisted: PersistedResource,
+    options?: UpdateResourceOptions,
+  ): Promise<void> {
+    const resourceType = persisted.resourceType;
+    const id = persisted.id;
 
     const mainRow = this.buildRow(persisted);
     const historyRow = buildHistoryRow(persisted);
 
-    await this.db.withTransaction(async (client) => {
-      // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
-      const lockResult = await client.query(
-        `SELECT "content", "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
-        [id],
-      );
+    // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
+    const lockResult = await client.query(
+      `SELECT "content", "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
+      [id],
+    );
 
-      if (lockResult.rows.length === 0) {
-        throw new ResourceNotFoundError(resourceType, id);
+    if (lockResult.rows.length === 0) {
+      throw new ResourceNotFoundError(resourceType, id);
+    }
+
+    const existingRow = lockResult.rows[0] as {
+      content: string;
+      deleted: boolean;
+    };
+    if (existingRow.deleted) {
+      throw new ResourceGoneError(resourceType, id);
+    }
+
+    // Optimistic locking check (under row lock — no race possible)
+    if (options?.ifMatch) {
+      const existing = JSON.parse(existingRow.content) as PersistedResource;
+      if (existing.meta.versionId !== options.ifMatch) {
+        throw new ResourceVersionConflictError(
+          resourceType,
+          id,
+          options.ifMatch,
+          existing.meta.versionId,
+        );
       }
+    }
 
-      const existingRow = lockResult.rows[0] as {
-        content: string;
-        deleted: boolean;
-      };
-      if (existingRow.deleted) {
-        throw new ResourceGoneError(resourceType, id);
-      }
+    const upsert = buildUpsertSQL(resourceType, mainRow);
+    await client.query(upsert.sql, upsert.values);
 
-      // Optimistic locking check (under row lock — no race possible)
-      if (options?.ifMatch) {
-        const existing = JSON.parse(existingRow.content) as PersistedResource;
-        if (existing.meta.versionId !== options.ifMatch) {
-          throw new ResourceVersionConflictError(
-            resourceType,
-            id,
-            options.ifMatch,
-            existing.meta.versionId,
-          );
-        }
-      }
+    const histInsert = buildInsertSQL(`${resourceType}_History`, historyRow);
+    await client.query(histInsert.sql, histInsert.values);
 
-      const upsert = buildUpsertSQL(resourceType, mainRow);
-      await client.query(upsert.sql, upsert.values);
+    // Update reference rows (delete old, write new)
+    await this.writeReferences(client, persisted);
 
-      const histInsert = buildInsertSQL(`${resourceType}_History`, historyRow);
-      await client.query(histInsert.sql, histInsert.values);
-
-      // Update reference rows (delete old, write new)
-      await this.writeReferences(client, persisted);
-
-      // Update global lookup table rows
-      await this.writeLookupRows(client, persisted);
-    });
-
-    // Invalidate cache after successful update
-    this.cache.invalidate(resourceType, id);
-
-    return persisted;
+    // Update global lookup table rows
+    await this.writeLookupRows(client, persisted);
   }
 
   // ---------------------------------------------------------------------------
@@ -369,43 +411,51 @@ export class FhirRepository implements ResourceRepository {
   // ---------------------------------------------------------------------------
 
   async deleteResource(resourceType: string, id: string): Promise<void> {
+    await this.db.withTransaction(async (client) => {
+      await this._executeDelete(client, resourceType, id);
+    });
+
+    this.cache.invalidate(resourceType, id);
+  }
+
+  /** Execute a delete against a transaction client. */
+  async _executeDelete(
+    client: TransactionClient,
+    resourceType: string,
+    id: string,
+  ): Promise<void> {
     const now = new Date().toISOString();
     const versionId = randomUUID();
 
     const mainRow = buildDeleteRow(resourceType, id, now);
     const historyRow = buildDeleteHistoryRow(id, versionId, now);
 
-    await this.db.withTransaction(async (client) => {
-      // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
-      const lockResult = await client.query(
-        `SELECT "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
-        [id],
-      );
+    // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
+    const lockResult = await client.query(
+      `SELECT "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
+      [id],
+    );
 
-      if (lockResult.rows.length === 0) {
-        throw new ResourceNotFoundError(resourceType, id);
-      }
+    if (lockResult.rows.length === 0) {
+      throw new ResourceNotFoundError(resourceType, id);
+    }
 
-      const existingRow = lockResult.rows[0] as { deleted: boolean };
-      if (existingRow.deleted) {
-        throw new ResourceGoneError(resourceType, id);
-      }
+    const existingRow = lockResult.rows[0] as { deleted: boolean };
+    if (existingRow.deleted) {
+      throw new ResourceGoneError(resourceType, id);
+    }
 
-      const upsert = buildUpsertSQL(resourceType, mainRow);
-      await client.query(upsert.sql, upsert.values);
+    const upsert = buildUpsertSQL(resourceType, mainRow);
+    await client.query(upsert.sql, upsert.values);
 
-      const histInsert = buildInsertSQL(`${resourceType}_History`, historyRow);
-      await client.query(histInsert.sql, histInsert.values);
+    const histInsert = buildInsertSQL(`${resourceType}_History`, historyRow);
+    await client.query(histInsert.sql, histInsert.values);
 
-      // Delete reference rows for deleted resource
-      await this.deleteReferences(client, resourceType, id);
+    // Delete reference rows for deleted resource
+    await this.deleteReferences(client, resourceType, id);
 
-      // Delete global lookup table rows
-      await this.deleteLookupRows(client, id);
-    });
-
-    // Invalidate cache after successful delete
-    this.cache.invalidate(resourceType, id);
+    // Delete global lookup table rows
+    await this.deleteLookupRows(client, id);
   }
 
   // ---------------------------------------------------------------------------
@@ -475,19 +525,25 @@ export class FhirRepository implements ResourceRepository {
       );
     }
 
-    // Search for existing match
-    const result = await executeSearch(this.db, searchRequest, this.registry);
-    if (result.resources.length > 0) {
-      // Resource already exists — return it without creating
-      return {
-        resource: result.resources[0] as T & PersistedResource,
-        created: false,
-      };
-    }
+    const registry = this.registry;
+    return this.db.withTransaction(async (client) => {
+      // Search inside transaction to prevent TOCTOU race
+      const searchSQL = buildSearchSQL(searchRequest, registry);
+      const { rows } = await client.query(searchSQL.sql, searchSQL.values);
+      const existing = mapRowsToResources(rows as any);
 
-    // No match — create normally
-    const created = await this.createResource(resource);
-    return { resource: created, created: true };
+      if (existing.length > 0) {
+        return {
+          resource: existing[0] as T & PersistedResource,
+          created: false,
+        };
+      }
+
+      // No match — create inside same transaction
+      const persisted = this._prepareCreate(resource);
+      await this._executeCreate(client, persisted);
+      return { resource: persisted as T & PersistedResource, created: true };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -511,26 +567,34 @@ export class FhirRepository implements ResourceRepository {
       );
     }
 
-    const result = await executeSearch(this.db, searchRequest, this.registry);
+    const registry = this.registry;
+    return this.db.withTransaction(async (client) => {
+      // Search inside transaction to prevent TOCTOU race
+      const searchSQL = buildSearchSQL(searchRequest, registry);
+      const { rows } = await client.query(searchSQL.sql, searchSQL.values);
+      const existing = mapRowsToResources(rows as any);
 
-    if (result.resources.length > 1) {
-      throw new PreconditionFailedError(
-        resource.resourceType,
-        result.resources.length,
-      );
-    }
+      if (existing.length > 1) {
+        throw new PreconditionFailedError(
+          resource.resourceType,
+          existing.length,
+        );
+      }
 
-    if (result.resources.length === 1) {
-      // Update existing
-      const existing = result.resources[0];
-      const toUpdate = { ...resource, id: existing.id } as T;
-      const updated = await this.updateResource(toUpdate);
-      return { resource: updated, created: false };
-    }
+      if (existing.length === 1) {
+        // Update existing inside same transaction
+        const toUpdate = { ...resource, id: existing[0].id } as T;
+        const persisted = this._prepareUpdate(toUpdate);
+        await this._executeUpdate(client, persisted);
+        this.cache.invalidate(persisted.resourceType, persisted.id);
+        return { resource: persisted as T & PersistedResource, created: false };
+      }
 
-    // No match — create
-    const created = await this.createResource(resource);
-    return { resource: created, created: true };
+      // No match — create inside same transaction
+      const persisted = this._prepareCreate(resource);
+      await this._executeCreate(client, persisted);
+      return { resource: persisted as T & PersistedResource, created: true };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -552,19 +616,26 @@ export class FhirRepository implements ResourceRepository {
       );
     }
 
-    const result = await executeSearch(this.db, searchRequest, this.registry);
-    let count = 0;
+    const registry = this.registry;
+    return this.db.withTransaction(async (client) => {
+      // Search inside transaction to prevent TOCTOU race
+      const searchSQL = buildSearchSQL(searchRequest, registry);
+      const { rows } = await client.query(searchSQL.sql, searchSQL.values);
+      const existing = mapRowsToResources(rows as any);
+      let count = 0;
 
-    for (const resource of result.resources) {
-      try {
-        await this.deleteResource(resourceType, resource.id);
-        count++;
-      } catch {
-        // Skip already-deleted or not-found
+      for (const resource of existing) {
+        try {
+          await this._executeDelete(client, resourceType, resource.id);
+          this.cache.invalidate(resourceType, resource.id);
+          count++;
+        } catch {
+          // Skip already-deleted or not-found
+        }
       }
-    }
 
-    return count;
+      return count;
+    });
   }
 
   // ---------------------------------------------------------------------------

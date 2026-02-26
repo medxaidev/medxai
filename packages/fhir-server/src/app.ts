@@ -22,6 +22,26 @@ import { errorToOutcome } from "./fhir/outcomes.js";
 // =============================================================================
 
 /**
+ * Validation result from the resource validator.
+ */
+export interface ResourceValidationResult {
+  valid: boolean;
+  issues?: Array<{ severity: string; code: string; diagnostics: string }>;
+}
+
+/**
+ * Optional resource validator function.
+ *
+ * Called before create/update persistence. If it returns `{ valid: false }`,
+ * the server responds with 422 Unprocessable Entity + OperationOutcome.
+ *
+ * Wire in the StructureValidator + FhirContext to enable full validation.
+ */
+export type ResourceValidator = (
+  resource: Record<string, unknown>,
+) => ResourceValidationResult | Promise<ResourceValidationResult>;
+
+/**
  * Options for creating the FHIR server app.
  */
 export interface AppOptions {
@@ -33,6 +53,8 @@ export interface AppOptions {
   logger?: boolean;
   /** Base URL for the server (used in Location headers, Bundle links). */
   baseUrl?: string;
+  /** Optional resource validator — called before create/update. */
+  resourceValidator?: ResourceValidator;
 }
 
 // =============================================================================
@@ -72,16 +94,18 @@ function isFastifyValidationError(error: unknown): error is FastifyValidationErr
  * ```
  */
 export async function createApp(options: AppOptions): Promise<FastifyInstance> {
-  const { repo, searchRegistry, logger = false, baseUrl } = options;
+  const { repo, searchRegistry, logger = false, baseUrl, resourceValidator } = options;
 
   const app = Fastify({
     logger,
+    bodyLimit: 16_777_216, // 16 MB — explicit FHIR resource size limit
   });
 
   // ── Decorate with repository and search registry ──────────────────────────
   app.decorate("repo", repo);
   app.decorate("searchRegistry", searchRegistry ?? null);
   app.decorate("baseUrl", baseUrl ?? "");
+  app.decorate("resourceValidator", resourceValidator ?? null);
 
   // ── Content-Type parsing ──────────────────────────────────────────────────
   // Accept application/fhir+json as JSON
@@ -90,7 +114,12 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     { parseAs: "string" },
     (_req, body, done) => {
       try {
-        const json = JSON.parse(body as string);
+        const str = body as string;
+        if (!str || str.trim() === "") {
+          done(null, undefined);
+          return;
+        }
+        const json = JSON.parse(str);
         done(null, json);
       } catch (err) {
         done(err as Error, undefined);
@@ -142,7 +171,21 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     },
   );
 
-  // ── Register routes ───────────────────────────────────────────────────────
+  // ── Health check endpoint ────────────────────────────────────────────
+  app.get("/healthcheck", async (_request, reply) => {
+    reply.header("content-type", "application/json");
+    return { status: "ok", uptime: process.uptime() };
+  });
+
+  // ── Graceful shutdown ──────────────────────────────────────────────
+  const shutdown = async () => {
+    await app.close();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+
+  // ── Register routes ───────────────────────────────────────────────────
   await app.register(metadataRoute, { baseUrl });
   if (searchRegistry) {
     await app.register(searchRoutes);

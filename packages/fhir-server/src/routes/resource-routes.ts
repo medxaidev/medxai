@@ -17,6 +17,7 @@ import type { ResourceRepository, FhirResource, HistoryOptions } from "@medxai/f
 import { buildHistoryBundle } from "@medxai/fhir-persistence";
 import { FHIR_JSON, buildETag, buildLastModified, buildLocationHeader, parseETag } from "../fhir/response.js";
 import { allOk, badRequest, errorToOutcome } from "../fhir/outcomes.js";
+import type { ResourceValidator } from "../app.js";
 
 // =============================================================================
 // Section 1: Route Parameter Types
@@ -50,6 +51,7 @@ interface HistoryQuerystring {
  */
 export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
   const repo = (fastify as FastifyInstance & { repo: ResourceRepository }).repo;
+  const validator = (fastify as FastifyInstance & { resourceValidator: ResourceValidator | null }).resourceValidator;
 
   // ── POST /:resourceType (create) ──────────────────────────────────────────
   fastify.post<{ Params: ResourceTypeParams; Body: FhirResource }>(
@@ -73,6 +75,21 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       }
 
       const resource: FhirResource = { ...body, resourceType };
+
+      // Validation gate — if validator is configured, validate before persistence
+      if (validator) {
+        const vResult = await validator(resource as unknown as Record<string, unknown>);
+        if (!vResult.valid) {
+          return sendOutcome(reply, 422, {
+            resourceType: "OperationOutcome",
+            issue: (vResult.issues ?? []).map((i) => ({
+              severity: i.severity as "error",
+              code: i.code,
+              diagnostics: i.diagnostics,
+            })),
+          });
+        }
+      }
 
       try {
         const created = await repo.createResource(resource);
@@ -136,7 +153,32 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
         );
       }
 
+      if (body.id && body.id !== id) {
+        return sendOutcome(
+          reply,
+          400,
+          badRequest(
+            `Resource id in body (${body.id}) does not match URL (${id})`,
+          ),
+        );
+      }
+
       const resource: FhirResource = { ...body, resourceType, id };
+
+      // Validation gate — if validator is configured, validate before persistence
+      if (validator) {
+        const vResult = await validator(resource as unknown as Record<string, unknown>);
+        if (!vResult.valid) {
+          return sendOutcome(reply, 422, {
+            resourceType: "OperationOutcome",
+            issue: (vResult.issues ?? []).map((i) => ({
+              severity: i.severity as "error",
+              code: i.code,
+              diagnostics: i.diagnostics,
+            })),
+          });
+        }
+      }
 
       // Parse If-Match header for optimistic locking
       const ifMatchHeader = request.headers["if-match"];
