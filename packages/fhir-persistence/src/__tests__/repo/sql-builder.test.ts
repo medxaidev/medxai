@@ -127,7 +127,7 @@ describe('buildInsertSQL', () => {
 describe('buildSelectByIdSQL', () => {
   it('generates SELECT with content and deleted columns', () => {
     const sql = buildSelectByIdSQL('Patient');
-    expect(sql).toBe('SELECT "content", "deleted" FROM "Patient" WHERE "id" = $1');
+    expect(sql).toBe('SELECT "content", "deleted", "projectId" FROM "Patient" WHERE "id" = $1');
   });
 
   it('quotes table name', () => {

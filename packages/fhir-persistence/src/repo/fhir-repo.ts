@@ -26,6 +26,7 @@ import type {
   HistoryEntry,
   SearchOptions,
   SearchResult,
+  OperationContext,
 } from "./types.js";
 import type { SearchRequest } from "../search/types.js";
 import { executeSearch } from "../search/search-executor.js";
@@ -118,12 +119,13 @@ export class FhirRepository implements ResourceRepository {
    */
   private buildRow(
     resource: PersistedResource,
+    context?: OperationContext,
   ): import("./types.js").ResourceRow {
     if (this.registry) {
       const impls = this.registry.getForResource(resource.resourceType);
-      return buildResourceRowWithSearch(resource, impls);
+      return buildResourceRowWithSearch(resource, impls, context);
     }
-    return buildResourceRow(resource);
+    return buildResourceRow(resource, context);
   }
 
   /**
@@ -231,10 +233,11 @@ export class FhirRepository implements ResourceRepository {
   async createResource<T extends FhirResource>(
     resource: T,
     options?: CreateResourceOptions,
+    context?: OperationContext,
   ): Promise<T & PersistedResource> {
     const persisted = this._prepareCreate(resource, options);
     await this.db.withTransaction(async (client) => {
-      await this._executeCreate(client, persisted);
+      await this._executeCreate(client, persisted, context);
     });
     return persisted;
   }
@@ -262,8 +265,9 @@ export class FhirRepository implements ResourceRepository {
   async _executeCreate(
     client: TransactionClient,
     persisted: PersistedResource,
+    context?: OperationContext,
   ): Promise<void> {
-    const mainRow = this.buildRow(persisted);
+    const mainRow = this.buildRow(persisted, context);
     const historyRow = buildHistoryRow(persisted);
 
     const upsert = buildUpsertSQL(persisted.resourceType, mainRow);
@@ -286,13 +290,16 @@ export class FhirRepository implements ResourceRepository {
   async readResource(
     resourceType: string,
     id: string,
+    context?: OperationContext,
   ): Promise<PersistedResource> {
-    // Check cache first
-    const cached = this.cache.get(resourceType, id);
-    if (cached) return cached;
+    // Check cache first (only when no project scoping, to avoid cross-tenant leaks)
+    if (!context?.project) {
+      const cached = this.cache.get(resourceType, id);
+      if (cached) return cached;
+    }
 
     const sql = buildSelectByIdSQL(resourceType);
-    const result = await this.db.query<{ content: string; deleted: boolean }>(
+    const result = await this.db.query<{ content: string; deleted: boolean; projectId: string }>(
       sql,
       [id],
     );
@@ -306,8 +313,17 @@ export class FhirRepository implements ResourceRepository {
       throw new ResourceGoneError(resourceType, id);
     }
 
+    // Project isolation: verify the resource belongs to the requested project
+    if (context?.project && !context.superAdmin) {
+      if (row.projectId && row.projectId !== context.project) {
+        throw new ResourceNotFoundError(resourceType, id);
+      }
+    }
+
     const resource = JSON.parse(row.content) as PersistedResource;
-    this.cache.set(resourceType, id, resource);
+    if (!context?.project) {
+      this.cache.set(resourceType, id, resource);
+    }
     return resource;
   }
 
@@ -318,11 +334,12 @@ export class FhirRepository implements ResourceRepository {
   async updateResource<T extends FhirResource>(
     resource: T,
     options?: UpdateResourceOptions,
+    context?: OperationContext,
   ): Promise<T & PersistedResource> {
     const persisted = this._prepareUpdate(resource);
 
     await this.db.withTransaction(async (client) => {
-      await this._executeUpdate(client, persisted, options);
+      await this._executeUpdate(client, persisted, options, context);
     });
 
     this.cache.invalidate(persisted.resourceType, persisted.id);
@@ -355,16 +372,17 @@ export class FhirRepository implements ResourceRepository {
     client: TransactionClient,
     persisted: PersistedResource,
     options?: UpdateResourceOptions,
+    context?: OperationContext,
   ): Promise<void> {
     const resourceType = persisted.resourceType;
     const id = persisted.id;
 
-    const mainRow = this.buildRow(persisted);
+    const mainRow = this.buildRow(persisted, context);
     const historyRow = buildHistoryRow(persisted);
 
     // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
     const lockResult = await client.query(
-      `SELECT "content", "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
+      `SELECT "content", "deleted", "projectId" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
       [id],
     );
 
@@ -375,9 +393,17 @@ export class FhirRepository implements ResourceRepository {
     const existingRow = lockResult.rows[0] as {
       content: string;
       deleted: boolean;
+      projectId?: string;
     };
     if (existingRow.deleted) {
       throw new ResourceGoneError(resourceType, id);
+    }
+
+    // Project isolation check (under row lock)
+    if (context?.project && !context.superAdmin) {
+      if (existingRow.projectId && existingRow.projectId !== context.project) {
+        throw new ResourceNotFoundError(resourceType, id);
+      }
     }
 
     // Optimistic locking check (under row lock — no race possible)
@@ -410,9 +436,9 @@ export class FhirRepository implements ResourceRepository {
   // Delete
   // ---------------------------------------------------------------------------
 
-  async deleteResource(resourceType: string, id: string): Promise<void> {
+  async deleteResource(resourceType: string, id: string, context?: OperationContext): Promise<void> {
     await this.db.withTransaction(async (client) => {
-      await this._executeDelete(client, resourceType, id);
+      await this._executeDelete(client, resourceType, id, context);
     });
 
     this.cache.invalidate(resourceType, id);
@@ -423,16 +449,17 @@ export class FhirRepository implements ResourceRepository {
     client: TransactionClient,
     resourceType: string,
     id: string,
+    context?: OperationContext,
   ): Promise<void> {
     const now = new Date().toISOString();
     const versionId = randomUUID();
 
-    const mainRow = buildDeleteRow(resourceType, id, now);
+    const mainRow = buildDeleteRow(resourceType, id, now, context);
     const historyRow = buildDeleteHistoryRow(id, versionId, now);
 
     // Read existing row inside transaction with FOR UPDATE to prevent TOCTOU races
     const lockResult = await client.query(
-      `SELECT "deleted" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
+      `SELECT "deleted", "projectId" FROM "${resourceType}" WHERE "id" = $1 FOR UPDATE`,
       [id],
     );
 
@@ -440,9 +467,16 @@ export class FhirRepository implements ResourceRepository {
       throw new ResourceNotFoundError(resourceType, id);
     }
 
-    const existingRow = lockResult.rows[0] as { deleted: boolean };
+    const existingRow = lockResult.rows[0] as { deleted: boolean; projectId?: string };
     if (existingRow.deleted) {
       throw new ResourceGoneError(resourceType, id);
+    }
+
+    // Project isolation check
+    if (context?.project && !context.superAdmin) {
+      if (existingRow.projectId && existingRow.projectId !== context.project) {
+        throw new ResourceNotFoundError(resourceType, id);
+      }
     }
 
     const upsert = buildUpsertSQL(resourceType, mainRow);
@@ -495,13 +529,20 @@ export class FhirRepository implements ResourceRepository {
   async searchResources(
     request: SearchRequest,
     options?: SearchOptions,
+    context?: OperationContext,
   ): Promise<SearchResult> {
     if (!this.registry) {
       throw new Error(
         "SearchParameterRegistry is required for search operations",
       );
     }
-    return executeSearch(this.db, request, this.registry, options);
+
+    // Inject project scoping into the search request
+    const scopedRequest = context?.project && !context.superAdmin
+      ? { ...request, project: context.project }
+      : request;
+
+    return executeSearch(this.db, scopedRequest, this.registry, options);
   }
 
   // ---------------------------------------------------------------------------

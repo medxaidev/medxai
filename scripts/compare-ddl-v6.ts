@@ -1,6 +1,6 @@
 /**
- * DDL Comparison Script v6
- * Compares medxai_all_5.sql vs medplum_all.sql
+ * DDL Comparison Script v7
+ * Compares medxai_all_6.sql vs medplum_all.sql
  * Extracts tables, columns, indexes, constraints and compares them systematically.
  */
 
@@ -110,20 +110,31 @@ function classifyTable(name: string): 'main' | 'history' | 'references' | 'looku
   if (name.endsWith('_History')) return 'history';
   if (name.endsWith('_References')) return 'references';
   if (['HumanName', 'Address', 'ContactPoint', 'Identifier'].includes(name)) return 'lookup';
-  // Medplum-only tables
+  // Medplum-only tables (not shared with MedXAI)
   if (['AsyncJob', 'BulkDataExport', 'DatabaseMigration', 'DomainConfiguration',
-    'JsonWebKey', 'Login', 'MedplumRevision', 'PasswordChangeRequest',
-    'ProjectMembership', 'UserConfiguration'].includes(name)) return 'other';
+    'MedplumRevision', 'PasswordChangeRequest',
+    'UserConfiguration'].includes(name)) return 'other';
   if (name.endsWith('_History') || name.endsWith('_References')) return 'other';
   return 'main';
 }
 
-// Known FHIR R4 resource types (standard)
+// Platform types shared between MedXAI and Medplum
+const SHARED_PLATFORM_TYPES = new Set([
+  'AccessPolicy', 'ClientApplication', 'JsonWebKey', 'Login',
+  'Project', 'ProjectMembership', 'User',
+]);
+
+// Platform types only in Medplum (not in MedXAI)
+const MEDPLUM_ONLY_PLATFORM_TYPES = new Set([
+  'AsyncJob', 'Bot', 'BulkDataExport',
+  'DatabaseMigration', 'DomainConfiguration',
+  'MedplumRevision', 'PasswordChangeRequest',
+  'SmartAppLaunch', 'UserConfiguration', 'Agent',
+]);
+
+// All Medplum extra types (for backward compat)
 const MEDPLUM_EXTRA_TYPES = new Set([
-  'AccessPolicy', 'AsyncJob', 'Bot', 'BulkDataExport', 'ClientApplication',
-  'DatabaseMigration', 'DomainConfiguration', 'JsonWebKey', 'Login',
-  'MedplumRevision', 'PasswordChangeRequest', 'Project', 'ProjectMembership',
-  'SmartAppLaunch', 'UserConfiguration', 'Agent', 'User',
+  ...SHARED_PLATFORM_TYPES, ...MEDPLUM_ONLY_PLATFORM_TYPES,
 ]);
 
 function compare(medxai: ReturnType<typeof parseSql>, medplum: ReturnType<typeof parseSql>) {
@@ -131,24 +142,41 @@ function compare(medxai: ReturnType<typeof parseSql>, medplum: ReturnType<typeof
   const log = (s: string) => output.push(s);
 
   // ─── 1. Table-level comparison ─────────────────────────────────────────────
-  log('# DDL Comparison Report v6');
+  log('# DDL Comparison Report v7');
   log(`# Generated: ${new Date().toISOString()}`);
-  log(`# MedXAI: medxai_all_5.sql | Medplum: medplum_all.sql`);
+  log(`# MedXAI: medxai_all_6.sql | Medplum: medplum_all.sql`);
   log('');
 
   const medxaiMainTables = new Set<string>();
   const medplumMainTables = new Set<string>();
+  const medxaiPlatformTables = new Set<string>();
+  const medplumPlatformTables_main = new Set<string>();
 
   for (const [name] of medxai.tables) {
-    if (classifyTable(name) === 'main') medxaiMainTables.add(name);
+    if (classifyTable(name) === 'main') {
+      if (SHARED_PLATFORM_TYPES.has(name)) {
+        medxaiPlatformTables.add(name);
+      }
+      medxaiMainTables.add(name);
+    }
   }
   for (const [name] of medplum.tables) {
-    if (classifyTable(name) === 'main' && !MEDPLUM_EXTRA_TYPES.has(name)) medplumMainTables.add(name);
+    if (classifyTable(name) === 'main') {
+      if (SHARED_PLATFORM_TYPES.has(name)) {
+        medplumPlatformTables_main.add(name);
+      }
+      if (!MEDPLUM_ONLY_PLATFORM_TYPES.has(name)) {
+        medplumMainTables.add(name);
+      }
+    }
   }
 
   log('## 1. Table Coverage');
-  log(`MedXAI main tables: ${medxaiMainTables.size}`);
-  log(`Medplum main tables (excl. platform): ${medplumMainTables.size}`);
+  log(`MedXAI main tables (incl. 7 platform): ${medxaiMainTables.size}`);
+  log(`Medplum main tables (excl. Medplum-only platform): ${medplumMainTables.size}`);
+  log(`MedXAI platform tables: ${medxaiPlatformTables.size} (${[...medxaiPlatformTables].sort().join(', ')})`);
+  log(`Shared platform types: ${[...SHARED_PLATFORM_TYPES].sort().join(', ')}`);
+  log(`Medplum-only platform types: ${[...MEDPLUM_ONLY_PLATFORM_TYPES].sort().join(', ')}`);
 
   const onlyMedxai = [...medxaiMainTables].filter(t => !medplumMainTables.has(t)).sort();
   const onlyMedplum = [...medplumMainTables].filter(t => !medxaiMainTables.has(t)).sort();
@@ -162,12 +190,52 @@ function compare(medxai: ReturnType<typeof parseSql>, medplum: ReturnType<typeof
   }
   log(`\nCommon main tables: ${commonMain.length}`);
 
-  // ─── 2. Medplum platform-only tables ───────────────────────────────────────
-  const medplumPlatformTables = [...medplum.tables.keys()]
-    .filter(t => MEDPLUM_EXTRA_TYPES.has(t) || MEDPLUM_EXTRA_TYPES.has(t.replace(/_History$|_References$/, '')))
+  // ─── 2. Platform tables comparison ─────────────────────────────────────────
+  const medplumOnlyPlatformTables = [...medplum.tables.keys()]
+    .filter(t => MEDPLUM_ONLY_PLATFORM_TYPES.has(t) || MEDPLUM_ONLY_PLATFORM_TYPES.has(t.replace(/_History$|_References$/, '')))
     .sort();
-  log(`\n## 2. Medplum Platform-Only Tables (${medplumPlatformTables.length})`);
-  log(medplumPlatformTables.join(', '));
+  log(`\n## 2. Medplum-Only Platform Tables (${medplumOnlyPlatformTables.length})`);
+  log(medplumOnlyPlatformTables.join(', '));
+
+  // ─── 2b. Shared platform tables comparison ────────────────────────────────
+  log(`\n## 2b. Shared Platform Resource Comparison`);
+  for (const rt of [...SHARED_PLATFORM_TYPES].sort()) {
+    const mxT = medxai.tables.get(rt);
+    const mpT = medplum.tables.get(rt);
+    log(`\n### ${rt}`);
+    if (!mxT && !mpT) { log('Not present in either'); continue; }
+    if (!mxT) { log('**Only in Medplum**'); continue; }
+    if (!mpT) { log('**Only in MedXAI**'); continue; }
+
+    const mxCols = [...mxT.columns.keys()].sort();
+    const mpCols = [...mpT.columns.keys()].sort();
+
+    const common = mxCols.filter(c => mpCols.includes(c));
+    const onlyMx = mxCols.filter(c => !mpCols.includes(c));
+    const onlyMp = mpCols.filter(c => !mxCols.includes(c));
+
+    log(`MedXAI columns (${mxCols.length}): ${mxCols.join(', ')}`);
+    log(`Medplum columns (${mpCols.length}): ${mpCols.join(', ')}`);
+    log(`Common: ${common.length} | Only MedXAI: ${onlyMx.length} | Only Medplum: ${onlyMp.length}`);
+    if (onlyMx.length) log(`Only in MedXAI: ${onlyMx.join(', ')}`);
+    if (onlyMp.length) log(`Only in Medplum: ${onlyMp.join(', ')}`);
+
+    // Type diffs on common columns
+    for (const col of common) {
+      const mxType = mxT.columns.get(col)!.type;
+      const mpType = mpT.columns.get(col)!.type;
+      if (mxType.toUpperCase() !== mpType.toUpperCase()) {
+        log(`  ⚠️ ${col}: MedXAI=${mxType} vs Medplum=${mpType}`);
+      }
+    }
+
+    // Check History + References
+    for (const suffix of ['_History', '_References']) {
+      const mxH = medxai.tables.has(`${rt}${suffix}`);
+      const mpH = medplum.tables.has(`${rt}${suffix}`);
+      log(`  ${rt}${suffix}: MedXAI=${mxH ? '✅' : '❌'} Medplum=${mpH ? '✅' : '❌'}`);
+    }
+  }
 
   // ─── 3. History & References table coverage ────────────────────────────────
   log('\n## 3. History & References Table Coverage');
@@ -570,7 +638,7 @@ function compare(medxai: ReturnType<typeof parseSql>, medplum: ReturnType<typeof
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 const pgdataDir = path.join(__dirname, '..', 'packages', 'fhir-persistence', 'src', '__tests__', 'pgdata');
-const medxaiSql = fs.readFileSync(path.join(pgdataDir, 'medxai_all_5.sql'), 'utf-8');
+const medxaiSql = fs.readFileSync(path.join(pgdataDir, 'medxai_all_6.sql'), 'utf-8');
 const medplumSql = fs.readFileSync(path.join(pgdataDir, 'medplum_all.sql'), 'utf-8');
 
 const medxai = parseSql(medxaiSql);
@@ -578,7 +646,7 @@ const medplum = parseSql(medplumSql);
 
 const result = compare(medxai, medplum);
 
-const outputPath = path.join(__dirname, '..', 'compare-result-v6.txt');
+const outputPath = path.join(__dirname, '..', 'compare-result-v7.txt');
 fs.writeFileSync(outputPath, result, 'utf-8');
 
 console.log(result);

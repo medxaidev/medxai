@@ -10,7 +10,7 @@
  * @module fhir-persistence/repo
  */
 
-import type { PersistedResource, ResourceRow, HistoryRow } from "./types.js";
+import type { PersistedResource, ResourceRow, HistoryRow, OperationContext } from "./types.js";
 import { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from "./types.js";
 import type { SearchParameterImpl } from "../registry/search-parameter-registry.js";
 import {
@@ -36,15 +36,13 @@ import {
  * @param resource - The persisted resource (must have `id` and `meta`).
  * @returns A `ResourceRow` ready for SQL insertion.
  */
-export function buildResourceRow(resource: PersistedResource): ResourceRow {
+export function buildResourceRow(resource: PersistedResource, context?: OperationContext): ResourceRow {
   const row: ResourceRow = {
     id: resource.id,
     content: JSON.stringify(resource),
     lastUpdated: resource.meta.lastUpdated,
     deleted: false,
-    projectId:
-      ((resource.meta as Record<string, unknown>)["project"] as string) ??
-      "00000000-0000-0000-0000-000000000000",
+    projectId: resolveProjectId(resource, context),
     __version: SCHEMA_VERSION,
     compartments:
       resource.resourceType === "Binary"
@@ -77,8 +75,9 @@ export function buildResourceRow(resource: PersistedResource): ResourceRow {
 export function buildResourceRowWithSearch(
   resource: PersistedResource,
   searchImpls: SearchParameterImpl[],
+  context?: OperationContext,
 ): ResourceRow {
-  const fixedRow = buildResourceRow(resource);
+  const fixedRow = buildResourceRow(resource, context);
   const searchCols = buildSearchColumns(resource, searchImpls);
   const metadataCols = buildMetadataColumns(resource);
   const sharedTokenCols = buildSharedTokenColumns(searchCols, metadataCols);
@@ -158,12 +157,23 @@ function isValidUuid(value: string): boolean {
 }
 
 /**
- * Extract a Patient ID from a FHIR Reference value, if it points to Patient.
+ * Resolve the projectId for a resource row.
  *
- * - `{ reference: "Patient/123" }` → `"123"`
- * - `{ reference: "Organization/456" }` → null (not Patient)
- * - `"Patient/abc"` → `"abc"`
+ * Priority:
+ * 1. context.project (from OperationContext — multi-tenant scoping)
+ * 2. resource.meta.project (legacy/direct injection)
+ * 3. Nil UUID fallback (no project context)
  */
+function resolveProjectId(resource: PersistedResource, context?: OperationContext): string {
+  if (context?.project) {
+    return context.project;
+  }
+  return (
+    ((resource.meta as Record<string, unknown>)["project"] as string) ??
+    "00000000-0000-0000-0000-000000000000"
+  );
+}
+
 function extractPatientReferenceId(value: unknown): string | null {
   let refString: string | null = null;
 
@@ -215,13 +225,14 @@ export function buildDeleteRow(
   resourceType: string,
   id: string,
   lastUpdated: string,
+  context?: OperationContext,
 ): ResourceRow {
   return {
     id,
     content: "",
     lastUpdated,
     deleted: true,
-    projectId: "00000000-0000-0000-0000-000000000000",
+    projectId: context?.project ?? "00000000-0000-0000-0000-000000000000",
     __version: DELETED_SCHEMA_VERSION,
     compartments: resourceType === "Binary" ? undefined : [],
   };

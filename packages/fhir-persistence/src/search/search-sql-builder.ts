@@ -64,6 +64,13 @@ export function buildSearchSQL(
   // Always filter out deleted resources
   whereConditions.push('"deleted" = false');
 
+  // Add project filter for multi-tenant scoping
+  if (request.project) {
+    whereConditions.push(`"projectId" = $${paramIndex}`);
+    allValues.push(request.project);
+    paramIndex++;
+  }
+
   // Add compartment filter if present
   if (request.compartment) {
     whereConditions.push(`"compartments" @> ARRAY[$${paramIndex}]::uuid[]`);
@@ -133,6 +140,13 @@ export function buildCountSQL(
 
   const whereConditions: string[] = [];
   whereConditions.push('"deleted" = false');
+
+  // Add project filter for multi-tenant scoping
+  if (request.project) {
+    whereConditions.push(`"projectId" = $${paramIndex}`);
+    allValues.push(request.project);
+    paramIndex++;
+  }
 
   // Add compartment filter if present
   if (request.compartment) {

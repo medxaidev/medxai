@@ -71,8 +71,15 @@ export type {
   HistoryBundle,
   HistoryBundleEntry,
   BuildHistoryBundleOptions,
+  OperationContext,
 } from './repo/index.js';
-export { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './repo/index.js';
+export {
+  SCHEMA_VERSION,
+  DELETED_SCHEMA_VERSION,
+  PLATFORM_RESOURCE_TYPES,
+  PROTECTED_RESOURCE_TYPES,
+  PROJECT_ADMIN_RESOURCE_TYPES,
+} from './repo/index.js';
 export {
   RepositoryError,
   ResourceNotFoundError,

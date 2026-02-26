@@ -97,7 +97,7 @@ export function buildInsertSQL(
  * @returns `{ sql }` — use with `values: [id]`.
  */
 export function buildSelectByIdSQL(tableName: string): string {
-  return `SELECT "content", "deleted" FROM "${tableName}" WHERE "id" = $1`;
+  return `SELECT "content", "deleted", "projectId" FROM "${tableName}" WHERE "id" = $1`;
 }
 
 /**

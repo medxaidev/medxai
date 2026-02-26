@@ -14,6 +14,74 @@
  */
 
 // =============================================================================
+// Section 0: Operation Context (ADR-006)
+// =============================================================================
+
+/**
+ * Operation context — flows through all CRUD/Search operations.
+ *
+ * S1 (Phase B): Only `project` is used — multi-tenant isolation.
+ * S5 (Phase C): Will extend to use `author`, `accessPolicy`, `superAdmin`.
+ */
+export interface OperationContext {
+  /** Current project ID for multi-tenant scoping. */
+  project?: string;
+
+  /** The actor performing the operation (User/Bot/ClientApplication reference). */
+  author?: string;
+
+  /** The AccessPolicy ID bound to this operation. */
+  accessPolicy?: string;
+
+  /** Whether this is a super-admin operation (bypasses project scoping). */
+  superAdmin?: boolean;
+}
+
+// =============================================================================
+// Section 0b: Platform Resource Type Guards (ADR-006)
+// =============================================================================
+
+/**
+ * Platform resource types that require special handling.
+ *
+ * These are MedXAI-defined resources (not part of FHIR R4 base spec).
+ * They participate in multi-tenant isolation via `projectId`.
+ */
+export const PLATFORM_RESOURCE_TYPES: ReadonlySet<string> = new Set([
+  'Project',
+  'User',
+  'ProjectMembership',
+  'Login',
+  'ClientApplication',
+  'AccessPolicy',
+  'JsonWebKey',
+]);
+
+/**
+ * Protected resource types that can only be managed by super-admins or
+ * the system itself. Normal project-scoped operations cannot create/update/delete these.
+ *
+ * Phase B: informational only — enforcement deferred to Phase C (Auth).
+ */
+export const PROTECTED_RESOURCE_TYPES: ReadonlySet<string> = new Set([
+  'Project',
+  'JsonWebKey',
+]);
+
+/**
+ * Resource types that can be managed by project admins (not just super-admins).
+ *
+ * Phase B: informational only — enforcement deferred to Phase C (Auth).
+ */
+export const PROJECT_ADMIN_RESOURCE_TYPES: ReadonlySet<string> = new Set([
+  'ProjectMembership',
+  'ClientApplication',
+  'AccessPolicy',
+  'User',
+  'Login',
+]);
+
+// =============================================================================
 // Section 1: FHIR Resource Shape
 // =============================================================================
 
@@ -167,21 +235,25 @@ export interface ResourceRepository {
    * - Generates `meta.versionId` (UUID)
    * - Sets `meta.lastUpdated` to current time
    * - Writes to main table + history table in a transaction
+   * - If `context.project` is set, injects projectId into the row
    *
    * @returns The persisted resource with populated `id` and `meta`.
    */
   createResource<T extends FhirResource>(
     resource: T,
     options?: CreateResourceOptions,
+    context?: OperationContext,
   ): Promise<T & PersistedResource>;
 
   /**
    * Read a resource by type and ID.
    *
+   * When `context.project` is set, verifies the resource belongs to that project.
+   *
    * @throws ResourceNotFoundError if the resource does not exist.
    * @throws ResourceGoneError if the resource has been deleted.
    */
-  readResource(resourceType: string, id: string): Promise<PersistedResource>;
+  readResource(resourceType: string, id: string, context?: OperationContext): Promise<PersistedResource>;
 
   /**
    * Update an existing resource.
@@ -191,6 +263,7 @@ export interface ResourceRepository {
    * - Sets `meta.lastUpdated` to current time
    * - Writes to main table (UPSERT) + history table in a transaction
    * - If `options.ifMatch` is set, performs optimistic locking check
+   * - If `context.project` is set, injects projectId into the row
    *
    * @throws ResourceNotFoundError if the resource does not exist.
    * @throws ResourceGoneError if the resource has been deleted.
@@ -199,6 +272,7 @@ export interface ResourceRepository {
   updateResource<T extends FhirResource>(
     resource: T,
     options?: UpdateResourceOptions,
+    context?: OperationContext,
   ): Promise<T & PersistedResource>;
 
   /**
@@ -210,7 +284,7 @@ export interface ResourceRepository {
    * @throws ResourceNotFoundError if the resource does not exist.
    * @throws ResourceGoneError if already deleted.
    */
-  deleteResource(resourceType: string, id: string): Promise<void>;
+  deleteResource(resourceType: string, id: string, context?: OperationContext): Promise<void>;
 
   /**
    * Read the version history of a resource (newest first).
@@ -245,14 +319,17 @@ export interface ResourceRepository {
    *
    * - Executes parameterized SQL built from the search request
    * - Optionally returns total count when `options.total === 'accurate'`
+   * - If `context.project` is set, adds projectId filter to the query
    *
    * @param request - Parsed FHIR search request.
    * @param options - Search options (e.g., total mode).
+   * @param context - Operation context for project scoping.
    * @returns Search result with matched resources and optional total.
    */
   searchResources(
     request: import('../search/types.js').SearchRequest,
     options?: SearchOptions,
+    context?: OperationContext,
   ): Promise<SearchResult>;
 }
 

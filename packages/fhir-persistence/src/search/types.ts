@@ -227,6 +227,14 @@ export interface SearchRequest {
     resourceType: string;
     id: string;
   };
+
+  /**
+   * Project ID for multi-tenant scoping.
+   * When set, search results are restricted to resources with matching `projectId`.
+   *
+   * Injected by the server layer from OperationContext.project.
+   */
+  project?: string;
 }
 
 /**

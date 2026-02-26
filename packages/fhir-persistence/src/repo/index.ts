@@ -18,8 +18,15 @@ export type {
   SearchResult,
   ResourceRow,
   HistoryRow,
+  OperationContext,
 } from './types.js';
-export { SCHEMA_VERSION, DELETED_SCHEMA_VERSION } from './types.js';
+export {
+  SCHEMA_VERSION,
+  DELETED_SCHEMA_VERSION,
+  PLATFORM_RESOURCE_TYPES,
+  PROTECTED_RESOURCE_TYPES,
+  PROJECT_ADMIN_RESOURCE_TYPES,
+} from './types.js';
 
 // Errors
 export {
