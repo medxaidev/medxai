@@ -24,6 +24,7 @@ import {
 } from "@medxai/fhir-persistence";
 import { FHIR_JSON } from "../fhir/response.js";
 import { errorToOutcome } from "../fhir/outcomes.js";
+import { getOperationContext } from "../auth/middleware.js";
 
 // =============================================================================
 // Section 1: Route Parameter Types
@@ -157,10 +158,13 @@ async function handleSearch(
     registry,
   );
 
+  // Extract auth context for project scoping
+  const context = getOperationContext(request);
+
   // Execute search
   const result = await repo.searchResources(searchRequest, {
     total: searchRequest.total,
-  });
+  }, context);
 
   // Build pagination context
   const baseUrl = serverBaseUrl || getBaseUrl(request);
@@ -226,10 +230,13 @@ async function handleCompartmentSearch(
     id: compartmentId,
   };
 
+  // Extract auth context for project scoping
+  const context = getOperationContext(request);
+
   // Execute search
   const result = await repo.searchResources(searchRequest, {
     total: searchRequest.total,
-  });
+  }, context);
 
   // Build pagination context
   const baseUrl = serverBaseUrl || getBaseUrl(request);

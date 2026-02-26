@@ -195,6 +195,18 @@
     {
       "resource": {
         "resourceType": "SearchParameter",
+        "id": "Login-code",
+        "url": "https://medxai.com/fhir/SearchParameter/Login-code",
+        "name": "code",
+        "code": "code",
+        "type": "string",
+        "base": ["Login"],
+        "expression": "Login.code"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
         "id": "ClientApplication-name",
         "url": "https://medxai.com/fhir/SearchParameter/ClientApplication-name",
         "name": "name",

@@ -18,6 +18,7 @@ import { buildHistoryBundle } from "@medxai/fhir-persistence";
 import { FHIR_JSON, buildETag, buildLastModified, buildLocationHeader, parseETag } from "../fhir/response.js";
 import { allOk, badRequest, errorToOutcome } from "../fhir/outcomes.js";
 import type { ResourceValidator } from "../app.js";
+import { getOperationContext } from "../auth/middleware.js";
 
 // =============================================================================
 // Section 1: Route Parameter Types
@@ -92,7 +93,8 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       }
 
       try {
-        const created = await repo.createResource(resource);
+        const context = getOperationContext(request);
+        const created = await repo.createResource(resource, undefined, context);
         const baseUrl = getBaseUrl(request);
 
         reply
@@ -119,7 +121,8 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       const { resourceType, id } = request.params;
 
       try {
-        const resource = await repo.readResource(resourceType, id);
+        const context = getOperationContext(request);
+        const resource = await repo.readResource(resourceType, id, context);
         reply
           .header("content-type", FHIR_JSON)
           .header("etag", buildETag(resource.meta.versionId))
@@ -185,7 +188,8 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       const ifMatch = ifMatchHeader ? parseETag(ifMatchHeader as string) : undefined;
 
       try {
-        const updated = await repo.updateResource(resource, { ifMatch });
+        const context = getOperationContext(request);
+        const updated = await repo.updateResource(resource, { ifMatch }, context);
         reply
           .header("content-type", FHIR_JSON)
           .header("etag", buildETag(updated.meta.versionId))
@@ -205,7 +209,8 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       const { resourceType, id } = request.params;
 
       try {
-        await repo.deleteResource(resourceType, id);
+        const context = getOperationContext(request);
+        await repo.deleteResource(resourceType, id, context);
         reply.header("content-type", FHIR_JSON);
         return allOk(`Deleted ${resourceType}/${id}`);
       } catch (err) {
@@ -234,6 +239,7 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       }
 
       try {
+        // Note: readHistory does not yet accept OperationContext — future enhancement
         const entries = await repo.readHistory(resourceType, id, options);
         const baseUrl = getBaseUrl(request);
         const bundle = buildHistoryBundle(entries, {
@@ -256,6 +262,7 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
       const { resourceType, id, vid } = request.params;
 
       try {
+        // Note: readVersion does not yet accept OperationContext — future enhancement
         const resource = await repo.readVersion(resourceType, id, vid);
         reply
           .header("content-type", FHIR_JSON)
