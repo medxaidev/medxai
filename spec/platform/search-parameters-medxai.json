@@ -1,0 +1,256 @@
+{
+  "resourceType": "Bundle",
+  "id": "medxai-platform-search-parameters",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "Project-name",
+        "url": "https://medxai.com/fhir/SearchParameter/Project-name",
+        "name": "name",
+        "code": "name",
+        "type": "string",
+        "base": ["Project"],
+        "expression": "Project.name"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "Project-owner",
+        "url": "https://medxai.com/fhir/SearchParameter/Project-owner",
+        "name": "owner",
+        "code": "owner",
+        "type": "reference",
+        "base": ["Project"],
+        "expression": "Project.owner",
+        "target": ["User"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "User-email",
+        "url": "https://medxai.com/fhir/SearchParameter/User-email",
+        "name": "email",
+        "code": "email",
+        "type": "string",
+        "base": ["User"],
+        "expression": "User.email"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "User-firstName",
+        "url": "https://medxai.com/fhir/SearchParameter/User-firstName",
+        "name": "firstName",
+        "code": "first-name",
+        "type": "string",
+        "base": ["User"],
+        "expression": "User.firstName"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "User-lastName",
+        "url": "https://medxai.com/fhir/SearchParameter/User-lastName",
+        "name": "lastName",
+        "code": "last-name",
+        "type": "string",
+        "base": ["User"],
+        "expression": "User.lastName"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "User-project",
+        "url": "https://medxai.com/fhir/SearchParameter/User-project",
+        "name": "project",
+        "code": "project",
+        "type": "reference",
+        "base": ["User"],
+        "expression": "User.project",
+        "target": ["Project"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ProjectMembership-project",
+        "url": "https://medxai.com/fhir/SearchParameter/ProjectMembership-project",
+        "name": "project",
+        "code": "project",
+        "type": "reference",
+        "base": ["ProjectMembership"],
+        "expression": "ProjectMembership.project",
+        "target": ["Project"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ProjectMembership-user",
+        "url": "https://medxai.com/fhir/SearchParameter/ProjectMembership-user",
+        "name": "user",
+        "code": "user",
+        "type": "reference",
+        "base": ["ProjectMembership"],
+        "expression": "ProjectMembership.user",
+        "target": ["User", "ClientApplication"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ProjectMembership-profile",
+        "url": "https://medxai.com/fhir/SearchParameter/ProjectMembership-profile",
+        "name": "profile-reference",
+        "code": "profile-reference",
+        "type": "reference",
+        "base": ["ProjectMembership"],
+        "expression": "ProjectMembership.profile",
+        "target": ["Practitioner", "Patient", "RelatedPerson"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ProjectMembership-accessPolicy",
+        "url": "https://medxai.com/fhir/SearchParameter/ProjectMembership-accessPolicy",
+        "name": "access-policy",
+        "code": "access-policy",
+        "type": "reference",
+        "base": ["ProjectMembership"],
+        "expression": "ProjectMembership.accessPolicy",
+        "target": ["AccessPolicy"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ProjectMembership-userName",
+        "url": "https://medxai.com/fhir/SearchParameter/ProjectMembership-userName",
+        "name": "user-name",
+        "code": "user-name",
+        "type": "string",
+        "base": ["ProjectMembership"],
+        "expression": "ProjectMembership.userName"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "Login-user",
+        "url": "https://medxai.com/fhir/SearchParameter/Login-user",
+        "name": "user",
+        "code": "user",
+        "type": "reference",
+        "base": ["Login"],
+        "expression": "Login.user",
+        "target": ["User"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "Login-client",
+        "url": "https://medxai.com/fhir/SearchParameter/Login-client",
+        "name": "client",
+        "code": "client",
+        "type": "reference",
+        "base": ["Login"],
+        "expression": "Login.client",
+        "target": ["ClientApplication"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "Login-project",
+        "url": "https://medxai.com/fhir/SearchParameter/Login-project",
+        "name": "project",
+        "code": "project",
+        "type": "reference",
+        "base": ["Login"],
+        "expression": "Login.project",
+        "target": ["Project"]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "Login-authMethod",
+        "url": "https://medxai.com/fhir/SearchParameter/Login-authMethod",
+        "name": "auth-method",
+        "code": "auth-method",
+        "type": "token",
+        "base": ["Login"],
+        "expression": "Login.authMethod"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ClientApplication-name",
+        "url": "https://medxai.com/fhir/SearchParameter/ClientApplication-name",
+        "name": "name",
+        "code": "name",
+        "type": "string",
+        "base": ["ClientApplication"],
+        "expression": "ClientApplication.name"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ClientApplication-status",
+        "url": "https://medxai.com/fhir/SearchParameter/ClientApplication-status",
+        "name": "status",
+        "code": "status",
+        "type": "token",
+        "base": ["ClientApplication"],
+        "expression": "ClientApplication.status"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "ClientApplication-redirectUri",
+        "url": "https://medxai.com/fhir/SearchParameter/ClientApplication-redirectUri",
+        "name": "redirect-uri",
+        "code": "redirect-uri",
+        "type": "uri",
+        "base": ["ClientApplication"],
+        "expression": "ClientApplication.redirectUri"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "AccessPolicy-name",
+        "url": "https://medxai.com/fhir/SearchParameter/AccessPolicy-name",
+        "name": "name",
+        "code": "name",
+        "type": "string",
+        "base": ["AccessPolicy"],
+        "expression": "AccessPolicy.name"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "SearchParameter",
+        "id": "JsonWebKey-active",
+        "url": "https://medxai.com/fhir/SearchParameter/JsonWebKey-active",
+        "name": "active",
+        "code": "active",
+        "type": "token",
+        "base": ["JsonWebKey"],
+        "expression": "JsonWebKey.active"
+      }
+    }
+  ]
+}

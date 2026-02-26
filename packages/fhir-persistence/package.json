@@ -15,9 +15,7 @@
     "url": "https://github.com/medxaidev/medxai.git",
     "directory": "packages/fhir-persistence"
   },
-  "sideEffects": [
-    "*.css"
-  ],
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/cjs/index.cjs",
   "module": "./dist/esm/index.mjs",

@@ -1,0 +1,1260 @@
+{
+  "resourceType": "Bundle",
+  "id": "medxai-platform-resources",
+  "type": "collection",
+  "entry": [
+    {
+      "fullUrl": "https://medxai.com/fhir/StructureDefinition/Project",
+      "resource": {
+        "resourceType": "StructureDefinition",
+        "id": "medxai-project",
+        "url": "https://medxai.com/fhir/StructureDefinition/Project",
+        "version": "1.0.0",
+        "name": "Project",
+        "title": "MedXAI Project",
+        "status": "active",
+        "publisher": "MedXAI",
+        "description": "Multi-tenant container. All clinical and administrative resources belong to a Project.",
+        "fhirVersion": "4.0.1",
+        "kind": "resource",
+        "abstract": false,
+        "type": "Project",
+        "baseDefinition": "http://hl7.org/fhir/StructureDefinition/DomainResource",
+        "derivation": "specialization",
+        "snapshot": {
+          "element": [
+            {
+              "id": "Project",
+              "path": "Project",
+              "min": 0,
+              "max": "*",
+              "base": { "path": "Project", "min": 0, "max": "*" }
+            },
+            {
+              "id": "Project.id",
+              "path": "Project.id",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "id" }],
+              "base": { "path": "Resource.id", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "Project.meta",
+              "path": "Project.meta",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Meta" }],
+              "base": { "path": "Resource.meta", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "Project.implicitRules",
+              "path": "Project.implicitRules",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }],
+              "base": { "path": "Resource.implicitRules", "min": 0, "max": "1" },
+              "isModifier": true,
+              "isSummary": true
+            },
+            {
+              "id": "Project.language",
+              "path": "Project.language",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "base": { "path": "Resource.language", "min": 0, "max": "1" }
+            },
+            {
+              "id": "Project.text",
+              "path": "Project.text",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Narrative" }],
+              "base": { "path": "DomainResource.text", "min": 0, "max": "1" }
+            },
+            {
+              "id": "Project.contained",
+              "path": "Project.contained",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Resource" }],
+              "base": { "path": "DomainResource.contained", "min": 0, "max": "*" }
+            },
+            {
+              "id": "Project.extension",
+              "path": "Project.extension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.extension", "min": 0, "max": "*" }
+            },
+            {
+              "id": "Project.modifierExtension",
+              "path": "Project.modifierExtension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.modifierExtension", "min": 0, "max": "*" },
+              "isModifier": true
+            },
+            {
+              "id": "Project.name",
+              "path": "Project.name",
+              "short": "Human-readable project name",
+              "min": 1,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "Project.description",
+              "path": "Project.description",
+              "short": "Project description",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "Project.superAdmin",
+              "path": "Project.superAdmin",
+              "short": "Whether this is the super-admin project",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            },
+            {
+              "id": "Project.strictMode",
+              "path": "Project.strictMode",
+              "short": "Enable strict FHIR validation",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            },
+            {
+              "id": "Project.checkReferencesOnWrite",
+              "path": "Project.checkReferencesOnWrite",
+              "short": "Validate reference targets exist on create/update",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            },
+            {
+              "id": "Project.owner",
+              "path": "Project.owner",
+              "short": "Project owner",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/User"]
+              }],
+              "isSummary": true
+            },
+            {
+              "id": "Project.features",
+              "path": "Project.features",
+              "short": "Enabled platform features",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "code" }]
+            },
+            {
+              "id": "Project.identifier",
+              "path": "Project.identifier",
+              "short": "External identifiers for this project",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Identifier" }],
+              "isSummary": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "https://medxai.com/fhir/StructureDefinition/User",
+      "resource": {
+        "resourceType": "StructureDefinition",
+        "id": "medxai-user",
+        "url": "https://medxai.com/fhir/StructureDefinition/User",
+        "version": "1.0.0",
+        "name": "User",
+        "title": "MedXAI User",
+        "status": "active",
+        "publisher": "MedXAI",
+        "description": "Human user account. Exists at server scope (cross-project) or project scope.",
+        "fhirVersion": "4.0.1",
+        "kind": "resource",
+        "abstract": false,
+        "type": "User",
+        "baseDefinition": "http://hl7.org/fhir/StructureDefinition/DomainResource",
+        "derivation": "specialization",
+        "snapshot": {
+          "element": [
+            {
+              "id": "User",
+              "path": "User",
+              "min": 0,
+              "max": "*",
+              "base": { "path": "User", "min": 0, "max": "*" }
+            },
+            {
+              "id": "User.id",
+              "path": "User.id",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "id" }],
+              "base": { "path": "Resource.id", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "User.meta",
+              "path": "User.meta",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Meta" }],
+              "base": { "path": "Resource.meta", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "User.implicitRules",
+              "path": "User.implicitRules",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }],
+              "base": { "path": "Resource.implicitRules", "min": 0, "max": "1" },
+              "isModifier": true,
+              "isSummary": true
+            },
+            {
+              "id": "User.language",
+              "path": "User.language",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "base": { "path": "Resource.language", "min": 0, "max": "1" }
+            },
+            {
+              "id": "User.text",
+              "path": "User.text",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Narrative" }],
+              "base": { "path": "DomainResource.text", "min": 0, "max": "1" }
+            },
+            {
+              "id": "User.contained",
+              "path": "User.contained",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Resource" }],
+              "base": { "path": "DomainResource.contained", "min": 0, "max": "*" }
+            },
+            {
+              "id": "User.extension",
+              "path": "User.extension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.extension", "min": 0, "max": "*" }
+            },
+            {
+              "id": "User.modifierExtension",
+              "path": "User.modifierExtension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.modifierExtension", "min": 0, "max": "*" },
+              "isModifier": true
+            },
+            {
+              "id": "User.firstName",
+              "path": "User.firstName",
+              "short": "User first (given) name",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "User.lastName",
+              "path": "User.lastName",
+              "short": "User last (family) name",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "User.email",
+              "path": "User.email",
+              "short": "Email address (login identifier)",
+              "min": 1,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "User.emailVerified",
+              "path": "User.emailVerified",
+              "short": "Whether email has been verified",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            },
+            {
+              "id": "User.passwordHash",
+              "path": "User.passwordHash",
+              "short": "Bcrypt password hash",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "User.project",
+              "path": "User.project",
+              "short": "Owning project (if project-scoped user)",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/Project"]
+              }]
+            },
+            {
+              "id": "User.identifier",
+              "path": "User.identifier",
+              "short": "External identifiers",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Identifier" }],
+              "isSummary": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "https://medxai.com/fhir/StructureDefinition/ProjectMembership",
+      "resource": {
+        "resourceType": "StructureDefinition",
+        "id": "medxai-project-membership",
+        "url": "https://medxai.com/fhir/StructureDefinition/ProjectMembership",
+        "version": "1.0.0",
+        "name": "ProjectMembership",
+        "title": "MedXAI Project Membership",
+        "status": "active",
+        "publisher": "MedXAI",
+        "description": "Links a User or ClientApplication to a Project with a role profile and optional AccessPolicy.",
+        "fhirVersion": "4.0.1",
+        "kind": "resource",
+        "abstract": false,
+        "type": "ProjectMembership",
+        "baseDefinition": "http://hl7.org/fhir/StructureDefinition/DomainResource",
+        "derivation": "specialization",
+        "snapshot": {
+          "element": [
+            {
+              "id": "ProjectMembership",
+              "path": "ProjectMembership",
+              "min": 0,
+              "max": "*",
+              "base": { "path": "ProjectMembership", "min": 0, "max": "*" }
+            },
+            {
+              "id": "ProjectMembership.id",
+              "path": "ProjectMembership.id",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "id" }],
+              "base": { "path": "Resource.id", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "ProjectMembership.meta",
+              "path": "ProjectMembership.meta",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Meta" }],
+              "base": { "path": "Resource.meta", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "ProjectMembership.implicitRules",
+              "path": "ProjectMembership.implicitRules",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }],
+              "base": { "path": "Resource.implicitRules", "min": 0, "max": "1" },
+              "isModifier": true,
+              "isSummary": true
+            },
+            {
+              "id": "ProjectMembership.language",
+              "path": "ProjectMembership.language",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "base": { "path": "Resource.language", "min": 0, "max": "1" }
+            },
+            {
+              "id": "ProjectMembership.text",
+              "path": "ProjectMembership.text",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Narrative" }],
+              "base": { "path": "DomainResource.text", "min": 0, "max": "1" }
+            },
+            {
+              "id": "ProjectMembership.contained",
+              "path": "ProjectMembership.contained",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Resource" }],
+              "base": { "path": "DomainResource.contained", "min": 0, "max": "*" }
+            },
+            {
+              "id": "ProjectMembership.extension",
+              "path": "ProjectMembership.extension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.extension", "min": 0, "max": "*" }
+            },
+            {
+              "id": "ProjectMembership.modifierExtension",
+              "path": "ProjectMembership.modifierExtension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.modifierExtension", "min": 0, "max": "*" },
+              "isModifier": true
+            },
+            {
+              "id": "ProjectMembership.project",
+              "path": "ProjectMembership.project",
+              "short": "The project this membership belongs to",
+              "min": 1,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/Project"]
+              }],
+              "isSummary": true
+            },
+            {
+              "id": "ProjectMembership.user",
+              "path": "ProjectMembership.user",
+              "short": "The user or client application",
+              "min": 1,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": [
+                  "https://medxai.com/fhir/StructureDefinition/User",
+                  "https://medxai.com/fhir/StructureDefinition/ClientApplication"
+                ]
+              }],
+              "isSummary": true
+            },
+            {
+              "id": "ProjectMembership.profile",
+              "path": "ProjectMembership.profile",
+              "short": "FHIR profile resource (Practitioner, Patient, etc.)",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": [
+                  "http://hl7.org/fhir/StructureDefinition/Practitioner",
+                  "http://hl7.org/fhir/StructureDefinition/Patient",
+                  "http://hl7.org/fhir/StructureDefinition/RelatedPerson"
+                ]
+              }]
+            },
+            {
+              "id": "ProjectMembership.accessPolicy",
+              "path": "ProjectMembership.accessPolicy",
+              "short": "Access control policy for this membership",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/AccessPolicy"]
+              }]
+            },
+            {
+              "id": "ProjectMembership.admin",
+              "path": "ProjectMembership.admin",
+              "short": "Whether this member is a project administrator",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            },
+            {
+              "id": "ProjectMembership.active",
+              "path": "ProjectMembership.active",
+              "short": "Whether this membership is active",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }],
+              "isModifier": true
+            },
+            {
+              "id": "ProjectMembership.userName",
+              "path": "ProjectMembership.userName",
+              "short": "Display name within the project",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "ProjectMembership.identifier",
+              "path": "ProjectMembership.identifier",
+              "short": "External identifiers",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Identifier" }]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "https://medxai.com/fhir/StructureDefinition/Login",
+      "resource": {
+        "resourceType": "StructureDefinition",
+        "id": "medxai-login",
+        "url": "https://medxai.com/fhir/StructureDefinition/Login",
+        "version": "1.0.0",
+        "name": "Login",
+        "title": "MedXAI Login",
+        "status": "active",
+        "publisher": "MedXAI",
+        "description": "OAuth2 login session. Tracks authentication state, token lifecycle, and grants.",
+        "fhirVersion": "4.0.1",
+        "kind": "resource",
+        "abstract": false,
+        "type": "Login",
+        "baseDefinition": "http://hl7.org/fhir/StructureDefinition/DomainResource",
+        "derivation": "specialization",
+        "snapshot": {
+          "element": [
+            {
+              "id": "Login",
+              "path": "Login",
+              "min": 0,
+              "max": "*",
+              "base": { "path": "Login", "min": 0, "max": "*" }
+            },
+            {
+              "id": "Login.id",
+              "path": "Login.id",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "id" }],
+              "base": { "path": "Resource.id", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "Login.meta",
+              "path": "Login.meta",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Meta" }],
+              "base": { "path": "Resource.meta", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "Login.implicitRules",
+              "path": "Login.implicitRules",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }],
+              "base": { "path": "Resource.implicitRules", "min": 0, "max": "1" },
+              "isModifier": true,
+              "isSummary": true
+            },
+            {
+              "id": "Login.language",
+              "path": "Login.language",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "base": { "path": "Resource.language", "min": 0, "max": "1" }
+            },
+            {
+              "id": "Login.text",
+              "path": "Login.text",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Narrative" }],
+              "base": { "path": "DomainResource.text", "min": 0, "max": "1" }
+            },
+            {
+              "id": "Login.contained",
+              "path": "Login.contained",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Resource" }],
+              "base": { "path": "DomainResource.contained", "min": 0, "max": "*" }
+            },
+            {
+              "id": "Login.extension",
+              "path": "Login.extension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.extension", "min": 0, "max": "*" }
+            },
+            {
+              "id": "Login.modifierExtension",
+              "path": "Login.modifierExtension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.modifierExtension", "min": 0, "max": "*" },
+              "isModifier": true
+            },
+            {
+              "id": "Login.client",
+              "path": "Login.client",
+              "short": "OAuth2 client that initiated this login",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/ClientApplication"]
+              }]
+            },
+            {
+              "id": "Login.user",
+              "path": "Login.user",
+              "short": "Authenticated user",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/User"]
+              }]
+            },
+            {
+              "id": "Login.membership",
+              "path": "Login.membership",
+              "short": "Active project membership for this session",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/ProjectMembership"]
+              }]
+            },
+            {
+              "id": "Login.project",
+              "path": "Login.project",
+              "short": "Active project for this session",
+              "min": 0,
+              "max": "1",
+              "type": [{
+                "code": "Reference",
+                "targetProfile": ["https://medxai.com/fhir/StructureDefinition/Project"]
+              }]
+            },
+            {
+              "id": "Login.authMethod",
+              "path": "Login.authMethod",
+              "short": "Authentication method (password, client-credentials, exchange)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }]
+            },
+            {
+              "id": "Login.authTime",
+              "path": "Login.authTime",
+              "short": "Time of authentication",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "instant" }]
+            },
+            {
+              "id": "Login.code",
+              "path": "Login.code",
+              "short": "Authorization code (for auth-code flow)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "Login.refreshSecret",
+              "path": "Login.refreshSecret",
+              "short": "Refresh token secret",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "Login.scope",
+              "path": "Login.scope",
+              "short": "OAuth2 scope string",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "Login.granted",
+              "path": "Login.granted",
+              "short": "Whether the login has been granted (token issued)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            },
+            {
+              "id": "Login.revoked",
+              "path": "Login.revoked",
+              "short": "Whether the login has been revoked",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }],
+              "isModifier": true
+            },
+            {
+              "id": "Login.superAdmin",
+              "path": "Login.superAdmin",
+              "short": "Whether this is a super-admin login",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            },
+            {
+              "id": "Login.remoteAddress",
+              "path": "Login.remoteAddress",
+              "short": "Client IP address",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "Login.userAgent",
+              "path": "Login.userAgent",
+              "short": "Client User-Agent header",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "https://medxai.com/fhir/StructureDefinition/ClientApplication",
+      "resource": {
+        "resourceType": "StructureDefinition",
+        "id": "medxai-client-application",
+        "url": "https://medxai.com/fhir/StructureDefinition/ClientApplication",
+        "version": "1.0.0",
+        "name": "ClientApplication",
+        "title": "MedXAI Client Application",
+        "status": "active",
+        "publisher": "MedXAI",
+        "description": "OAuth2 client application registration. Used for server-to-server authentication.",
+        "fhirVersion": "4.0.1",
+        "kind": "resource",
+        "abstract": false,
+        "type": "ClientApplication",
+        "baseDefinition": "http://hl7.org/fhir/StructureDefinition/DomainResource",
+        "derivation": "specialization",
+        "snapshot": {
+          "element": [
+            {
+              "id": "ClientApplication",
+              "path": "ClientApplication",
+              "min": 0,
+              "max": "*",
+              "base": { "path": "ClientApplication", "min": 0, "max": "*" }
+            },
+            {
+              "id": "ClientApplication.id",
+              "path": "ClientApplication.id",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "id" }],
+              "base": { "path": "Resource.id", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "ClientApplication.meta",
+              "path": "ClientApplication.meta",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Meta" }],
+              "base": { "path": "Resource.meta", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "ClientApplication.implicitRules",
+              "path": "ClientApplication.implicitRules",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }],
+              "base": { "path": "Resource.implicitRules", "min": 0, "max": "1" },
+              "isModifier": true,
+              "isSummary": true
+            },
+            {
+              "id": "ClientApplication.language",
+              "path": "ClientApplication.language",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "base": { "path": "Resource.language", "min": 0, "max": "1" }
+            },
+            {
+              "id": "ClientApplication.text",
+              "path": "ClientApplication.text",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Narrative" }],
+              "base": { "path": "DomainResource.text", "min": 0, "max": "1" }
+            },
+            {
+              "id": "ClientApplication.contained",
+              "path": "ClientApplication.contained",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Resource" }],
+              "base": { "path": "DomainResource.contained", "min": 0, "max": "*" }
+            },
+            {
+              "id": "ClientApplication.extension",
+              "path": "ClientApplication.extension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.extension", "min": 0, "max": "*" }
+            },
+            {
+              "id": "ClientApplication.modifierExtension",
+              "path": "ClientApplication.modifierExtension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.modifierExtension", "min": 0, "max": "*" },
+              "isModifier": true
+            },
+            {
+              "id": "ClientApplication.name",
+              "path": "ClientApplication.name",
+              "short": "Human-readable client name",
+              "min": 1,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "ClientApplication.description",
+              "path": "ClientApplication.description",
+              "short": "Client description",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "ClientApplication.status",
+              "path": "ClientApplication.status",
+              "short": "active | off | error",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "isSummary": true
+            },
+            {
+              "id": "ClientApplication.secret",
+              "path": "ClientApplication.secret",
+              "short": "Client secret (hashed)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "ClientApplication.redirectUri",
+              "path": "ClientApplication.redirectUri",
+              "short": "Allowed redirect URI for OAuth2",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }]
+            },
+            {
+              "id": "ClientApplication.identifier",
+              "path": "ClientApplication.identifier",
+              "short": "External identifiers",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Identifier" }],
+              "isSummary": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "https://medxai.com/fhir/StructureDefinition/AccessPolicy",
+      "resource": {
+        "resourceType": "StructureDefinition",
+        "id": "medxai-access-policy",
+        "url": "https://medxai.com/fhir/StructureDefinition/AccessPolicy",
+        "version": "1.0.0",
+        "name": "AccessPolicy",
+        "title": "MedXAI Access Policy",
+        "status": "active",
+        "publisher": "MedXAI",
+        "description": "Fine-grained access control policy. Defines per-resource-type read/write permissions with optional criteria filters.",
+        "fhirVersion": "4.0.1",
+        "kind": "resource",
+        "abstract": false,
+        "type": "AccessPolicy",
+        "baseDefinition": "http://hl7.org/fhir/StructureDefinition/DomainResource",
+        "derivation": "specialization",
+        "snapshot": {
+          "element": [
+            {
+              "id": "AccessPolicy",
+              "path": "AccessPolicy",
+              "min": 0,
+              "max": "*",
+              "base": { "path": "AccessPolicy", "min": 0, "max": "*" }
+            },
+            {
+              "id": "AccessPolicy.id",
+              "path": "AccessPolicy.id",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "id" }],
+              "base": { "path": "Resource.id", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "AccessPolicy.meta",
+              "path": "AccessPolicy.meta",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Meta" }],
+              "base": { "path": "Resource.meta", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "AccessPolicy.implicitRules",
+              "path": "AccessPolicy.implicitRules",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }],
+              "base": { "path": "Resource.implicitRules", "min": 0, "max": "1" },
+              "isModifier": true,
+              "isSummary": true
+            },
+            {
+              "id": "AccessPolicy.language",
+              "path": "AccessPolicy.language",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "base": { "path": "Resource.language", "min": 0, "max": "1" }
+            },
+            {
+              "id": "AccessPolicy.text",
+              "path": "AccessPolicy.text",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Narrative" }],
+              "base": { "path": "DomainResource.text", "min": 0, "max": "1" }
+            },
+            {
+              "id": "AccessPolicy.contained",
+              "path": "AccessPolicy.contained",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Resource" }],
+              "base": { "path": "DomainResource.contained", "min": 0, "max": "*" }
+            },
+            {
+              "id": "AccessPolicy.extension",
+              "path": "AccessPolicy.extension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.extension", "min": 0, "max": "*" }
+            },
+            {
+              "id": "AccessPolicy.modifierExtension",
+              "path": "AccessPolicy.modifierExtension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.modifierExtension", "min": 0, "max": "*" },
+              "isModifier": true
+            },
+            {
+              "id": "AccessPolicy.name",
+              "path": "AccessPolicy.name",
+              "short": "Human-readable policy name",
+              "min": 1,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "AccessPolicy.resource",
+              "path": "AccessPolicy.resource",
+              "short": "Per-resource-type access rules",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "BackboneElement" }]
+            },
+            {
+              "id": "AccessPolicy.resource.resourceType",
+              "path": "AccessPolicy.resource.resourceType",
+              "short": "FHIR resource type this rule applies to",
+              "min": 1,
+              "max": "1",
+              "type": [{ "code": "code" }]
+            },
+            {
+              "id": "AccessPolicy.resource.criteria",
+              "path": "AccessPolicy.resource.criteria",
+              "short": "FHIR search criteria filter (e.g. Encounter?participant=Practitioner/%profile.id)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "AccessPolicy.resource.readonly",
+              "path": "AccessPolicy.resource.readonly",
+              "short": "If true, only read operations are allowed",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "https://medxai.com/fhir/StructureDefinition/JsonWebKey",
+      "resource": {
+        "resourceType": "StructureDefinition",
+        "id": "medxai-json-web-key",
+        "url": "https://medxai.com/fhir/StructureDefinition/JsonWebKey",
+        "version": "1.0.0",
+        "name": "JsonWebKey",
+        "title": "MedXAI JSON Web Key",
+        "status": "active",
+        "publisher": "MedXAI",
+        "description": "RSA or EC key pair for JWT signing and verification. Stored as a FHIR resource for lifecycle management.",
+        "fhirVersion": "4.0.1",
+        "kind": "resource",
+        "abstract": false,
+        "type": "JsonWebKey",
+        "baseDefinition": "http://hl7.org/fhir/StructureDefinition/DomainResource",
+        "derivation": "specialization",
+        "snapshot": {
+          "element": [
+            {
+              "id": "JsonWebKey",
+              "path": "JsonWebKey",
+              "min": 0,
+              "max": "*",
+              "base": { "path": "JsonWebKey", "min": 0, "max": "*" }
+            },
+            {
+              "id": "JsonWebKey.id",
+              "path": "JsonWebKey.id",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "id" }],
+              "base": { "path": "Resource.id", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "JsonWebKey.meta",
+              "path": "JsonWebKey.meta",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Meta" }],
+              "base": { "path": "Resource.meta", "min": 0, "max": "1" },
+              "isSummary": true
+            },
+            {
+              "id": "JsonWebKey.implicitRules",
+              "path": "JsonWebKey.implicitRules",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "uri" }],
+              "base": { "path": "Resource.implicitRules", "min": 0, "max": "1" },
+              "isModifier": true,
+              "isSummary": true
+            },
+            {
+              "id": "JsonWebKey.language",
+              "path": "JsonWebKey.language",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "base": { "path": "Resource.language", "min": 0, "max": "1" }
+            },
+            {
+              "id": "JsonWebKey.text",
+              "path": "JsonWebKey.text",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "Narrative" }],
+              "base": { "path": "DomainResource.text", "min": 0, "max": "1" }
+            },
+            {
+              "id": "JsonWebKey.contained",
+              "path": "JsonWebKey.contained",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Resource" }],
+              "base": { "path": "DomainResource.contained", "min": 0, "max": "*" }
+            },
+            {
+              "id": "JsonWebKey.extension",
+              "path": "JsonWebKey.extension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.extension", "min": 0, "max": "*" }
+            },
+            {
+              "id": "JsonWebKey.modifierExtension",
+              "path": "JsonWebKey.modifierExtension",
+              "min": 0,
+              "max": "*",
+              "type": [{ "code": "Extension" }],
+              "base": { "path": "DomainResource.modifierExtension", "min": 0, "max": "*" },
+              "isModifier": true
+            },
+            {
+              "id": "JsonWebKey.active",
+              "path": "JsonWebKey.active",
+              "short": "Whether this key is currently active for signing",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "boolean" }],
+              "isSummary": true
+            },
+            {
+              "id": "JsonWebKey.kty",
+              "path": "JsonWebKey.kty",
+              "short": "Key type (RSA, EC)",
+              "min": 1,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "isSummary": true
+            },
+            {
+              "id": "JsonWebKey.alg",
+              "path": "JsonWebKey.alg",
+              "short": "Algorithm (RS256, RS384, RS512, ES256, ES384)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "code" }],
+              "isSummary": true
+            },
+            {
+              "id": "JsonWebKey.kid",
+              "path": "JsonWebKey.kid",
+              "short": "Key ID",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }],
+              "isSummary": true
+            },
+            {
+              "id": "JsonWebKey.n",
+              "path": "JsonWebKey.n",
+              "short": "RSA modulus (base64url)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.e",
+              "path": "JsonWebKey.e",
+              "short": "RSA public exponent (base64url)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.d",
+              "path": "JsonWebKey.d",
+              "short": "RSA/EC private exponent (base64url)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.p",
+              "path": "JsonWebKey.p",
+              "short": "RSA first prime factor",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.q",
+              "path": "JsonWebKey.q",
+              "short": "RSA second prime factor",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.dp",
+              "path": "JsonWebKey.dp",
+              "short": "RSA first factor CRT exponent",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.dq",
+              "path": "JsonWebKey.dq",
+              "short": "RSA second factor CRT exponent",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.qi",
+              "path": "JsonWebKey.qi",
+              "short": "RSA first CRT coefficient",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.x",
+              "path": "JsonWebKey.x",
+              "short": "EC x coordinate (base64url)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            },
+            {
+              "id": "JsonWebKey.y",
+              "path": "JsonWebKey.y",
+              "short": "EC y coordinate (base64url)",
+              "min": 0,
+              "max": "1",
+              "type": [{ "code": "string" }]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

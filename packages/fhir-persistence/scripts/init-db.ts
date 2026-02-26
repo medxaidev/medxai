@@ -25,7 +25,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
-import { loadBundleFromFile } from '@medxai/fhir-core';
+import { loadBundlesFromFiles } from '@medxai/fhir-core';
 
 import { StructureDefinitionRegistry } from '../src/registry/structure-definition-registry.js';
 import { SearchParameterRegistry } from '../src/registry/search-parameter-registry.js';
@@ -123,13 +123,23 @@ Options:
 // =============================================================================
 
 function generateSchema(specDir: string): { ddlString: string; statements: string[]; resourceCount: number } {
-  console.log(`[init-db] Loading profiles from ${specDir}/profiles-resources.json ...`);
-  const profilesResult = loadBundleFromFile(resolve(specDir, 'profiles-resources.json'));
+  const scriptDir = dirname(fileURLToPath(import.meta.url));
+  const rootDir = resolve(scriptDir, '..', '..', '..');
+  const platformDir = resolve(rootDir, 'spec', 'platform');
+
+  // Load FHIR R4 profiles + MedXAI platform profiles (later overrides earlier)
+  console.log(`[init-db] Loading FHIR R4 profiles from ${specDir}/profiles-resources.json ...`);
+  console.log(`[init-db] Loading MedXAI platform profiles from ${platformDir}/profiles-medxai.json ...`);
+  const profilesResult = loadBundlesFromFiles([
+    resolve(specDir, 'profiles-resources.json'),
+    resolve(platformDir, 'profiles-medxai.json'),
+  ]);
 
   const sdRegistry = new StructureDefinitionRegistry();
   sdRegistry.indexAll(profilesResult.profiles);
   console.log(`[init-db] Indexed ${sdRegistry.getTableResourceTypes().length} resource types`);
 
+  // Load FHIR R4 search parameters + MedXAI platform search parameters
   console.log(`[init-db] Loading search parameters from ${specDir}/search-parameters.json ...`);
   const spBundle = JSON.parse(
     readFileSync(resolve(specDir, 'search-parameters.json'), 'utf8'),
@@ -137,6 +147,14 @@ function generateSchema(specDir: string): { ddlString: string; statements: strin
 
   const spRegistry = new SearchParameterRegistry();
   spRegistry.indexBundle(spBundle);
+
+  const platformSpPath = resolve(platformDir, 'search-parameters-medxai.json');
+  console.log(`[init-db] Loading platform search parameters from ${platformSpPath} ...`);
+  const platformSpBundle = JSON.parse(
+    readFileSync(platformSpPath, 'utf8'),
+  ) as SearchParameterBundle;
+  const platformSpResult = spRegistry.indexBundle(platformSpBundle);
+  console.log(`[init-db] Platform search params: ${platformSpResult.indexed} indexed, ${platformSpResult.skipped} skipped`);
 
   console.log('[init-db] Building schema definition ...');
   const schema = buildSchemaDefinition(sdRegistry, spRegistry);

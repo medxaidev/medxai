@@ -23,7 +23,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { loadBundleFromFile } from '@medxai/fhir-core';
+import { loadBundlesFromFiles } from '@medxai/fhir-core';
 
 import { StructureDefinitionRegistry } from '../registry/structure-definition-registry.js';
 import { SearchParameterRegistry } from '../registry/search-parameter-registry.js';
@@ -116,14 +116,20 @@ Options:
 export function run(args: string[]): string {
   const options = parseArgs(args);
 
-  // 1. Load StructureDefinitions
-  const profilesPath = resolve(options.specDir, 'profiles-resources.json');
-  const profilesResult = loadBundleFromFile(profilesPath);
+  // Resolve platform directory relative to spec-dir
+  // spec-dir is typically <root>/spec/fhir/r4, platform is <root>/spec/platform
+  const platformDir = resolve(options.specDir, '..', '..', 'platform');
+
+  // 1. Load StructureDefinitions (FHIR R4 + MedXAI platform)
+  const profilesResult = loadBundlesFromFiles([
+    resolve(options.specDir, 'profiles-resources.json'),
+    resolve(platformDir, 'profiles-medxai.json'),
+  ]);
 
   const sdRegistry = new StructureDefinitionRegistry();
   sdRegistry.indexAll(profilesResult.profiles);
 
-  // 2. Load SearchParameters
+  // 2. Load SearchParameters (FHIR R4 + MedXAI platform)
   const spPath = resolve(options.specDir, 'search-parameters.json');
   const spBundle = JSON.parse(
     readFileSync(spPath, 'utf8'),
@@ -131,6 +137,11 @@ export function run(args: string[]): string {
 
   const spRegistry = new SearchParameterRegistry();
   spRegistry.indexBundle(spBundle);
+
+  const platformSpBundle = JSON.parse(
+    readFileSync(resolve(platformDir, 'search-parameters-medxai.json'), 'utf8'),
+  ) as SearchParameterBundle;
+  spRegistry.indexBundle(platformSpBundle);
 
   // 3. Generate schema
   let output: string;
@@ -169,8 +180,8 @@ export function run(args: string[]): string {
 
 // Only run if this file is executed directly (not imported)
 const isMainModule = process.argv[1]?.endsWith('generate-schema.ts') ||
-                     process.argv[1]?.endsWith('generate-schema.js') ||
-                     process.argv[1]?.endsWith('generate-schema.mjs');
+  process.argv[1]?.endsWith('generate-schema.js') ||
+  process.argv[1]?.endsWith('generate-schema.mjs');
 
 if (isMainModule) {
   const args = process.argv.slice(2);
