@@ -2,7 +2,7 @@
 
 ## Status
 
-**Status:** ACCEPTED — 阶段A已完成  
+**Status:** ACCEPTED — 阶段A+B已完成, 阶段C进行中  
 **Date:** 2026-02-26  
 **Deciders:** Core Architecture Team  
 **Supersedes:** None  
@@ -359,30 +359,37 @@ export interface OperationContext {
 
 ## 实施计划
 
-### 阶段 A: 文件与 Schema (本 ADR)
+### 阶段 A: 文件与 Schema ✅ 已完成 (2026-02-26)
 
 1. ✅ ADR-006 编写
-2. 创建 `spec/platform/profiles-medxai.json` — 7 个平台资源 StructureDefinition
-3. 创建 `spec/platform/search-parameters-medxai.json` — 平台搜索参数
-4. 更新 `init-db.ts` 和 `generate-schema.ts` 加载路径
-5. 重新生成 DDL，验证平台表
-6. 更新数据库 (`--reset`)
+2. ✅ 创建 `spec/platform/profiles-medxai.json` — 7 个平台资源 StructureDefinition
+3. ✅ 创建 `spec/platform/search-parameters-medxai.json` — 20 个平台搜索参数
+4. ✅ 更新 `init-db.ts` 和 `generate-schema.ts` 加载路径
+5. ✅ 重新生成 DDL — 153 资源类型, 4896 DDL, 7 个平台表确认
+6. ✅ 测试验证 — tsc clean, 3549/3549 pass, 0 regressions
 
-### 阶段 B: Repository 集成 (后续工作)
+**详细记录**: `devdocs/stages/S1-Phase-AB-Platform-Resource-MultiTenant.md`
 
-7. 定义 `OperationContext` 接口
-8. `FhirRepository` 方法增加 `context?` 参数
-9. 写入路径注入 project ID 到 compartments
-10. 搜索路径增加 project 过滤
-11. 定义 `protectedResourceTypes` 和 `projectAdminResourceTypes`
-12. 测试全量通过
+### 阶段 B: Repository 集成 ✅ 已完成 (2026-02-26)
 
-### 阶段 C: Auth 集成 (S5)
+7. ✅ 定义 `OperationContext` 接口
+8. ✅ `FhirRepository` 方法增加 `context?` 参数
+9. ✅ 写入路径注入 project ID 到 `projectId` 列 (via `resolveProjectId()`)
+10. ✅ 搜索路径增加 project 过滤 (`SearchRequest.project` + SQL WHERE)
+11. ✅ 定义 `PROTECTED_RESOURCE_TYPES` 和 `PROJECT_ADMIN_RESOURCE_TYPES`
+12. ✅ 测试全量通过 — 3549/3549 pass, 0 regressions
 
-13. JWT 签发/验证 (基于 JsonWebKey)
-14. `/auth/login`, `/oauth2/token` 路由
-15. Fastify preHandler 中间件
-16. AccessPolicy enforcement
+### 阶段 C: Auth 集成 (进行中)
+
+13. JWT 密钥管理 (JsonWebKey + jose 库 + 签发/验证)
+14. Auth 路由 (`/auth/login`, `/oauth2/token`)
+15. Fastify 认证中间件 (Bearer token → AuthState → OperationContext)
+16. AccessPolicy 基础执行 (supportsInteraction + canPerformInteraction)
+17. 数据库 Seed (superAdmin Project + User + ClientApplication)
+18. Phase C 测试验证
+
+**设计文档**: `devdocs/decisions/ADR-007-Auth-Integration-Strategy.md`  
+**详细记录**: `devdocs/stages/S1-Phase-C-Auth-Integration.md`
 
 ---
 

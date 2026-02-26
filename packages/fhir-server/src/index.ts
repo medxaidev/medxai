@@ -53,3 +53,29 @@ export type {
 // ─── Routes ─────────────────────────────────────────────────────────────────
 export { resourceRoutes } from "./routes/resource-routes.js";
 export { metadataRoute } from "./routes/metadata-route.js";
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+export {
+  initKeys,
+  generateAccessToken,
+  generateRefreshToken,
+  verifyJwt,
+  getJwks,
+  generateSecret,
+  buildAuthenticateToken,
+  requireAuth,
+  buildOperationContext,
+  getOperationContext,
+  registerLoginRoutes,
+  registerTokenRoutes,
+  seedDatabase,
+} from "./auth/index.js";
+export type {
+  AccessTokenClaims,
+  RefreshTokenClaims,
+  JWKS,
+  AuthState,
+  OperationContext,
+  SeedConfig,
+  SeedResult,
+} from "./auth/index.js";

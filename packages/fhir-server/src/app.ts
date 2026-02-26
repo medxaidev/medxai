@@ -16,6 +16,10 @@ import { searchRoutes } from "./routes/search-routes.js";
 import { metadataRoute } from "./routes/metadata-route.js";
 import { FHIR_JSON } from "./fhir/response.js";
 import { errorToOutcome } from "./fhir/outcomes.js";
+import { buildAuthenticateToken, getOperationContext } from "./auth/middleware.js";
+import { registerLoginRoutes } from "./auth/login.js";
+import { registerTokenRoutes } from "./auth/token.js";
+import { getJwks } from "./auth/keys.js";
 
 // =============================================================================
 // Section 1: Types
@@ -47,6 +51,8 @@ export type ResourceValidator = (
 export interface AppOptions {
   /** The FhirRepository instance for persistence operations. */
   repo: ResourceRepository;
+  /** System-level repository for auth operations (no project/AccessPolicy restrictions). */
+  systemRepo?: ResourceRepository;
   /** SearchParameterRegistry for search operations. Optional — search disabled if not provided. */
   searchRegistry?: SearchParameterRegistry;
   /** Enable Fastify/pino logging. Default: false. */
@@ -55,6 +61,8 @@ export interface AppOptions {
   baseUrl?: string;
   /** Optional resource validator — called before create/update. */
   resourceValidator?: ResourceValidator;
+  /** Enable auth middleware and routes. Default: false. */
+  enableAuth?: boolean;
 }
 
 // =============================================================================
@@ -94,7 +102,7 @@ function isFastifyValidationError(error: unknown): error is FastifyValidationErr
  * ```
  */
 export async function createApp(options: AppOptions): Promise<FastifyInstance> {
-  const { repo, searchRegistry, logger = false, baseUrl, resourceValidator } = options;
+  const { repo, systemRepo, searchRegistry, logger = false, baseUrl, resourceValidator, enableAuth = false } = options;
 
   const app = Fastify({
     logger,
@@ -185,7 +193,27 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 
-  // ── Register routes ───────────────────────────────────────────────────
+  // ── Auth middleware & routes ──────────────────────────────────────────────────
+  const authRepo = systemRepo ?? repo;
+  if (enableAuth) {
+    // Global hook: attempt to resolve Bearer token into AuthState on every request
+    app.addHook("onRequest", buildAuthenticateToken(authRepo));
+
+    // Auth routes (no authentication required)
+    registerLoginRoutes(app, authRepo);
+    registerTokenRoutes(app, authRepo);
+
+    // JWKS endpoint
+    app.get("/.well-known/jwks.json", async (_request, reply) => {
+      reply.header("content-type", "application/json");
+      return getJwks();
+    });
+  }
+
+  // Decorate request with auth helper
+  app.decorate("getOperationContext", getOperationContext);
+
+  // ── Register routes ───────────────────────────────────────────────────────────
   await app.register(metadataRoute, { baseUrl });
   if (searchRegistry) {
     await app.register(searchRoutes);

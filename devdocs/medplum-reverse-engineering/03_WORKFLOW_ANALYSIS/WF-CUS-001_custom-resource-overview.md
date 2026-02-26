@@ -10,25 +10,25 @@ Medplum 在标准 FHIR R4 资源之外，通过 `profiles-medplum.json` 定义�
 
 ## 2. 资源分类矩阵
 
-| 类别 | 资源类型 | 权限层级 | 数据库存储 | 核心用途 |
-|------|---------|---------|-----------|---------|
-| **Tier-0: 系统保护** | `Login` | `protectedResourceTypes` — 仅 superAdmin/system | DB + Cache (部分 cache-only) | OAuth 登录会话 |
-| **Tier-0: 系统保护** | `JsonWebKey` | `protectedResourceTypes` — 仅 superAdmin/system | DB | JWT 签名密钥 |
-| **Tier-0: 系统保护** | `DomainConfiguration` | `protectedResourceTypes` — 仅 superAdmin/system | DB | 域名到项目映射 |
-| **Tier-1: 项目管理** | `Project` | `projectAdminResourceTypes` — projectAdmin+ | DB | 多租户项目容器 |
-| **Tier-1: 项目管理** | `User` | `projectAdminResourceTypes` — projectAdmin+ | DB | 人类用户账号 |
-| **Tier-1: 项目管理** | `ProjectMembership` | `projectAdminResourceTypes` — projectAdmin+ | DB | 用户-项目-角色关联 |
-| **Tier-1: 项目管理** | `UserSecurityRequest` | `projectAdminResourceTypes` — projectAdmin+ | DB | 密码重置/MFA 请求 |
-| **Tier-2: 应用层** | `ClientApplication` | 普通 FHIR CRUD (通过 AccessPolicy) | DB | OAuth2 客户端应用 |
-| **Tier-2: 应用层** | `Bot` | 普通 FHIR CRUD | DB | 服务器端自动化脚本 |
-| **Tier-2: 应用层** | `AccessPolicy` | 普通 FHIR CRUD | DB | 细粒度访问控制策略 |
-| **Tier-2: 应用层** | `UserConfiguration` | 普通 FHIR CRUD | DB | 用户 UI 配置 |
-| **Tier-2: 应用层** | `Agent` | 普通 FHIR CRUD | DB | 本地网络代理 (HL7/DICOM) |
-| **Tier-3: 运行时** | `AsyncJob` | 普通 FHIR CRUD | DB | 异步批量操作状态 |
-| **Tier-3: 运行时** | `BulkDataExport` | 普通 FHIR CRUD | DB | $export 操作状态 |
-| **Tier-3: 运行时** | `SmartAppLaunch` | 普通 FHIR CRUD | DB | SMART on FHIR 启动上下文 |
-| **Tier-4: 逻辑型** | `ViewDefinition` | N/A (logical) | 不持久化 | SQL-on-FHIR 视图定义 |
-| **复合类型** | `IdentityProvider` | 嵌入在 ClientApplication 中 | 随宿主资源存储 | 外部 IdP 配置 |
+| 类别                 | 资源类型              | 权限层级                                        | 数据库存储                   | 核心用途                 |
+| -------------------- | --------------------- | ----------------------------------------------- | ---------------------------- | ------------------------ |
+| **Tier-0: 系统保护** | `Login`               | `protectedResourceTypes` — 仅 superAdmin/system | DB + Cache (部分 cache-only) | OAuth 登录会话           |
+| **Tier-0: 系统保护** | `JsonWebKey`          | `protectedResourceTypes` — 仅 superAdmin/system | DB                           | JWT 签名密钥             |
+| **Tier-0: 系统保护** | `DomainConfiguration` | `protectedResourceTypes` — 仅 superAdmin/system | DB                           | 域名到项目映射           |
+| **Tier-1: 项目管理** | `Project`             | `projectAdminResourceTypes` — projectAdmin+     | DB                           | 多租户项目容器           |
+| **Tier-1: 项目管理** | `User`                | `projectAdminResourceTypes` — projectAdmin+     | DB                           | 人类用户账号             |
+| **Tier-1: 项目管理** | `ProjectMembership`   | `projectAdminResourceTypes` — projectAdmin+     | DB                           | 用户-项目-角色关联       |
+| **Tier-1: 项目管理** | `UserSecurityRequest` | `projectAdminResourceTypes` — projectAdmin+     | DB                           | 密码重置/MFA 请求        |
+| **Tier-2: 应用层**   | `ClientApplication`   | 普通 FHIR CRUD (通过 AccessPolicy)              | DB                           | OAuth2 客户端应用        |
+| **Tier-2: 应用层**   | `Bot`                 | 普通 FHIR CRUD                                  | DB                           | 服务器端自动化脚本       |
+| **Tier-2: 应用层**   | `AccessPolicy`        | 普通 FHIR CRUD                                  | DB                           | 细粒度访问控制策略       |
+| **Tier-2: 应用层**   | `UserConfiguration`   | 普通 FHIR CRUD                                  | DB                           | 用户 UI 配置             |
+| **Tier-2: 应用层**   | `Agent`               | 普通 FHIR CRUD                                  | DB                           | 本地网络代理 (HL7/DICOM) |
+| **Tier-3: 运行时**   | `AsyncJob`            | 普通 FHIR CRUD                                  | DB                           | 异步批量操作状态         |
+| **Tier-3: 运行时**   | `BulkDataExport`      | 普通 FHIR CRUD                                  | DB                           | $export 操作状态         |
+| **Tier-3: 运行时**   | `SmartAppLaunch`      | 普通 FHIR CRUD                                  | DB                           | SMART on FHIR 启动上下文 |
+| **Tier-4: 逻辑型**   | `ViewDefinition`      | N/A (logical)                                   | 不持久化                     | SQL-on-FHIR 视图定义     |
+| **复合类型**         | `IdentityProvider`    | 嵌入在 ClientApplication 中                     | 随宿主资源存储               | 外部 IdP 配置            |
 
 ## 3. 权限层级体系
 
@@ -37,10 +37,15 @@ Medplum 在标准 FHIR R4 资源之外，通过 `profiles-medplum.json` 定义�
 **定义位置**: `packages/core/src/access.ts:15`
 
 ```typescript
-export const protectedResourceTypes = ['DomainConfiguration', 'JsonWebKey', 'Login'];
+export const protectedResourceTypes = [
+  "DomainConfiguration",
+  "JsonWebKey",
+  "Login",
+];
 ```
 
 **行为**:
+
 - `repo.supportsInteraction()` 对非 superAdmin 返回 `false` → 完全阻止 CRUD
 - `repo.canPerformInteraction()` 对非 superAdmin 返回 `undefined` → 阻止读取
 - 不参与 projectId 分配（`getProjectId()` 返回 `undefined`）
@@ -52,10 +57,16 @@ export const protectedResourceTypes = ['DomainConfiguration', 'JsonWebKey', 'Log
 **定义位置**: `packages/core/src/access.ts:21`
 
 ```typescript
-export const projectAdminResourceTypes = ['UserSecurityRequest', 'Project', 'ProjectMembership', 'User'];
+export const projectAdminResourceTypes = [
+  "UserSecurityRequest",
+  "Project",
+  "ProjectMembership",
+  "User",
+];
 ```
 
 **行为**:
+
 - AccessPolicy 通配符 `resourceType: '*'` **不匹配**这些类型 → 必须显式声明
 - 需要 `projectAdmin: true` 或 `superAdmin: true` 才能操作
 - 专用的管理 API 路由 (`/admin/projects/...`)
@@ -77,13 +88,13 @@ export const projectAdminResourceTypes = ['UserSecurityRequest', 'Project', 'Pro
 repo.ts:1975-2002
 ```
 
-| 资源类型 | projectId 逻辑 |
-|---------|---------------|
-| `Project` | `project.id`（自身 ID）|
-| `ProjectMembership` | `resolveId(membership.project)`（所属项目）|
-| `User` (superAdmin) | `user.meta.project`（可由 superAdmin 设置）|
-| `protectedResourceTypes` | `undefined`（无项目归属）|
-| 其他 | `existing.meta.project` 或 `context.projects[0].id` |
+| 资源类型                 | projectId 逻辑                                      |
+| ------------------------ | --------------------------------------------------- |
+| `Project`                | `project.id`（自身 ID）                             |
+| `ProjectMembership`      | `resolveId(membership.project)`（所属项目）         |
+| `User` (superAdmin)      | `user.meta.project`（可由 superAdmin 设置）         |
+| `protectedResourceTypes` | `undefined`（无项目归属）                           |
+| 其他                     | `existing.meta.project` 或 `context.projects[0].id` |
 
 ### 4.2 isCacheOnly() — 缓存优化
 
@@ -126,58 +137,58 @@ precommit.ts:48-58, 176-192
 
 ### 5.1 专用 FHIR Operations（内部路由器）
 
-| 路由 | Handler | 关联资源 |
-|------|---------|---------|
-| `POST /Project/$init` | `projectInitHandler` | Project, ClientApplication, Practitioner, ProjectMembership |
-| `POST /Project/:id/$clone` | `projectCloneHandler` | Project (superAdmin only) |
-| `POST /User/:id/$update-email` | `updateUserEmailOperation` | User, ProjectMembership |
-| `POST /Bot/:id/$deploy` | `deployHandler` | Bot |
-| `GET/POST /Bot/$execute`, `/Bot/:id/$execute` | `executeHandler` | Bot |
-| `POST /ClientApplication/:id/$rotate-secret` | `rotateSecretHandler` | ClientApplication |
-| `POST /AsyncJob/:id/$cancel` | `asyncJobCancelHandler` | AsyncJob |
-| `GET /Agent/:id/$status` | `agentStatusHandler` | Agent |
-| `GET /Agent/:id/$reload-config` | `agentReloadConfigHandler` | Agent |
-| `GET /Agent/:id/$upgrade` | `agentUpgradeHandler` | Agent |
-| `GET /Agent/:id/$fetch-logs` | `agentFetchLogsHandler` | Agent |
-| `POST /Agent/$push` | `agentPushHandler` | Agent |
+| 路由                                          | Handler                    | 关联资源                                                    |
+| --------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
+| `POST /Project/$init`                         | `projectInitHandler`       | Project, ClientApplication, Practitioner, ProjectMembership |
+| `POST /Project/:id/$clone`                    | `projectCloneHandler`      | Project (superAdmin only)                                   |
+| `POST /User/:id/$update-email`                | `updateUserEmailOperation` | User, ProjectMembership                                     |
+| `POST /Bot/:id/$deploy`                       | `deployHandler`            | Bot                                                         |
+| `GET/POST /Bot/$execute`, `/Bot/:id/$execute` | `executeHandler`           | Bot                                                         |
+| `POST /ClientApplication/:id/$rotate-secret`  | `rotateSecretHandler`      | ClientApplication                                           |
+| `POST /AsyncJob/:id/$cancel`                  | `asyncJobCancelHandler`    | AsyncJob                                                    |
+| `GET /Agent/:id/$status`                      | `agentStatusHandler`       | Agent                                                       |
+| `GET /Agent/:id/$reload-config`               | `agentReloadConfigHandler` | Agent                                                       |
+| `GET /Agent/:id/$upgrade`                     | `agentUpgradeHandler`      | Agent                                                       |
+| `GET /Agent/:id/$fetch-logs`                  | `agentFetchLogsHandler`    | Agent                                                       |
+| `POST /Agent/$push`                           | `agentPushHandler`         | Agent                                                       |
 
 ### 5.2 Admin API 路由（Express 路由器）
 
-| 路由 | 方法 | 功能 |
-|------|------|------|
-| `/admin/projects/:projectId` | GET | 读取项目详情 |
-| `/admin/projects/:projectId` | POST | 更新项目 |
-| `/admin/projects/:projectId/members` | GET | 列出项目成员 |
-| `/admin/projects/:projectId/members/:id` | GET | 读取成员 |
-| `/admin/projects/:projectId/members/:id` | POST | 更新成员 |
-| `/admin/projects/:projectId/members/:id` | DELETE | 删除成员 |
-| `/admin/projects/:projectId/invite` | POST | 邀请用户 |
-| `/admin/projects/:projectId/bot` | POST | 创建 Bot |
-| `/admin/projects/:projectId/client` | POST | 创建 ClientApplication |
-| `/admin/projects/:projectId/secrets` | GET/POST | 管理项目 Secrets |
+| 路由                                     | 方法     | 功能                   |
+| ---------------------------------------- | -------- | ---------------------- |
+| `/admin/projects/:projectId`             | GET      | 读取项目详情           |
+| `/admin/projects/:projectId`             | POST     | 更新项目               |
+| `/admin/projects/:projectId/members`     | GET      | 列出项目成员           |
+| `/admin/projects/:projectId/members/:id` | GET      | 读取成员               |
+| `/admin/projects/:projectId/members/:id` | POST     | 更新成员               |
+| `/admin/projects/:projectId/members/:id` | DELETE   | 删除成员               |
+| `/admin/projects/:projectId/invite`      | POST     | 邀请用户               |
+| `/admin/projects/:projectId/bot`         | POST     | 创建 Bot               |
+| `/admin/projects/:projectId/client`      | POST     | 创建 ClientApplication |
+| `/admin/projects/:projectId/secrets`     | GET/POST | 管理项目 Secrets       |
 
 ### 5.3 Auth API 路由
 
-| 路由 | 功能 | 关联资源 |
-|------|------|---------|
-| `POST /auth/login` | 用户登录 | Login, User, ProjectMembership |
-| `POST /auth/newuser` | 新用户注册 | User |
-| `POST /auth/newproject` | 创建新项目 | Project, Practitioner, ProjectMembership, ClientApplication, Login |
-| `POST /auth/profile` | 选择 profile | Login, ProjectMembership |
-| `POST /auth/changepassword` | 修改密码 | User |
-| `POST /auth/resetpassword` | 重置密码 | UserSecurityRequest, User |
-| `POST /auth/setpassword` | 设置密码 | UserSecurityRequest, User |
-| `POST /auth/verifyemail` | 验证邮箱 | UserSecurityRequest, User |
-| `POST /auth/mfa/setup` | MFA 设置 | User |
-| `POST /auth/mfa/verify` | MFA 验证 | Login, User |
+| 路由                        | 功能         | 关联资源                                                           |
+| --------------------------- | ------------ | ------------------------------------------------------------------ |
+| `POST /auth/login`          | 用户登录     | Login, User, ProjectMembership                                     |
+| `POST /auth/newuser`        | 新用户注册   | User                                                               |
+| `POST /auth/newproject`     | 创建新项目   | Project, Practitioner, ProjectMembership, ClientApplication, Login |
+| `POST /auth/profile`        | 选择 profile | Login, ProjectMembership                                           |
+| `POST /auth/changepassword` | 修改密码     | User                                                               |
+| `POST /auth/resetpassword`  | 重置密码     | UserSecurityRequest, User                                          |
+| `POST /auth/setpassword`    | 设置密码     | UserSecurityRequest, User                                          |
+| `POST /auth/verifyemail`    | 验证邮箱     | UserSecurityRequest, User                                          |
+| `POST /auth/mfa/setup`      | MFA 设置     | User                                                               |
+| `POST /auth/mfa/verify`     | MFA 验证     | Login, User                                                        |
 
 ### 5.4 OAuth2 端点
 
-| 路由 | 功能 | 关联资源 |
-|------|------|---------|
-| `POST /oauth2/token` | Token 发放 | Login, ClientApplication, ProjectMembership |
-| `GET /oauth2/authorize` | 授权页面 | ClientApplication |
-| `POST /oauth2/token (client_credentials)` | 服务端认证 | ClientApplication, ProjectMembership |
+| 路由                                      | 功能       | 关联资源                                    |
+| ----------------------------------------- | ---------- | ------------------------------------------- |
+| `POST /oauth2/token`                      | Token 发放 | Login, ClientApplication, ProjectMembership |
+| `GET /oauth2/authorize`                   | 授权页面   | ClientApplication                           |
+| `POST /oauth2/token (client_credentials)` | 服务端认证 | ClientApplication, ProjectMembership        |
 
 ## 6. 数据库 Seed 流程
 
@@ -199,6 +210,7 @@ Seed 按以下顺序创建系统初始数据：
 ```
 
 **关键常量**:
+
 - `r4ProjectId = '161452d9-43b7-5c29-aa7b-c85680fa45c6'` — 硬编码的 R4 项目 ID
 - `systemResourceProjectId = '65897e4f-7add-55f3-9b17-035b5a4e6d52'` — 系统资源的 projectId
 
@@ -254,30 +266,30 @@ Seed 按以下顺序创建系统初始数据：
 
 ### 8.1 必须实现（核心功能所需）
 
-| 资源 | 必要性 | 理由 |
-|------|--------|------|
-| `Project` | **必须** | 多租户隔离的基础，projectId 列的来源 |
-| `ProjectMembership` | **必须** | 用户-项目关联，AccessPolicy 绑定 |
-| `User` | **必须** | 认证主体 |
-| `Login` | **必须** | OAuth2 会话管理 |
-| `ClientApplication` | **必须** | 服务端 OAuth2 认证 |
-| `AccessPolicy` | **必须** | 行级访问控制 |
+| 资源                | 必要性   | 理由                                 |
+| ------------------- | -------- | ------------------------------------ |
+| `Project`           | **必须** | 多租户隔离的基础，projectId 列的来源 |
+| `ProjectMembership` | **必须** | 用户-项目关联，AccessPolicy 绑定     |
+| `User`              | **必须** | 认证主体                             |
+| `Login`             | **必须** | OAuth2 会话管理                      |
+| `ClientApplication` | **必须** | 服务端 OAuth2 认证                   |
+| `AccessPolicy`      | **必须** | 行级访问控制                         |
 
 ### 8.2 可选实现（根据功能需求）
 
-| 资源 | 建议 | 理由 |
-|------|------|------|
-| `Bot` | 推荐 | 服务端自动化、Subscription 处理 |
-| `Agent` | 可延后 | 仅用于本地网络集成 (HL7v2/DICOM) |
-| `AsyncJob` | 推荐 | 批量操作状态追踪 |
-| `BulkDataExport` | 可延后 | $export 操作 |
-| `SmartAppLaunch` | 可延后 | SMART on FHIR 集成 |
-| `UserConfiguration` | 可延后 | UI 个性化 |
-| `UserSecurityRequest` | 推荐 | 密码重置/MFA 流程 |
-| `DomainConfiguration` | 可延后 | 多域名部署 |
-| `JsonWebKey` | **必须** | JWT 签名/验证 |
-| `ViewDefinition` | 不需要 | 逻辑类型，不持久化 |
-| `IdentityProvider` | 可延后 | 外部 IdP 集成（嵌入 ClientApplication） |
+| 资源                  | 建议     | 理由                                    |
+| --------------------- | -------- | --------------------------------------- |
+| `Bot`                 | 推荐     | 服务端自动化、Subscription 处理         |
+| `Agent`               | 可延后   | 仅用于本地网络集成 (HL7v2/DICOM)        |
+| `AsyncJob`            | 推荐     | 批量操作状态追踪                        |
+| `BulkDataExport`      | 可延后   | $export 操作                            |
+| `SmartAppLaunch`      | 可延后   | SMART on FHIR 集成                      |
+| `UserConfiguration`   | 可延后   | UI 个性化                               |
+| `UserSecurityRequest` | 推荐     | 密码重置/MFA 流程                       |
+| `DomainConfiguration` | 可延后   | 多域名部署                              |
+| `JsonWebKey`          | **必须** | JWT 签名/验证                           |
+| `ViewDefinition`      | 不需要   | 逻辑类型，不持久化                      |
+| `IdentityProvider`    | 可延后   | 外部 IdP 集成（嵌入 ClientApplication） |
 
 ### 8.3 关键设计差异
 
@@ -289,5 +301,8 @@ Seed 按以下顺序创建系统初始数据：
 ---
 
 **详细分析见**:
+
 - [WF-CUS-002: 核心安全资源](WF-CUS-002_core-security-resources.md) — Project, User, ProjectMembership, Login
 - [WF-CUS-003: 应用层资源](WF-CUS-003_application-resources.md) — ClientApplication, Bot, AccessPolicy, Agent 等
+- [WF-CUS-004: 认证集成](WF-CUS-004_auth-jwt-login.md) — JWT 密钥管理、Login 路由、OAuth2 Token 流程
+- [WF-CUS-005: 中间件与 AccessPolicy 执行](WF-CUS-005_middleware-accesspolicy.md) — 请求上下文、四层 AccessPolicy 执行引擎
