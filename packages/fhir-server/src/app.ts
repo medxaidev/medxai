@@ -22,6 +22,11 @@ import { errorToOutcome } from "./fhir/outcomes.js";
 import { buildAuthenticateToken, getOperationContext } from "./auth/middleware.js";
 import { registerLoginRoutes } from "./auth/login.js";
 import { registerTokenRoutes } from "./auth/token.js";
+import { registerUserInfoRoutes } from "./auth/userinfo.js";
+import { registerMeRoute } from "./auth/me.js";
+import { registerNewUserRoute } from "./auth/register.js";
+import { registerChangePasswordRoute } from "./auth/changepassword.js";
+import { registerLogoutRoutes } from "./auth/logout.js";
 import { getJwks } from "./auth/keys.js";
 
 // =============================================================================
@@ -231,6 +236,56 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
       reply.header("content-type", "application/json");
       return getJwks();
     });
+
+    // OpenID Connect discovery
+    app.get("/.well-known/openid-configuration", async (_request, reply) => {
+      const base = baseUrl || `${_request.protocol}://${_request.hostname}`;
+      reply.header("content-type", "application/json");
+      return {
+        issuer: base,
+        authorization_endpoint: `${base}/oauth2/authorize`,
+        token_endpoint: `${base}/oauth2/token`,
+        userinfo_endpoint: `${base}/oauth2/userinfo`,
+        jwks_uri: `${base}/.well-known/jwks.json`,
+        registration_endpoint: `${base}/oauth2/register`,
+        scopes_supported: ["openid", "profile", "email", "offline_access"],
+        response_types_supported: ["code"],
+        grant_types_supported: ["authorization_code", "client_credentials", "refresh_token"],
+        token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
+        subject_types_supported: ["public"],
+        id_token_signing_alg_values_supported: ["RS256"],
+      };
+    });
+
+    // SMART on FHIR configuration
+    app.get("/.well-known/smart-configuration", async (_request, reply) => {
+      const base = baseUrl || `${_request.protocol}://${_request.hostname}`;
+      reply.header("content-type", "application/json");
+      return {
+        authorization_endpoint: `${base}/oauth2/authorize`,
+        token_endpoint: `${base}/oauth2/token`,
+        token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
+        registration_endpoint: `${base}/oauth2/register`,
+        scopes_supported: ["openid", "profile", "email", "fhirUser", "launch", "offline_access"],
+        response_types_supported: ["code"],
+        capabilities: [
+          "launch-standalone",
+          "client-public",
+          "client-confidential-symmetric",
+          "sso-openid-connect",
+          "context-standalone-patient",
+          "permission-patient",
+          "permission-user",
+        ],
+      };
+    });
+
+    // Register additional auth routes
+    registerUserInfoRoutes(app, authRepo);
+    registerMeRoute(app, authRepo);
+    registerNewUserRoute(app, authRepo);
+    registerChangePasswordRoute(app, authRepo);
+    registerLogoutRoutes(app, authRepo);
   }
 
   // Decorate request with auth helper

@@ -13,8 +13,9 @@
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import type { ResourceRepository, FhirResource, HistoryOptions } from "@medxai/fhir-persistence";
-import { buildHistoryBundle } from "@medxai/fhir-persistence";
+import type { ResourceRepository, FhirResource, HistoryOptions, SearchParameterRegistry } from "@medxai/fhir-persistence";
+import type { FhirRepository } from "@medxai/fhir-persistence";
+import { buildHistoryBundle, parseSearchRequest } from "@medxai/fhir-persistence";
 import { FHIR_JSON, buildETag, buildLastModified, buildLocationHeader, parseETag } from "../fhir/response.js";
 import { allOk, badRequest, errorToOutcome } from "../fhir/outcomes.js";
 import type { ResourceValidator } from "../app.js";
@@ -54,6 +55,7 @@ interface HistoryQuerystring {
 export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
   const repo = (fastify as FastifyInstance & { repo: ResourceRepository }).repo;
   const validator = (fastify as FastifyInstance & { resourceValidator: ResourceValidator | null }).resourceValidator;
+  const registry = (fastify as any).searchRegistry as SearchParameterRegistry | null;
 
   // ── POST /:resourceType (create) ──────────────────────────────────────────
   fastify.post<{ Params: ResourceTypeParams; Body: FhirResource }>(
@@ -95,6 +97,41 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
 
       try {
         const context = getOperationContext(request);
+
+        // Conditional create: If-None-Exist header
+        const ifNoneExist = request.headers["if-none-exist"] as string | undefined;
+        if (ifNoneExist && registry) {
+          const queryParams = parseIfNoneExistHeader(ifNoneExist);
+          const searchRequest = parseSearchRequest(resourceType, queryParams, registry);
+          const result = await (repo as unknown as FhirRepository).conditionalCreate(
+            resource,
+            searchRequest,
+          );
+
+          const baseUrl = getBaseUrl(request);
+          const status = result.created ? 201 : 200;
+          reply
+            .status(status)
+            .header("content-type", FHIR_JSON)
+            .header("etag", buildETag(result.resource.meta.versionId))
+            .header("last-modified", buildLastModified(result.resource.meta.lastUpdated));
+
+          if (result.created) {
+            reply.header(
+              "location",
+              buildLocationHeader(baseUrl, resourceType, result.resource.id, result.resource.meta.versionId),
+            );
+            logAuditEvent(repo, {
+              action: "create",
+              resourceType,
+              resourceId: result.resource.id,
+              context,
+            }, context);
+          }
+
+          return result.resource;
+        }
+
         const created = await repo.createResource(resource, undefined, context);
         const baseUrl = getBaseUrl(request);
 
@@ -248,6 +285,40 @@ export async function resourceRoutes(fastify: FastifyInstance): Promise<void> {
     },
   );
 
+  // ── GET /:resourceType/_history (history-type) ─────────────────────────────
+  fastify.get<{ Params: ResourceTypeParams; Querystring: HistoryQuerystring }>(
+    "/:resourceType/_history",
+    async (request, reply) => {
+      const { resourceType } = request.params;
+      const { _since, _count } = request.query;
+
+      const options: HistoryOptions = {};
+      if (_since) {
+        options.since = _since;
+      }
+      if (_count) {
+        const count = parseInt(_count, 10);
+        if (!isNaN(count) && count > 0) {
+          options.count = count;
+        }
+      }
+
+      try {
+        const entries = await repo.readTypeHistory(resourceType, options);
+        const baseUrl = getBaseUrl(request);
+        const bundle = buildHistoryBundle(entries, {
+          baseUrl,
+          selfUrl: `${baseUrl}/${resourceType}/_history`,
+        });
+        reply.header("content-type", FHIR_JSON);
+        return bundle;
+      } catch (err) {
+        const { status, outcome } = errorToOutcome(err);
+        return sendOutcome(reply, status, outcome);
+      }
+    },
+  );
+
   // ── GET /:resourceType/:id/_history (history-instance) ────────────────────
   fastify.get<{ Params: ResourceIdParams; Querystring: HistoryQuerystring }>(
     "/:resourceType/:id/_history",
@@ -328,4 +399,18 @@ function getBaseUrl(request: FastifyRequest): string {
   const protocol = request.protocol;
   const host = request.hostname;
   return `${protocol}://${host}`;
+}
+
+/**
+ * Parse an If-None-Exist header value into search query parameters.
+ * Example: "identifier=http://example.org|123&name=Smith" → { identifier: "...", name: "Smith" }
+ */
+function parseIfNoneExistHeader(header: string): Record<string, string> {
+  const params: Record<string, string> = {};
+  const pairs = header.split("&");
+  for (const pair of pairs) {
+    const [key, value] = pair.split("=").map((s) => decodeURIComponent(s.trim()));
+    if (key) params[key] = value ?? "";
+  }
+  return params;
 }

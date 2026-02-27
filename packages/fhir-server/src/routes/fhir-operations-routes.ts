@@ -289,6 +289,71 @@ export async function fhirOperationsRoutes(fastify: FastifyInstance): Promise<vo
     },
   );
 
+  // ── PUT /:resourceType?search (conditional update) ──────────────────────
+  if (registry) {
+    fastify.put<{ Params: ResourceTypeParams; Querystring: Record<string, string> }>(
+      "/:resourceType",
+      async (request, reply) => {
+        const { resourceType } = request.params;
+        const queryParams = request.query;
+        const body = request.body as Record<string, unknown> | undefined;
+
+        if (!queryParams || Object.keys(queryParams).length === 0) {
+          return sendOutcome(
+            reply,
+            400,
+            badRequest("Conditional update requires search parameters in the query string"),
+          );
+        }
+
+        if (!body || typeof body !== "object") {
+          return sendOutcome(reply, 400, badRequest("Request body is required"));
+        }
+
+        try {
+          const context = getOperationContext(request);
+          const searchRequest = parseSearchRequest(resourceType, queryParams, registry);
+          const result = await (repo as FhirRepository).conditionalUpdate(
+            { ...body, resourceType } as any,
+            searchRequest,
+          );
+
+          const baseUrl = getBaseUrl(request);
+          const status = result.created ? 201 : 200;
+          reply
+            .status(status)
+            .header("content-type", FHIR_JSON)
+            .header("etag", buildETag(result.resource.meta.versionId))
+            .header("last-modified", buildLastModified(result.resource.meta.lastUpdated));
+
+          if (result.created) {
+            reply.header(
+              "location",
+              `${baseUrl}/${resourceType}/${result.resource.id}/_history/${result.resource.meta.versionId}`,
+            );
+          }
+
+          // Audit
+          logAuditEvent(
+            repo,
+            {
+              action: result.created ? "create" : "update",
+              resourceType,
+              resourceId: result.resource.id,
+              context,
+            },
+            context,
+          );
+
+          return result.resource;
+        } catch (err) {
+          const { status, outcome } = errorToOutcome(err);
+          return sendOutcome(reply, status, outcome);
+        }
+      },
+    );
+  }
+
   // ── Conditional DELETE /:resourceType?search ────────────────────────────
   if (registry) {
     fastify.delete<{ Params: ResourceTypeParams; Querystring: Record<string, string> }>(
@@ -330,6 +395,39 @@ export async function fhirOperationsRoutes(fastify: FastifyInstance): Promise<vo
       },
     );
   }
+
+  // ── POST /:resourceType/:id/$reindex ────────────────────────────────────
+  fastify.post<{ Params: ResourceIdParams }>(
+    "/:resourceType/:id/$reindex",
+    async (request, reply) => {
+      const { resourceType, id } = request.params;
+
+      try {
+        const context = getOperationContext(request);
+
+        // Read the current resource
+        const resource = await repo.readResource(resourceType, id, context);
+
+        // Re-update with the same content to rebuild search indices
+        const updated = await repo.updateResource(resource as any, undefined, context);
+
+        reply.header("content-type", FHIR_JSON);
+        return {
+          resourceType: "OperationOutcome",
+          issue: [
+            {
+              severity: "information",
+              code: "informational",
+              diagnostics: `Reindexed ${resourceType}/${id} (version ${updated.meta.versionId})`,
+            },
+          ],
+        };
+      } catch (err) {
+        const { status, outcome } = errorToOutcome(err);
+        return sendOutcome(reply, status, outcome);
+      }
+    },
+  );
 }
 
 // =============================================================================
