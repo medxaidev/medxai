@@ -306,3 +306,4 @@ Seed 按以下顺序创建系统初始数据：
 - [WF-CUS-003: 应用层资源](WF-CUS-003_application-resources.md) — ClientApplication, Bot, AccessPolicy, Agent 等
 - [WF-CUS-004: 认证集成](WF-CUS-004_auth-jwt-login.md) — JWT 密钥管理、Login 路由、OAuth2 Token 流程
 - [WF-CUS-005: 中间件与 AccessPolicy 执行](WF-CUS-005_middleware-accesspolicy.md) — 请求上下文、四层 AccessPolicy 执行引擎
+- [WF-CUS-006: MedplumClient 核心能力](WF-CUS-006_medplum-client.md) — CRUD、Batch/Transaction、GraphQL、缓存、自动重试、WebSocket 订阅

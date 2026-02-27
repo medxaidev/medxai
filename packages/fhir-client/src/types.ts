@@ -34,7 +34,13 @@ export interface Bundle<T extends FhirResource = FhirResource> {
   type: string;
   total?: number;
   link?: Array<{ relation: string; url: string }>;
-  entry?: Array<{ fullUrl?: string; resource: T; search?: { mode: string } }>;
+  entry?: Array<{
+    fullUrl?: string;
+    resource?: T;
+    search?: { mode: string };
+    request?: { method: string; url: string };
+    response?: { status: string; location?: string; etag?: string; lastModified?: string };
+  }>;
 }
 
 /**
@@ -97,7 +103,21 @@ export interface SignInResult {
 }
 
 // =============================================================================
-// Section 3: Client Configuration
+// Section 3: JSON Patch Types
+// =============================================================================
+
+/**
+ * A single JSON Patch operation (RFC 6902).
+ */
+export interface PatchOperation {
+  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
+  path: string;
+  value?: unknown;
+  from?: string;
+}
+
+// =============================================================================
+// Section 4: Client Configuration
 // =============================================================================
 
 /**
@@ -110,10 +130,43 @@ export interface MedXAIClientConfig {
   accessToken?: string;
   /** Optional fetch implementation (defaults to global fetch). */
   fetchImpl?: typeof fetch;
+  /** LRU resource cache capacity (default: 1000, 0 = disabled). */
+  cacheSize?: number;
+  /** Cache TTL in milliseconds (default: 60000 for browser, 0 for Node). */
+  cacheTime?: number;
+  /** Max retry attempts for 429/5xx (default: 2, total 3 attempts). */
+  maxRetries?: number;
+  /** Max total retry wait in ms (default: 2000). */
+  maxRetryTime?: number;
+  /** Token refresh grace period in ms (default: 300000 = 5 min). */
+  refreshGracePeriod?: number;
+  /** Callback when authentication fails permanently. */
+  onUnauthenticated?: () => void;
 }
 
 // =============================================================================
-// Section 3: Error Types
+// Section 5: Request Options
+// =============================================================================
+
+/**
+ * Per-request options for advanced control.
+ */
+export interface RequestOptions {
+  /** Override cache behavior: 'no-cache' skips reading cache. */
+  cache?: 'default' | 'no-cache' | 'reload';
+  /** Signal to abort the request. */
+  signal?: AbortSignal;
+}
+
+/**
+ * An array of resources that also carries the original Bundle.
+ */
+export type ResourceArray<T extends FhirResource = FhirResource> = T[] & {
+  bundle: Bundle<T>;
+};
+
+// =============================================================================
+// Section 6: Error Types
 // =============================================================================
 
 /**

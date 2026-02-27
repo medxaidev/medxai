@@ -15,5 +15,8 @@ export type {
   LoginResponse,
   TokenResponse,
   SignInResult,
+  PatchOperation,
+  RequestOptions,
+  ResourceArray,
 } from './types.js';
 export { FhirClientError } from './types.js';

@@ -17,6 +17,9 @@ import type {
   LoginResponse,
   TokenResponse,
   SignInResult,
+  PatchOperation,
+  RequestOptions,
+  ResourceArray,
 } from "./types.js";
 import { FhirClientError } from "./types.js";
 
@@ -60,13 +63,29 @@ export class MedXAIClient {
   private baseUrl: string;
   private accessToken?: string;
   private refreshToken?: string;
+  private accessTokenExpires?: number;
+  private basicAuth?: string;
   private readonly fetchFn: typeof fetch;
+  private readonly maxRetries: number;
+  private readonly maxRetryTime: number;
+  private readonly refreshGracePeriod: number;
+  private readonly onUnauthenticated?: () => void;
+
+  // LRU cache
+  private readonly cache: LRUCache<CacheEntry>;
+  private readonly cacheTime: number;
 
   constructor(config: MedXAIClientConfig) {
     // Strip trailing slash
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.accessToken = config.accessToken;
     this.fetchFn = config.fetchImpl ?? globalThis.fetch;
+    this.maxRetries = config.maxRetries ?? 2;
+    this.maxRetryTime = config.maxRetryTime ?? 2000;
+    this.refreshGracePeriod = config.refreshGracePeriod ?? 300_000;
+    this.onUnauthenticated = config.onUnauthenticated;
+    this.cache = new LRUCache<CacheEntry>(config.cacheSize ?? 1000);
+    this.cacheTime = config.cacheTime ?? (typeof window !== "undefined" ? 60_000 : 0);
   }
 
   // ===========================================================================
@@ -76,8 +95,18 @@ export class MedXAIClient {
   /**
    * Set the access token for authenticated requests.
    */
-  setAccessToken(token: string | undefined): void {
+  setAccessToken(token: string | undefined, refreshToken?: string): void {
     this.accessToken = token;
+    if (refreshToken !== undefined) {
+      this.refreshToken = refreshToken;
+    }
+  }
+
+  /**
+   * Set Basic Auth credentials (for client_credentials pre-exchange).
+   */
+  setBasicAuth(clientId: string, clientSecret: string): void {
+    this.basicAuth = btoa(`${clientId}:${clientSecret}`);
   }
 
   /**
@@ -123,8 +152,7 @@ export class MedXAIClient {
     const tokenResult = await this.exchangeCode(loginResult.code);
 
     // Step 3: Set tokens on this client
-    this.accessToken = tokenResult.access_token;
-    this.refreshToken = tokenResult.refresh_token;
+    this.setTokensFromResponse(tokenResult);
 
     return {
       accessToken: tokenResult.access_token,
@@ -136,7 +164,46 @@ export class MedXAIClient {
   }
 
   /**
-   * Sign out — clear tokens from this client.
+   * Sign in with client credentials (M2M / service accounts).
+   *
+   * @param clientId - The OAuth2 client ID.
+   * @param clientSecret - The OAuth2 client secret.
+   * @returns Sign-in result with tokens.
+   */
+  async startClientLogin(
+    clientId: string,
+    clientSecret: string,
+  ): Promise<SignInResult> {
+    const url = `${this.baseUrl}/oauth2/token`;
+    const body = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+    }).toString();
+
+    const response = await this.fetchFn(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      body,
+    });
+
+    const tokenResult = await this.handleJsonResponse<TokenResponse>(response);
+    this.setTokensFromResponse(tokenResult);
+
+    return {
+      accessToken: tokenResult.access_token,
+      refreshToken: tokenResult.refresh_token,
+      expiresIn: tokenResult.expires_in,
+      project: tokenResult.project,
+      profile: tokenResult.profile,
+    };
+  }
+
+  /**
+   * Sign out — clear tokens and auth state from this client.
    *
    * Note: This only clears local state. The server-side Login resource
    * remains valid until it expires or is explicitly revoked.
@@ -144,6 +211,9 @@ export class MedXAIClient {
   signOut(): void {
     this.accessToken = undefined;
     this.refreshToken = undefined;
+    this.accessTokenExpires = undefined;
+    this.basicAuth = undefined;
+    this.cache.clear();
   }
 
   /**
@@ -173,12 +243,7 @@ export class MedXAIClient {
     });
 
     const tokenResult = await this.handleJsonResponse<TokenResponse>(response);
-
-    // Update stored tokens
-    this.accessToken = tokenResult.access_token;
-    if (tokenResult.refresh_token) {
-      this.refreshToken = tokenResult.refresh_token;
-    }
+    this.setTokensFromResponse(tokenResult);
 
     return {
       accessToken: tokenResult.access_token,
@@ -242,12 +307,32 @@ export class MedXAIClient {
    */
   async createResource<T extends FhirResource>(resource: T): Promise<T> {
     const url = `${this.baseUrl}/${resource.resourceType}`;
-    const response = await this.fetchFn(url, {
-      method: "POST",
-      headers: this.buildHeaders(),
+    const result = await this.request<T>("POST", url, {
       body: JSON.stringify(resource),
     });
-    return this.handleResponse<T>(response);
+    // Invalidate search cache for this resource type
+    this.invalidateSearches(resource.resourceType);
+    return result;
+  }
+
+  /**
+   * Create a resource only if no matching resource exists.
+   *
+   * @param resource - The resource to create.
+   * @param query - Search criteria (sent as `If-None-Exist` header).
+   * @returns The created or existing resource.
+   */
+  async createResourceIfNoneExist<T extends FhirResource>(
+    resource: T,
+    query: string,
+  ): Promise<T> {
+    const url = `${this.baseUrl}/${resource.resourceType}`;
+    const result = await this.request<T>("POST", url, {
+      body: JSON.stringify(resource),
+      extraHeaders: { "if-none-exist": query },
+    });
+    this.invalidateSearches(resource.resourceType);
+    return result;
   }
 
   /**
@@ -261,13 +346,18 @@ export class MedXAIClient {
   async readResource<T extends FhirResource>(
     resourceType: string,
     id: string,
+    options?: RequestOptions,
   ): Promise<T> {
     const url = `${this.baseUrl}/${resourceType}/${id}`;
-    const response = await this.fetchFn(url, {
-      method: "GET",
-      headers: this.buildHeaders(),
-    });
-    return this.handleResponse<T>(response);
+    return this.cachedGet<T>(url, options);
+  }
+
+  /**
+   * Read a resource by reference string (e.g., "Patient/123").
+   */
+  async readReference<T extends FhirResource>(reference: string): Promise<T> {
+    const url = `${this.baseUrl}/${reference}`;
+    return this.cachedGet<T>(url);
   }
 
   /**
@@ -281,12 +371,56 @@ export class MedXAIClient {
       throw new FhirClientError(400, "Resource must have an id for update");
     }
     const url = `${this.baseUrl}/${resource.resourceType}/${resource.id}`;
-    const response = await this.fetchFn(url, {
-      method: "PUT",
-      headers: this.buildHeaders(),
+    const result = await this.request<T>("PUT", url, {
       body: JSON.stringify(resource),
     });
-    return this.handleResponse<T>(response);
+    // Update cache with new version
+    this.cacheResource(result);
+    this.invalidateSearches(resource.resourceType);
+    return result;
+  }
+
+  /**
+   * Conditional update (upsert): update if exists, create if not.
+   *
+   * @param resource - The resource to create or update.
+   * @param query - Search criteria for the conditional match.
+   * @returns The created or updated resource.
+   */
+  async upsertResource<T extends FhirResource>(
+    resource: T,
+    query: string,
+  ): Promise<T> {
+    const url = `${this.baseUrl}/${resource.resourceType}?${query}`;
+    const result = await this.request<T>("PUT", url, {
+      body: JSON.stringify(resource),
+    });
+    this.cacheResource(result);
+    this.invalidateSearches(resource.resourceType);
+    return result;
+  }
+
+  /**
+   * Apply a JSON Patch (RFC 6902) to a resource.
+   *
+   * @param resourceType - The FHIR resource type.
+   * @param id - The resource ID.
+   * @param operations - Array of JSON Patch operations.
+   * @returns The patched resource.
+   */
+  async patchResource<T extends FhirResource>(
+    resourceType: string,
+    id: string,
+    operations: PatchOperation[],
+  ): Promise<T> {
+    const url = `${this.baseUrl}/${resourceType}/${id}`;
+    const result = await this.request<T>("PATCH", url, {
+      body: JSON.stringify(operations),
+      extraHeaders: { "content-type": "application/json-patch+json" },
+    });
+    this.cacheResource(result);
+    this.invalidateSearches(resourceType);
+    return result;
   }
 
   /**
@@ -301,11 +435,25 @@ export class MedXAIClient {
     id: string,
   ): Promise<OperationOutcome> {
     const url = `${this.baseUrl}/${resourceType}/${id}`;
-    const response = await this.fetchFn(url, {
-      method: "DELETE",
-      headers: this.buildHeaders(),
+    const result = await this.request<OperationOutcome>("DELETE", url);
+    this.cache.delete(`${this.baseUrl}/${resourceType}/${id}`);
+    this.invalidateSearches(resourceType);
+    return result;
+  }
+
+  /**
+   * Validate a resource against its profile.
+   *
+   * @param resource - The resource to validate.
+   * @returns OperationOutcome with validation results.
+   */
+  async validateResource<T extends FhirResource>(
+    resource: T,
+  ): Promise<OperationOutcome> {
+    const url = `${this.baseUrl}/${resource.resourceType}/$validate`;
+    return this.request<OperationOutcome>("POST", url, {
+      body: JSON.stringify(resource),
     });
-    return this.handleResponse<OperationOutcome>(response);
   }
 
   // ===========================================================================
@@ -313,16 +461,11 @@ export class MedXAIClient {
   // ===========================================================================
 
   /**
-   * Search for resources.
+   * Search for resources (returns Bundle).
    *
    * @param resourceType - The FHIR resource type to search.
    * @param params - Search parameters as key-value pairs.
    * @returns A Bundle containing matching resources.
-   *
-   * @example
-   * ```ts
-   * const bundle = await client.search("Patient", { name: "Smith", _count: "10" });
-   * ```
    */
   async search<T extends FhirResource>(
     resourceType: string,
@@ -334,11 +477,64 @@ export class MedXAIClient {
         url.searchParams.set(key, value);
       }
     }
-    const response = await this.fetchFn(url.toString(), {
-      method: "GET",
-      headers: this.buildHeaders(),
+    return this.cachedGet<Bundle<T>>(url.toString());
+  }
+
+  /**
+   * Search and return a single resource (automatically sets `_count=1`).
+   *
+   * @param resourceType - The FHIR resource type.
+   * @param params - Search parameters.
+   * @returns The first matching resource, or undefined if none found.
+   */
+  async searchOne<T extends FhirResource>(
+    resourceType: string,
+    params?: Record<string, string>,
+  ): Promise<T | undefined> {
+    const bundle = await this.search<T>(resourceType, {
+      ...params,
+      _count: "1",
     });
-    return this.handleResponse<Bundle<T>>(response);
+    return bundle.entry?.[0]?.resource;
+  }
+
+  /**
+   * Search and return an array of resources (extracts from Bundle).
+   *
+   * The returned array has a `bundle` property with the original Bundle.
+   *
+   * @param resourceType - The FHIR resource type.
+   * @param params - Search parameters.
+   * @returns A ResourceArray containing matching resources.
+   */
+  async searchResources<T extends FhirResource>(
+    resourceType: string,
+    params?: Record<string, string>,
+  ): Promise<ResourceArray<T>> {
+    const bundle = await this.search<T>(resourceType, params);
+    return bundleToResourceArray(bundle);
+  }
+
+  /**
+   * Paginated search using an async generator.
+   * Yields one page of resources at a time.
+   *
+   * @param resourceType - The FHIR resource type.
+   * @param params - Search parameters.
+   */
+  async *searchResourcePages<T extends FhirResource>(
+    resourceType: string,
+    params?: Record<string, string>,
+  ): AsyncGenerator<ResourceArray<T>> {
+    let bundle = await this.search<T>(resourceType, params);
+    yield bundleToResourceArray(bundle);
+
+    let nextUrl = bundle.link?.find((l) => l.relation === "next")?.url;
+    while (nextUrl) {
+      bundle = await this.cachedGet<Bundle<T>>(nextUrl);
+      yield bundleToResourceArray(bundle);
+      nextUrl = bundle.link?.find((l) => l.relation === "next")?.url;
+    }
   }
 
   /**
@@ -354,15 +550,27 @@ export class MedXAIClient {
   ): Promise<Bundle<T>> {
     const url = `${this.baseUrl}/${resourceType}/_search`;
     const body = new URLSearchParams(params).toString();
-    const response = await this.fetchFn(url, {
-      method: "POST",
-      headers: {
-        ...this.buildHeaders(),
-        "content-type": "application/x-www-form-urlencoded",
-      },
+    return this.request<Bundle<T>>("POST", url, {
       body,
+      extraHeaders: { "content-type": "application/x-www-form-urlencoded" },
     });
-    return this.handleResponse<Bundle<T>>(response);
+  }
+
+  // ===========================================================================
+  // Batch / Transaction
+  // ===========================================================================
+
+  /**
+   * Execute a FHIR Batch or Transaction Bundle.
+   *
+   * @param bundle - A Bundle with type 'batch' or 'transaction'.
+   * @returns The response Bundle.
+   */
+  async executeBatch(bundle: Bundle): Promise<Bundle> {
+    const url = this.baseUrl;
+    return this.request<Bundle>("POST", url, {
+      body: JSON.stringify(bundle),
+    });
   }
 
   // ===========================================================================
@@ -381,11 +589,7 @@ export class MedXAIClient {
     id: string,
   ): Promise<Bundle<T>> {
     const url = `${this.baseUrl}/${resourceType}/${id}/_history`;
-    const response = await this.fetchFn(url, {
-      method: "GET",
-      headers: this.buildHeaders(),
-    });
-    return this.handleResponse<Bundle<T>>(response);
+    return this.cachedGet<Bundle<T>>(url);
   }
 
   /**
@@ -402,11 +606,19 @@ export class MedXAIClient {
     versionId: string,
   ): Promise<T> {
     const url = `${this.baseUrl}/${resourceType}/${id}/_history/${versionId}`;
-    const response = await this.fetchFn(url, {
-      method: "GET",
-      headers: this.buildHeaders(),
-    });
-    return this.handleResponse<T>(response);
+    return this.cachedGet<T>(url);
+  }
+
+  // ===========================================================================
+  // Operations
+  // ===========================================================================
+
+  /**
+   * Patient $everything — returns all resources in the patient compartment.
+   */
+  async readPatientEverything(id: string): Promise<Bundle> {
+    const url = `${this.baseUrl}/Patient/${id}/$everything`;
+    return this.cachedGet<Bundle>(url);
   }
 
   // ===========================================================================
@@ -418,16 +630,184 @@ export class MedXAIClient {
    */
   async readMetadata(): Promise<FhirResource> {
     const url = `${this.baseUrl}/metadata`;
-    const response = await this.fetchFn(url, {
-      method: "GET",
-      headers: this.buildHeaders(),
-    });
-    return this.handleResponse<FhirResource>(response);
+    return this.cachedGet<FhirResource>(url);
   }
 
   // ===========================================================================
-  // Internal
+  // Cache Management
   // ===========================================================================
+
+  /**
+   * Get a cached resource synchronously (no network request).
+   * Returns undefined if not in cache.
+   */
+  getCached<T extends FhirResource>(
+    resourceType: string,
+    id: string,
+  ): T | undefined {
+    const url = `${this.baseUrl}/${resourceType}/${id}`;
+    const entry = this.cache.get(url);
+    if (!entry) return undefined;
+    if (this.cacheTime > 0 && Date.now() - entry.time > this.cacheTime) {
+      this.cache.delete(url);
+      return undefined;
+    }
+    return entry.value as T;
+  }
+
+  /**
+   * Invalidate all cached data.
+   */
+  invalidateAll(): void {
+    this.cache.clear();
+  }
+
+  // ===========================================================================
+  // Internal — Request Pipeline
+  // ===========================================================================
+
+  private async request<T>(
+    method: string,
+    url: string,
+    options?: {
+      body?: string;
+      extraHeaders?: Record<string, string>;
+      signal?: AbortSignal;
+    },
+  ): Promise<T> {
+    // Auto-refresh token if expired
+    await this.refreshIfExpired();
+
+    const headers = this.buildHeaders();
+    if (options?.extraHeaders) {
+      Object.assign(headers, options.extraHeaders);
+    }
+
+    const fetchOptions: RequestInit = {
+      method,
+      headers,
+      body: options?.body,
+      signal: options?.signal,
+    };
+
+    const response = await this.fetchWithRetry(url, fetchOptions);
+
+    // Handle 401 — attempt token refresh and retry once
+    if (response.status === 401) {
+      const retried = await this.handleUnauthenticated(method, url, fetchOptions);
+      if (retried) return retried as T;
+    }
+
+    return this.handleResponse<T>(response);
+  }
+
+  private async cachedGet<T>(url: string, options?: RequestOptions): Promise<T> {
+    // Check cache
+    if (this.cacheTime > 0 && options?.cache !== "no-cache" && options?.cache !== "reload") {
+      const entry = this.cache.get(url);
+      if (entry && Date.now() - entry.time <= this.cacheTime) {
+        return entry.value as T;
+      }
+    }
+
+    const result = await this.request<T>("GET", url, { signal: options?.signal });
+
+    // Cache the result
+    if (this.cacheTime > 0) {
+      this.cache.set(url, { value: result, time: Date.now() });
+    }
+
+    return result;
+  }
+
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit,
+  ): Promise<Response> {
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      const response = await this.fetchFn(url, options);
+
+      if (!isRetryable(response.status) || attempt === this.maxRetries) {
+        return response;
+      }
+
+      // Exponential backoff: 500 * 1.5^attempt
+      const delay = Math.min(500 * Math.pow(1.5, attempt), this.maxRetryTime);
+      await sleep(delay);
+    }
+
+    // Unreachable but TypeScript needs it
+    return this.fetchFn(url, options);
+  }
+
+  private async refreshIfExpired(): Promise<void> {
+    if (!this.accessTokenExpires || !this.refreshToken) return;
+    if (Date.now() < this.accessTokenExpires - this.refreshGracePeriod) return;
+
+    try {
+      await this.refreshAccessToken();
+    } catch {
+      // Token refresh failed — continue with current token
+    }
+  }
+
+  private async handleUnauthenticated<T>(
+    method: string,
+    url: string,
+    fetchOptions: RequestInit,
+  ): Promise<T | undefined> {
+    if (this.refreshToken) {
+      try {
+        await this.refreshAccessToken();
+        // Retry with new token
+        const headers = this.buildHeaders();
+        Object.assign(headers, (fetchOptions.headers as Record<string, string>) ?? {});
+        const retryResponse = await this.fetchFn(url, {
+          ...fetchOptions,
+          headers,
+        });
+        if (retryResponse.ok) {
+          return (await this.handleResponse<T>(retryResponse));
+        }
+      } catch {
+        // Refresh failed
+      }
+    }
+
+    // Permanent auth failure
+    this.signOut();
+    this.onUnauthenticated?.();
+    return undefined;
+  }
+
+  private setTokensFromResponse(tokenResult: TokenResponse): void {
+    this.accessToken = tokenResult.access_token;
+    this.refreshToken = tokenResult.refresh_token;
+    if (tokenResult.expires_in) {
+      this.accessTokenExpires = Date.now() + tokenResult.expires_in * 1000;
+    }
+  }
+
+  private cacheResource(resource: FhirResource): void {
+    if (!resource.id || this.cacheTime === 0) return;
+    const url = `${this.baseUrl}/${resource.resourceType}/${resource.id}`;
+    this.cache.set(url, { value: resource, time: Date.now() });
+  }
+
+  private invalidateSearches(resourceType: string): void {
+    // Remove all cache entries that look like search URLs for this type
+    const prefix = `${this.baseUrl}/${resourceType}`;
+    for (const key of this.cache.keys()) {
+      // Invalidate search URLs (contain '?' or are the type URL without an ID)
+      if (key.startsWith(prefix) && (key.includes("?") || key === prefix)) {
+        this.cache.delete(key);
+      }
+      // Invalidate history URLs
+      if (key.includes("_history") && key.startsWith(prefix)) {
+        this.cache.delete(key);
+      }
+    }
+  }
 
   private buildHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
@@ -436,6 +816,8 @@ export class MedXAIClient {
     };
     if (this.accessToken) {
       headers["authorization"] = `Bearer ${this.accessToken}`;
+    } else if (this.basicAuth) {
+      headers["authorization"] = `Basic ${this.basicAuth}`;
     }
     return headers;
   }
@@ -502,4 +884,76 @@ function isOperationOutcome(value: unknown): value is OperationOutcome {
     value !== null &&
     (value as Record<string, unknown>).resourceType === "OperationOutcome"
   );
+}
+
+function isRetryable(status: number): boolean {
+  return status === 429 || (status >= 500 && status < 600);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function bundleToResourceArray<T extends FhirResource>(
+  bundle: Bundle<T>,
+): ResourceArray<T> {
+  const resources = (bundle.entry?.map((e) => e.resource).filter(Boolean) as T[]) ?? [];
+  const arr = resources as ResourceArray<T>;
+  arr.bundle = bundle;
+  return arr;
+}
+
+// =============================================================================
+// Section 4: LRU Cache
+// =============================================================================
+
+interface CacheEntry {
+  value: unknown;
+  time: number;
+}
+
+/**
+ * Simple LRU cache using Map insertion order.
+ */
+class LRUCache<T> {
+  private readonly max: number;
+  private readonly map = new Map<string, T>();
+
+  constructor(max: number) {
+    this.max = max;
+  }
+
+  get(key: string): T | undefined {
+    const value = this.map.get(key);
+    if (value === undefined) return undefined;
+    // Move to end (most recently used)
+    this.map.delete(key);
+    this.map.set(key, value);
+    return value;
+  }
+
+  set(key: string, value: T): void {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    } else if (this.map.size >= this.max && this.max > 0) {
+      // Evict oldest (first key)
+      const firstKey = this.map.keys().next().value;
+      if (firstKey !== undefined) {
+        this.map.delete(firstKey);
+      }
+    }
+    this.map.set(key, value);
+  }
+
+  delete(key: string): void {
+    this.map.delete(key);
+  }
+
+  clear(): void {
+    this.map.clear();
+  }
+
+  keys(): IterableIterator<string> {
+    return this.map.keys();
+  }
 }
