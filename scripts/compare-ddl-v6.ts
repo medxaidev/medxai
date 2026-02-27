@@ -1,6 +1,6 @@
 /**
- * DDL Comparison Script v7
- * Compares medxai_all_6.sql vs medplum_all.sql
+ * DDL Comparison Script v8
+ * Compares medxai_all_7.sql vs medplum_all.sql
  * Extracts tables, columns, indexes, constraints and compares them systematically.
  */
 
@@ -142,9 +142,9 @@ function compare(medxai: ReturnType<typeof parseSql>, medplum: ReturnType<typeof
   const log = (s: string) => output.push(s);
 
   // ─── 1. Table-level comparison ─────────────────────────────────────────────
-  log('# DDL Comparison Report v7');
+  log('# DDL Comparison Report v8');
   log(`# Generated: ${new Date().toISOString()}`);
-  log(`# MedXAI: medxai_all_6.sql | Medplum: medplum_all.sql`);
+  log(`# MedXAI: medxai_all_7.sql | Medplum: medplum_all.sql`);
   log('');
 
   const medxaiMainTables = new Set<string>();
@@ -638,7 +638,7 @@ function compare(medxai: ReturnType<typeof parseSql>, medplum: ReturnType<typeof
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 const pgdataDir = path.join(__dirname, '..', 'packages', 'fhir-persistence', 'src', '__tests__', 'pgdata');
-const medxaiSql = fs.readFileSync(path.join(pgdataDir, 'medxai_all_6.sql'), 'utf-8');
+const medxaiSql = fs.readFileSync(path.join(pgdataDir, 'medxai_all_7.sql'), 'utf-8');
 const medplumSql = fs.readFileSync(path.join(pgdataDir, 'medplum_all.sql'), 'utf-8');
 
 const medxai = parseSql(medxaiSql);
@@ -646,7 +646,7 @@ const medplum = parseSql(medplumSql);
 
 const result = compare(medxai, medplum);
 
-const outputPath = path.join(__dirname, '..', 'compare-result-v7.txt');
+const outputPath = path.join(__dirname, '..', 'compare-result-v8.txt');
 fs.writeFileSync(outputPath, result, 'utf-8');
 
 console.log(result);
