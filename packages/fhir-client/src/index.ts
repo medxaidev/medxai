@@ -21,3 +21,9 @@ export type {
   BatchQueueEntry,
 } from './types.js';
 export { FhirClientError } from './types.js';
+export { ClientSubscriptionManager } from './subscription-manager.js';
+export type {
+  SubscriptionManagerOptions,
+  SubscriptionEvent,
+  SubscriptionNotificationEvent,
+} from './subscription-manager.js';

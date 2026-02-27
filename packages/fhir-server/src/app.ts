@@ -16,6 +16,7 @@ import { searchRoutes } from "./routes/search-routes.js";
 import { metadataRoute } from "./routes/metadata-route.js";
 import { fhirOperationsRoutes } from "./routes/fhir-operations-routes.js";
 import { adminRoutes } from "./routes/admin-routes.js";
+import { terminologyRoutes } from "./terminology/terminology-routes.js";
 import { FHIR_JSON } from "./fhir/response.js";
 import { errorToOutcome } from "./fhir/outcomes.js";
 import { buildAuthenticateToken, getOperationContext } from "./auth/middleware.js";
@@ -246,6 +247,9 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     await app.register(searchRoutes);
   }
   await app.register(resourceRoutes);
+
+  // Terminology routes ($expand, $validate-code, $lookup)
+  await app.register(terminologyRoutes);
 
   // Admin routes (require auth — each route has its own preHandler)
   await app.register(adminRoutes);
