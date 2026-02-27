@@ -18,5 +18,6 @@ export type {
   PatchOperation,
   RequestOptions,
   ResourceArray,
+  BatchQueueEntry,
 } from './types.js';
 export { FhirClientError } from './types.js';

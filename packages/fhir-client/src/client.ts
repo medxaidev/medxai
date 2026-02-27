@@ -20,6 +20,7 @@ import type {
   PatchOperation,
   RequestOptions,
   ResourceArray,
+  BatchQueueEntry,
 } from "./types.js";
 import { FhirClientError } from "./types.js";
 
@@ -74,6 +75,12 @@ export class MedXAIClient {
   // LRU cache
   private readonly cache: LRUCache<CacheEntry>;
   private readonly cacheTime: number;
+
+  // Auto-batch queue
+  private batchQueue: BatchQueueEntry[] = [];
+  private batchTimer: ReturnType<typeof setTimeout> | null = null;
+  private autoBatchEnabled = false;
+  private autoBatchDelay = 50; // ms
 
   constructor(config: MedXAIClientConfig) {
     // Strip trailing slash
@@ -634,6 +641,300 @@ export class MedXAIClient {
   }
 
   // ===========================================================================
+  // J1: Auto-Batch
+  // ===========================================================================
+
+  /**
+   * Enable or disable auto-batching.
+   *
+   * When enabled, individual CRUD operations are queued and flushed
+   * as a single batch Bundle after a configurable delay.
+   *
+   * @param enabled - Whether to enable auto-batching.
+   * @param delay - Delay in ms before flushing the queue (default: 50).
+   */
+  setAutoBatch(enabled: boolean, delay?: number): void {
+    this.autoBatchEnabled = enabled;
+    if (delay !== undefined) this.autoBatchDelay = delay;
+    if (!enabled && this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+      // Flush remaining
+      if (this.batchQueue.length > 0) {
+        void this.flushBatch();
+      }
+    }
+  }
+
+  /**
+   * Manually flush the auto-batch queue.
+   * Returns when all queued operations have completed.
+   */
+  async flushBatch(): Promise<void> {
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+
+    const entries = this.batchQueue.splice(0);
+    if (entries.length === 0) return;
+
+    const bundle: Bundle = {
+      resourceType: "Bundle",
+      type: "batch",
+      entry: entries.map((e) => ({
+        resource: e.resource,
+        request: { method: e.method, url: e.url },
+      })),
+    };
+
+    try {
+      const response = await this.executeBatch(bundle);
+      const responseEntries = response.entry ?? [];
+
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const respEntry = responseEntries[i];
+
+        if (!respEntry) {
+          entry.reject(new FhirClientError(500, "No response entry for batch item"));
+          continue;
+        }
+
+        const status = parseInt(respEntry.response?.status ?? "500", 10);
+        if (status >= 200 && status < 300) {
+          entry.resolve(respEntry.resource ?? { resourceType: "OperationOutcome", issue: [] } as OperationOutcome);
+        } else {
+          entry.reject(
+            new FhirClientError(
+              status,
+              `Batch entry failed with status ${respEntry.response?.status}`,
+            ),
+          );
+        }
+      }
+    } catch (err) {
+      // Reject all pending entries
+      for (const entry of entries) {
+        entry.reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+  }
+
+  /**
+   * Queue a request for auto-batching.
+   * Returns a Promise that resolves when the batch is flushed.
+   * @internal
+   */
+  pushToBatch<T extends FhirResource>(
+    method: string,
+    url: string,
+    resource?: FhirResource,
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.batchQueue.push({
+        method,
+        url,
+        resource,
+        resolve: resolve as (value: FhirResource | OperationOutcome) => void,
+        reject,
+      });
+
+      if (!this.batchTimer) {
+        this.batchTimer = setTimeout(() => {
+          this.batchTimer = null;
+          void this.flushBatch();
+        }, this.autoBatchDelay);
+      }
+    });
+  }
+
+  /**
+   * Check if auto-batch is enabled.
+   */
+  isAutoBatchEnabled(): boolean {
+    return this.autoBatchEnabled;
+  }
+
+  // ===========================================================================
+  // J2: Binary / Attachment Support
+  // ===========================================================================
+
+  /**
+   * Upload a binary attachment.
+   *
+   * @param data - The binary data as a string, Blob, or ArrayBuffer.
+   * @param contentType - The MIME type of the data.
+   * @param securityContext - Optional resource reference for security context.
+   * @returns The created Binary resource.
+   */
+  async uploadBinary(
+    data: string | Blob | ArrayBuffer,
+    contentType: string,
+    securityContext?: string,
+  ): Promise<FhirResource> {
+    await this.refreshIfExpired();
+    const headers = this.buildHeaders();
+    headers["content-type"] = contentType;
+    if (securityContext) {
+      headers["x-security-context"] = securityContext;
+    }
+
+    const url = `${this.baseUrl}/Binary`;
+    const response = await this.fetchWithRetry(url, {
+      method: "POST",
+      headers,
+      body: data as BodyInit,
+    });
+
+    return this.handleResponse<FhirResource>(response);
+  }
+
+  /**
+   * Download a binary attachment.
+   *
+   * @param id - The Binary resource ID.
+   * @returns The binary data as a Blob.
+   */
+  async downloadBinary(id: string): Promise<Blob> {
+    await this.refreshIfExpired();
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers["authorization"] = `Bearer ${this.accessToken}`;
+    }
+
+    const url = `${this.baseUrl}/Binary/${id}`;
+    const response = await this.fetchWithRetry(url, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new FhirClientError(
+        response.status,
+        `Failed to download Binary/${id}: ${response.statusText}`,
+      );
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * Create a Binary resource with base64-encoded data.
+   *
+   * @param contentType - MIME type.
+   * @param data - Base64-encoded data.
+   * @returns The created Binary resource.
+   */
+  async createBinary(
+    contentType: string,
+    data: string,
+  ): Promise<FhirResource> {
+    return this.createResource({
+      resourceType: "Binary",
+      contentType,
+      data,
+    });
+  }
+
+  // ===========================================================================
+  // J3: PKCE Login Flow
+  // ===========================================================================
+
+  /**
+   * Generate a PKCE code verifier and challenge for OAuth2 authorization.
+   *
+   * @returns Object with `codeVerifier` and `codeChallenge`.
+   */
+  static async generatePkceChallenge(): Promise<{
+    codeVerifier: string;
+    codeChallenge: string;
+  }> {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const codeVerifier = base64UrlEncode(array);
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(codeVerifier);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    const codeChallenge = base64UrlEncode(new Uint8Array(digest));
+
+    return { codeVerifier, codeChallenge };
+  }
+
+  /**
+   * Build the authorization URL for a PKCE login flow.
+   *
+   * @param options - PKCE authorization options.
+   * @returns The full authorization URL to redirect the user to.
+   */
+  buildPkceAuthorizationUrl(options: {
+    clientId: string;
+    redirectUri: string;
+    codeChallenge: string;
+    scope?: string;
+    state?: string;
+  }): string {
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: options.clientId,
+      redirect_uri: options.redirectUri,
+      code_challenge: options.codeChallenge,
+      code_challenge_method: "S256",
+      scope: options.scope ?? "openid offline",
+    });
+    if (options.state) {
+      params.set("state", options.state);
+    }
+    return `${this.baseUrl}/oauth2/authorize?${params.toString()}`;
+  }
+
+  /**
+   * Exchange an authorization code with PKCE code verifier.
+   *
+   * @param code - The authorization code from the callback.
+   * @param codeVerifier - The PKCE code verifier.
+   * @param redirectUri - The redirect URI used in the authorization request.
+   * @returns Sign-in result with tokens.
+   */
+  async exchangeCodeWithPkce(
+    code: string,
+    codeVerifier: string,
+    redirectUri?: string,
+  ): Promise<SignInResult> {
+    const url = `${this.baseUrl}/oauth2/token`;
+    const params: Record<string, string> = {
+      grant_type: "authorization_code",
+      code,
+      code_verifier: codeVerifier,
+    };
+    if (redirectUri) {
+      params.redirect_uri = redirectUri;
+    }
+
+    const body = new URLSearchParams(params).toString();
+    const response = await this.fetchFn(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      body,
+    });
+
+    const tokenResult = await this.handleJsonResponse<TokenResponse>(response);
+    this.setTokensFromResponse(tokenResult);
+
+    return {
+      accessToken: tokenResult.access_token,
+      refreshToken: tokenResult.refresh_token,
+      expiresIn: tokenResult.expires_in,
+      project: tokenResult.project,
+      profile: tokenResult.profile,
+    };
+  }
+
+  // ===========================================================================
   // Cache Management
   // ===========================================================================
 
@@ -884,6 +1185,12 @@ function isOperationOutcome(value: unknown): value is OperationOutcome {
     value !== null &&
     (value as Record<string, unknown>).resourceType === "OperationOutcome"
   );
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function isRetryable(status: number): boolean {

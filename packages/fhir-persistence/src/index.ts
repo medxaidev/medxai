@@ -136,6 +136,15 @@ export {
   mapRowsToResources,
 } from './search/index.js';
 
+// ─── Bundle Processor ────────────────────────────────────────────────────────
+export type {
+  BundleEntry,
+  PersistenceBundle,
+  BundleResponseEntry,
+  BundleResponse,
+} from './repo/index.js';
+export { processTransaction, processBatch } from './repo/index.js';
+
 // ─── Migrations ─────────────────────────────────────────────────────────────
 export { MigrationRunner } from './migrations/index.js';
 export type {

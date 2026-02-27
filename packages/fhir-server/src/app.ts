@@ -14,6 +14,8 @@ import type { SearchParameterRegistry } from "@medxai/fhir-persistence";
 import { resourceRoutes } from "./routes/resource-routes.js";
 import { searchRoutes } from "./routes/search-routes.js";
 import { metadataRoute } from "./routes/metadata-route.js";
+import { fhirOperationsRoutes } from "./routes/fhir-operations-routes.js";
+import { adminRoutes } from "./routes/admin-routes.js";
 import { FHIR_JSON } from "./fhir/response.js";
 import { errorToOutcome } from "./fhir/outcomes.js";
 import { buildAuthenticateToken, getOperationContext } from "./auth/middleware.js";
@@ -111,6 +113,7 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
 
   // ── Decorate with repository and search registry ──────────────────────────
   app.decorate("repo", repo);
+  app.decorate("systemRepo", systemRepo ?? repo);
   app.decorate("searchRegistry", searchRegistry ?? null);
   app.decorate("baseUrl", baseUrl ?? "");
   app.decorate("resourceValidator", resourceValidator ?? null);
@@ -159,6 +162,25 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
     const { status, outcome } = errorToOutcome(error);
     reply.status(status).header("content-type", FHIR_JSON).send(outcome);
   });
+
+  // ── Content-Type parsing for JSON Patch (RFC 6902) ─────────────────────────
+  app.addContentTypeParser(
+    "application/json-patch+json",
+    { parseAs: "string" },
+    (_req, body, done) => {
+      try {
+        const str = body as string;
+        if (!str || str.trim() === "") {
+          done(null, undefined);
+          return;
+        }
+        const json = JSON.parse(str);
+        done(null, json);
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
 
   // ── Content-Type parsing for form-encoded search ──────────────────────────
   app.addContentTypeParser(
@@ -215,10 +237,18 @@ export async function createApp(options: AppOptions): Promise<FastifyInstance> {
 
   // ── Register routes ───────────────────────────────────────────────────────────
   await app.register(metadataRoute, { baseUrl });
+
+  // FHIR operations routes (Bundle, $validate, $everything, PATCH, conditional delete)
+  // Must be registered BEFORE search routes to avoid route conflicts
+  await app.register(fhirOperationsRoutes);
+
   if (searchRegistry) {
     await app.register(searchRoutes);
   }
   await app.register(resourceRoutes);
+
+  // Admin routes (require auth — each route has its own preHandler)
+  await app.register(adminRoutes);
 
   return app;
 }

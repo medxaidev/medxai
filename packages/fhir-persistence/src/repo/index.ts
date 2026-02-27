@@ -81,3 +81,12 @@ export type {
   BuildHistoryBundleOptions,
 } from './history-bundle.js';
 export { buildHistoryBundle } from './history-bundle.js';
+
+// Bundle Processor
+export type {
+  BundleEntry,
+  Bundle as PersistenceBundle,
+  BundleResponseEntry,
+  BundleResponse,
+} from './bundle-processor.js';
+export { processTransaction, processBatch } from './bundle-processor.js';

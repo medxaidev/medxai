@@ -166,7 +166,27 @@ export type ResourceArray<T extends FhirResource = FhirResource> = T[] & {
 };
 
 // =============================================================================
-// Section 6: Error Types
+// Section 6: Auto-Batch Types
+// =============================================================================
+
+/**
+ * A queued request in the auto-batch queue.
+ */
+export interface BatchQueueEntry {
+  /** Bundle entry request method. */
+  method: string;
+  /** Bundle entry request URL (relative). */
+  url: string;
+  /** Resource body (for POST/PUT). */
+  resource?: FhirResource;
+  /** Resolve callback for the Promise returned to the caller. */
+  resolve: (value: FhirResource | OperationOutcome) => void;
+  /** Reject callback. */
+  reject: (error: Error) => void;
+}
+
+// =============================================================================
+// Section 7: Error Types
 // =============================================================================
 
 /**
