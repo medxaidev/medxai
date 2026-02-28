@@ -629,6 +629,167 @@ export class MedXAIClient {
   }
 
   // ===========================================================================
+  // Terminology Operations
+  // ===========================================================================
+
+  /**
+   * Expand a ValueSet into a flat list of codes.
+   *
+   * @param params - Expansion parameters.
+   * @param params.url - Canonical URL of the ValueSet.
+   * @param params.id - Resource ID of the ValueSet (alternative to url).
+   * @param params.filter - Text filter to apply to codes/display.
+   * @param params.count - Maximum number of codes to return.
+   * @param params.offset - Offset for paging.
+   * @param params.displayLanguage - Preferred language for display values.
+   * @returns An expanded ValueSet resource.
+   */
+  async expandValueSet(params: {
+    url?: string;
+    id?: string;
+    filter?: string;
+    count?: number;
+    offset?: number;
+    displayLanguage?: string;
+  }): Promise<FhirResource> {
+    if (params.id) {
+      const qs = new URLSearchParams();
+      if (params.filter) qs.set("filter", params.filter);
+      if (params.count !== undefined) qs.set("count", String(params.count));
+      if (params.offset !== undefined) qs.set("offset", String(params.offset));
+      if (params.displayLanguage) qs.set("displayLanguage", params.displayLanguage);
+      const query = qs.toString();
+      const url = `${this.baseUrl}/ValueSet/${params.id}/$expand${query ? `?${query}` : ""}`;
+      return this.cachedGet<FhirResource>(url);
+    }
+
+    // POST with Parameters body
+    const parameter: Array<{ name: string; valueUri?: string; valueString?: string; valueInteger?: number }> = [];
+    if (params.url) parameter.push({ name: "url", valueUri: params.url });
+    if (params.filter) parameter.push({ name: "filter", valueString: params.filter });
+    if (params.count !== undefined) parameter.push({ name: "count", valueInteger: params.count });
+    if (params.offset !== undefined) parameter.push({ name: "offset", valueInteger: params.offset });
+    if (params.displayLanguage) parameter.push({ name: "displayLanguage", valueString: params.displayLanguage });
+
+    const url = `${this.baseUrl}/ValueSet/$expand`;
+    return this.request<FhirResource>("POST", url, {
+      body: JSON.stringify({ resourceType: "Parameters", parameter }),
+    });
+  }
+
+  /**
+   * Lookup a code in a CodeSystem.
+   *
+   * @param params - Lookup parameters.
+   * @param params.system - CodeSystem URL.
+   * @param params.code - Code to look up.
+   * @param params.id - CodeSystem resource ID (alternative to system).
+   * @returns A Parameters resource with lookup results.
+   */
+  async lookupCode(params: {
+    system?: string;
+    code: string;
+    id?: string;
+  }): Promise<FhirResource> {
+    if (params.id) {
+      const qs = new URLSearchParams({ code: params.code });
+      const url = `${this.baseUrl}/CodeSystem/${params.id}/$lookup?${qs.toString()}`;
+      return this.cachedGet<FhirResource>(url);
+    }
+
+    const url = `${this.baseUrl}/CodeSystem/$lookup`;
+    const parameter: Array<{ name: string; valueUri?: string; valueCode?: string }> = [];
+    if (params.system) parameter.push({ name: "system", valueUri: params.system });
+    parameter.push({ name: "code", valueCode: params.code });
+
+    return this.request<FhirResource>("POST", url, {
+      body: JSON.stringify({ resourceType: "Parameters", parameter }),
+    });
+  }
+
+  /**
+   * Validate a code against a CodeSystem or ValueSet.
+   *
+   * @param params - Validation parameters.
+   * @param params.url - CodeSystem or ValueSet canonical URL.
+   * @param params.system - CodeSystem URL (for CodeSystem validation).
+   * @param params.code - The code to validate.
+   * @param params.id - Resource ID (alternative to url/system).
+   * @param params.resourceType - "CodeSystem" or "ValueSet" (default: "CodeSystem").
+   * @returns A Parameters resource with validation result.
+   */
+  async validateCode(params: {
+    url?: string;
+    system?: string;
+    code: string;
+    id?: string;
+    resourceType?: "CodeSystem" | "ValueSet";
+  }): Promise<FhirResource> {
+    const rt = params.resourceType ?? "CodeSystem";
+
+    if (params.id) {
+      const qs = new URLSearchParams({ code: params.code });
+      if (params.system) qs.set("system", params.system);
+      const url = `${this.baseUrl}/${rt}/${params.id}/$validate-code?${qs.toString()}`;
+      return this.cachedGet<FhirResource>(url);
+    }
+
+    const url = `${this.baseUrl}/${rt}/$validate-code`;
+    const parameter: Array<{ name: string; valueUri?: string; valueCode?: string }> = [];
+    if (params.url) parameter.push({ name: "url", valueUri: params.url });
+    if (params.system) parameter.push({ name: "system", valueUri: params.system });
+    parameter.push({ name: "code", valueCode: params.code });
+
+    return this.request<FhirResource>("POST", url, {
+      body: JSON.stringify({ resourceType: "Parameters", parameter }),
+    });
+  }
+
+  // ===========================================================================
+  // Conformance Resource Helpers
+  // ===========================================================================
+
+  /**
+   * Get a StructureDefinition by resource type name.
+   *
+   * @param type - The FHIR resource type (e.g., "Patient").
+   * @returns The StructureDefinition resource, or undefined if not found.
+   */
+  async getStructureDefinition(type: string): Promise<FhirResource | undefined> {
+    return this.searchOne<FhirResource>("StructureDefinition", { type });
+  }
+
+  /**
+   * Get a StructureDefinition by canonical URL.
+   *
+   * @param url - The canonical URL of the StructureDefinition.
+   * @returns The StructureDefinition resource, or undefined if not found.
+   */
+  async getStructureDefinitionByUrl(url: string): Promise<FhirResource | undefined> {
+    return this.searchOne<FhirResource>("StructureDefinition", { url });
+  }
+
+  /**
+   * Get a ValueSet by canonical URL.
+   *
+   * @param url - The canonical URL of the ValueSet.
+   * @returns The ValueSet resource, or undefined if not found.
+   */
+  async getValueSet(url: string): Promise<FhirResource | undefined> {
+    return this.searchOne<FhirResource>("ValueSet", { url });
+  }
+
+  /**
+   * Get a CodeSystem by canonical URL.
+   *
+   * @param url - The canonical URL of the CodeSystem.
+   * @returns The CodeSystem resource, or undefined if not found.
+   */
+  async getCodeSystem(url: string): Promise<FhirResource | undefined> {
+    return this.searchOne<FhirResource>("CodeSystem", { url });
+  }
+
+  // ===========================================================================
   // Metadata
   // ===========================================================================
 

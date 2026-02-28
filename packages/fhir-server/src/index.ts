@@ -79,3 +79,18 @@ export type {
   SeedConfig,
   SeedResult,
 } from "./auth/index.js";
+
+// ─── Terminology ───────────────────────────────────────────────────────────
+export { seedConformanceResources } from "./terminology/seed-conformance.js";
+export type {
+  SeedConformanceOptions,
+  SeedConformanceResult,
+} from "./terminology/seed-conformance.js";
+
+export { TerminologyService, TerminologyError } from "./terminology/terminology-service.js";
+export type {
+  Coding,
+  ExpandResult,
+  ValidateCodeResult,
+  LookupResult,
+} from "./terminology/terminology-service.js";

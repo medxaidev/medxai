@@ -12,6 +12,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { ResourceRepository } from "@medxai/fhir-persistence";
 import { TerminologyService, TerminologyError } from "./terminology-service.js";
+import type { ExpandOptions } from "./terminology-service.js";
 import { FHIR_JSON } from "../fhir/response.js";
 import { badRequest } from "../fhir/outcomes.js";
 
@@ -36,19 +37,18 @@ export async function terminologyRoutes(fastify: FastifyInstance): Promise<void>
   // POST /ValueSet/$expand (by url parameter or POST body)
   fastify.post("/ValueSet/$expand", async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, unknown> | undefined;
+    const query = request.query as Record<string, string>;
 
     // Extract params from Parameters resource or query
-    const url = (body as any)?.parameter?.find?.((p: any) => p.name === "url")?.valueUri
-      ?? (request.query as any)?.url;
-    const filter = (body as any)?.parameter?.find?.((p: any) => p.name === "filter")?.valueString
-      ?? (request.query as any)?.filter;
+    const url = extractParam(body, query, "url", "valueUri");
+    const opts = extractExpandOptions(body, query);
 
     if (!url) {
       return sendOutcome(reply, 400, badRequest("Parameter 'url' is required for $expand"));
     }
 
     try {
-      const result = await svc.expandByUrl(url, filter);
+      const result = await svc.expandByUrl(url, opts);
       reply.header("content-type", FHIR_JSON);
       return toExpandParameters(result);
     } catch (err) {
@@ -61,10 +61,11 @@ export async function terminologyRoutes(fastify: FastifyInstance): Promise<void>
     "/ValueSet/:id/$expand",
     async (request, reply) => {
       const { id } = request.params;
-      const filter = (request.query as any)?.filter;
+      const query = request.query as Record<string, string>;
+      const opts = extractExpandOptions(undefined, query);
 
       try {
-        const result = await svc.expandById(id, filter);
+        const result = await svc.expandById(id, opts);
         reply.header("content-type", FHIR_JSON);
         return toExpandParameters(result);
       } catch (err) {
@@ -171,6 +172,62 @@ export async function terminologyRoutes(fastify: FastifyInstance): Promise<void>
       }
     },
   );
+
+  // ── CodeSystem/$subsumes ──────────────────────────────────────────────────
+
+  // POST /CodeSystem/$subsumes
+  fastify.post("/CodeSystem/$subsumes", async (request: FastifyRequest, reply: FastifyReply) => {
+    const body = request.body as Record<string, unknown> | undefined;
+    const query = request.query as Record<string, string>;
+
+    const system = extractParam(body, query, "system", "valueUri");
+    const codeA = extractParam(body, query, "codeA", "valueCode");
+    const codeB = extractParam(body, query, "codeB", "valueCode");
+
+    if (!codeA || !codeB) {
+      return sendOutcome(reply, 400, badRequest("Parameters 'codeA' and 'codeB' are required"));
+    }
+    if (!system) {
+      return sendOutcome(reply, 400, badRequest("Parameter 'system' is required"));
+    }
+
+    try {
+      const result = await svc.subsumes(system, codeA, codeB);
+      reply.header("content-type", FHIR_JSON);
+      return {
+        resourceType: "Parameters",
+        parameter: [{ name: "outcome", valueCode: result.outcome }],
+      };
+    } catch (err) {
+      return handleTermError(reply, err);
+    }
+  });
+
+  // GET /CodeSystem/:id/$subsumes
+  fastify.get<{ Params: IdParams }>(
+    "/CodeSystem/:id/$subsumes",
+    async (request, reply) => {
+      const { id } = request.params;
+      const query = request.query as Record<string, string>;
+      const codeA = query?.codeA;
+      const codeB = query?.codeB;
+
+      if (!codeA || !codeB) {
+        return sendOutcome(reply, 400, badRequest("Query parameters 'codeA' and 'codeB' are required"));
+      }
+
+      try {
+        const result = await svc.subsumesById(id, codeA, codeB);
+        reply.header("content-type", FHIR_JSON);
+        return {
+          resourceType: "Parameters",
+          parameter: [{ name: "outcome", valueCode: result.outcome }],
+        };
+      } catch (err) {
+        return handleTermError(reply, err);
+      }
+    },
+  );
 }
 
 // =============================================================================
@@ -188,6 +245,23 @@ function extractParam(
   if (fromBody) return fromBody;
   // From query string
   return query?.[name];
+}
+
+function extractExpandOptions(
+  body: Record<string, unknown> | undefined,
+  query: Record<string, string>,
+): ExpandOptions {
+  const filter = extractParam(body, query, "filter", "valueString");
+  const displayLanguage = extractParam(body, query, "displayLanguage", "valueString");
+  const countStr = extractParam(body, query, "count", "valueInteger");
+  const offsetStr = extractParam(body, query, "offset", "valueInteger");
+
+  return {
+    filter: filter || undefined,
+    displayLanguage: displayLanguage || undefined,
+    count: countStr ? parseInt(countStr, 10) : undefined,
+    offset: offsetStr ? parseInt(offsetStr, 10) : undefined,
+  };
 }
 
 // =============================================================================
