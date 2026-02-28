@@ -17,7 +17,26 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import type { ResourceRepository } from "@medxai/fhir-persistence";
+
+// UUID v4 regex for detecting whether an id is already a UUID
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Generate a deterministic UUID from a string key.
+ * Uses SHA-256 and formats bytes 0-15 as a UUID v4-shaped string.
+ */
+function deterministicUuid(key: string): string {
+  const hash = createHash("sha256").update(key).digest("hex");
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    "4" + hash.slice(13, 16),       // version nibble = 4
+    ((parseInt(hash[16], 16) & 0x3) | 0x8).toString(16) + hash.slice(17, 20), // variant
+    hash.slice(20, 32),
+  ].join("-");
+}
 
 // =============================================================================
 // Section 1: Types
@@ -254,11 +273,14 @@ export async function seedConformanceResources(
     const id = resource.id as string;
     initType(rt);
 
+    // DB id column is UUID — convert non-UUID spec IDs to deterministic UUIDs
+    const dbId = UUID_RE.test(id) ? id : deterministicUuid(`${rt}/${id}`);
+
     try {
       if (skipExisting) {
         // Check if resource already exists
         try {
-          await repo.readResource(rt, id);
+          await repo.readResource(rt, dbId);
           // Already exists — skip
           result.skipped++;
           result.byType[rt].skipped++;
@@ -272,7 +294,7 @@ export async function seedConformanceResources(
       // Strip narrative text to save space
       const cleaned = stripNarrative(resource);
 
-      await repo.createResource(cleaned as any, { assignedId: id });
+      await repo.createResource(cleaned as any, { assignedId: dbId });
       result.created++;
       result.byType[rt].created++;
     } catch (err) {

@@ -86,7 +86,7 @@ export class MedXAIClient {
     // Strip trailing slash
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.accessToken = config.accessToken;
-    this.fetchFn = config.fetchImpl ?? globalThis.fetch;
+    this.fetchFn = config.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.maxRetries = config.maxRetries ?? 2;
     this.maxRetryTime = config.maxRetryTime ?? 2000;
     this.refreshGracePeriod = config.refreshGracePeriod ?? 300_000;
