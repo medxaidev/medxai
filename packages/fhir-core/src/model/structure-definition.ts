@@ -28,8 +28,8 @@ import type {
   CodeableConcept,
   Coding,
   ContactDetail,
+  BackboneElement,
   DomainResource,
-  Extension,
   Identifier,
   UsageContext,
 } from './primitives.js';
@@ -44,13 +44,7 @@ import type { ElementDefinition } from './element-definition.js';
  * A mapping to an external specification that the structure conforms to.
  * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.mapping
  */
-export interface StructureDefinitionMapping {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
-  /** Extensions that cannot be ignored even if unrecognized (0..*) */
-  modifierExtension?: Extension[];
+export interface StructureDefinitionMapping extends BackboneElement {
   /** Internal id when this mapping is used (1..1) */
   identity: FhirId;
   /** Identifies what this mapping refers to (0..1) */
@@ -67,13 +61,7 @@ export interface StructureDefinitionMapping {
  * type = 'Extension'.
  * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.context
  */
-export interface StructureDefinitionContext {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
-  /** Extensions that cannot be ignored even if unrecognized (0..*) */
-  modifierExtension?: Extension[];
+export interface StructureDefinitionContext extends BackboneElement {
   /** fhirpath | element | extension (1..1) */
   type: ExtensionContextType;
   /** Where the extension can be used in instances (1..1) */
@@ -86,13 +74,7 @@ export interface StructureDefinitionContext {
  * inheritance chain.
  * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.snapshot
  */
-export interface StructureDefinitionSnapshot {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
-  /** Extensions that cannot be ignored even if unrecognized (0..*) */
-  modifierExtension?: Extension[];
+export interface StructureDefinitionSnapshot extends BackboneElement {
   /**
    * Definition of elements in the resource (if no StructureDefinition) (1..*)
    *
@@ -109,13 +91,7 @@ export interface StructureDefinitionSnapshot {
  * format used when creating profiles.
  * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.differential
  */
-export interface StructureDefinitionDifferential {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
-  /** Extensions that cannot be ignored even if unrecognized (0..*) */
-  modifierExtension?: Extension[];
+export interface StructureDefinitionDifferential extends BackboneElement {
   /**
    * Definition of elements in the resource (if no StructureDefinition) (1..*)
    *

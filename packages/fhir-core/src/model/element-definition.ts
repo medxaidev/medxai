@@ -32,7 +32,7 @@ import type {
   BindingStrength,
   BackboneElement,
   Coding,
-  Extension,
+  Element,
 } from './primitives.js';
 
 // =============================================================================
@@ -46,11 +46,7 @@ import type {
  * for matching slices in an instance.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.slicing
  */
-export interface ElementDefinitionSlicing {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface ElementDefinitionSlicing extends Element {
   /**
    * Element values that are used to distinguish the slices (0..*)
    *
@@ -77,11 +73,7 @@ export interface ElementDefinitionSlicing {
  * Designates a discriminator to differentiate between slices.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.slicing.discriminator
  */
-export interface SlicingDiscriminator {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface SlicingDiscriminator extends Element {
   /**
    * value | exists | pattern | type | profile (1..1)
    * @see https://hl7.org/fhir/R4/valueset-discriminator-type.html
@@ -104,11 +96,7 @@ export interface SlicingDiscriminator {
  * through the derived and related profiles.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.base
  */
-export interface ElementDefinitionBase {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface ElementDefinitionBase extends Element {
   /** Path that identifies the base element (1..1) */
   path: FhirString;
   /** Min cardinality of the base element (1..1) */
@@ -127,11 +115,7 @@ export interface ElementDefinitionBase {
  * The data type or resource that is a permitted type for the element.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.type
  */
-export interface ElementDefinitionType {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface ElementDefinitionType extends Element {
   /**
    * Data type or Resource (name) (1..1)
    *
@@ -178,11 +162,7 @@ export interface ElementDefinitionType {
  * for the element to be valid.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.constraint
  */
-export interface ElementDefinitionConstraint {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface ElementDefinitionConstraint extends Element {
   /**
    * Target of 'condition' reference (1..1)
    *
@@ -229,11 +209,7 @@ export interface ElementDefinitionConstraint {
  * conformance expectation.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.binding
  */
-export interface ElementDefinitionBinding {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface ElementDefinitionBinding extends Element {
   /**
    * required | extensible | preferred | example (1..1)
    *
@@ -258,11 +234,7 @@ export interface ElementDefinitionBinding {
  * A sample value for the element, providing an example for implementers.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.example
  */
-export interface ElementDefinitionExample {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface ElementDefinitionExample extends Element {
   /** Describes the purpose of this example (1..1) */
   label: FhirString;
   /**
@@ -285,11 +257,7 @@ export interface ElementDefinitionExample {
  * corresponds to this element.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.mapping
  */
-export interface ElementDefinitionMapping {
-  /** Unique id for inter-element referencing (0..1) */
-  id?: FhirString;
-  /** Additional content defined by implementations (0..*) */
-  extension?: Extension[];
+export interface ElementDefinitionMapping extends Element {
   /**
    * Reference to mapping declaration (1..1)
    *

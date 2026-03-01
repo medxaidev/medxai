@@ -37,7 +37,7 @@ type Branded<Base, Brand extends string> = Base & {
  * FHIR boolean: true | false
  * @see https://hl7.org/fhir/R4/datatypes.html#boolean
  */
-export type FhirBoolean = boolean;
+export type FhirBoolean = Branded<boolean, 'FhirBoolean'>;
 
 /**
  * FHIR integer: whole numbers in the range -2,147,483,648..2,147,483,647
@@ -333,10 +333,15 @@ export interface Extension extends Element {
   /** Identifies the meaning of the extension (1..1) */
   url: FhirUri;
   /**
-   * Value of extension.
-   * This is a choice type [x] — the actual property name in JSON will be
-   * `valueString`, `valueCode`, `valueBoolean`, etc.
-   * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
+   * Value of extension (0..1).
+   *
+   * Choice type [x] — the actual property name in JSON will be
+   * `valueString`, `valueCode`, `valueBoolean`, `valueCoding`, etc.
+   * Allows **all** FHIR data types (~50+ types).
+   *
+   * Stage-1: represented as `unknown`; fhir-parser will handle
+   * concrete dispatch in Phase 2.
+   * @see https://hl7.org/fhir/R4/extensibility-definitions.html#Extension.value_x_
    */
   value?: unknown;
 }
@@ -468,9 +473,15 @@ export interface UsageContext extends Element {
   /** Type of context being specified (1..1) */
   code: Coding;
   /**
-   * Value that defines the context.
-   * Choice type [x]: valueCodeableConcept | valueQuantity | valueRange | valueReference
-   * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
+   * Value that defines the context (1..1).
+   *
+   * Choice type [x] — the actual property name in JSON will be
+   * `valueCodeableConcept`, `valueQuantity`, `valueRange`, or `valueReference`.
+   * Allows: CodeableConcept | Quantity | Range | Reference.
+   *
+   * Stage-1: represented as `unknown`; fhir-parser will handle
+   * concrete dispatch in Phase 2.
+   * @see https://hl7.org/fhir/R4/metadatatypes-definitions.html#UsageContext.value_x_
    */
   value?: unknown;
 }

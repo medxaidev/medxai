@@ -572,7 +572,7 @@ function processTypeSlicing(
     slicingRoot.slicing = {
       discriminator: [{ type: 'type' as any, path: '$this' as any }],
       rules: 'open' as any,
-      ordered: false,
+      ordered: false as any,
     };
   }
   result.push(slicingRoot);

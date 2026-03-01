@@ -68,7 +68,7 @@ export function makeExtensionSlicing(): ElementDefinitionSlicing {
       },
     ],
     rules: 'open' as any,
-    ordered: false,
+    ordered: false as any,
   };
 }
 
@@ -322,7 +322,7 @@ export function handleNewSlicing(
     // Synthesize a basic open slicing
     slicingRoot.slicing = {
       rules: 'open' as any,
-      ordered: false,
+      ordered: false as any,
     };
   }
 
