@@ -6,11 +6,12 @@
  * Usage:
  *   npx tsx scripts/dev-server.mts
  *
- * Env vars (all optional, defaults shown):
- *   DB_HOST=localhost  DB_PORT=5433  DB_NAME=medxai_dev
- *   DB_USER=postgres   DB_PASSWORD=assert
- *   ADMIN_EMAIL=admin@medxai.test  ADMIN_PASSWORD=medxai123
- *   PORT=8080
+ * Configuration priority:
+ * 1. Environment variables (DB_HOST, PORT, ADMIN_EMAIL, etc.)
+ * 2. medxai.config.json (in packages/fhir-server/)
+ * 3. Built-in defaults
+ *
+ * See src/config.ts for all supported options.
  */
 
 import { resolve, dirname } from "node:path";
@@ -19,20 +20,16 @@ import { readFileSync, existsSync } from "node:fs";
 import { DatabaseClient, FhirRepository, SearchParameterRegistry } from "@medxai/fhir-persistence";
 import type { SearchParameterBundle } from "@medxai/fhir-persistence";
 import { createApp, seedDatabase, initKeys, seedConformanceResources } from "../src/index.js";
+import { loadConfig } from "../src/config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ── Config ──────────────────────────────────────────────────────────────────
-const DB_HOST = process.env["DB_HOST"] ?? "localhost";
-const DB_PORT = parseInt(process.env["DB_PORT"] ?? "5433", 10);
-const DB_NAME = process.env["DB_NAME"] ?? "medxai_dev";
-const DB_USER = process.env["DB_USER"] ?? "postgres";
-const DB_PASSWORD = process.env["DB_PASSWORD"] ?? "assert";
+const serverRoot = resolve(__dirname, "..");
+const config = loadConfig(serverRoot);
 
-const ADMIN_EMAIL = process.env["ADMIN_EMAIL"] ?? "admin@medxai.test";
-const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"] ?? "medxai123";
-const PORT = parseInt(process.env["PORT"] ?? "8080", 10);
-const BASE_URL = `http://localhost:${PORT}`;
+const { database: dbCfg, seed: seedCfg } = config;
+const BASE_URL = config.baseUrl.replace(/\/$/, ""); // strip trailing slash
 
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
@@ -42,13 +39,13 @@ async function main() {
   console.log();
 
   // 1. Connect to database
-  console.log(`[DB] Connecting to ${DB_HOST}:${DB_PORT}/${DB_NAME}...`);
+  console.log(`[DB] Connecting to ${dbCfg.host}:${dbCfg.port}/${dbCfg.dbname}...`);
   const db = new DatabaseClient({
-    host: DB_HOST,
-    port: DB_PORT,
-    database: DB_NAME,
-    user: DB_USER,
-    password: DB_PASSWORD,
+    host: dbCfg.host,
+    port: dbCfg.port,
+    database: dbCfg.dbname,
+    user: dbCfg.username,
+    password: dbCfg.password,
   });
 
   const alive = await db.ping();
@@ -90,12 +87,12 @@ async function main() {
   console.log("[Seed] Seeding platform resources...");
   try {
     const seed = await seedDatabase(systemRepo, {
-      adminEmail: ADMIN_EMAIL,
-      adminPassword: ADMIN_PASSWORD,
+      adminEmail: seedCfg.adminEmail,
+      adminPassword: seedCfg.adminPassword,
     });
     console.log("[Seed] ✅ Seed complete");
     console.log(`  Project:  ${seed.project.id} (Super Admin)`);
-    console.log(`  User:     ${seed.user.id} (${ADMIN_EMAIL})`);
+    console.log(`  User:     ${seed.user.id} (${seedCfg.adminEmail})`);
     console.log(`  Client:   ${seed.client.id}`);
     console.log(`  Secret:   ${seed.clientSecret}`);
   } catch (err: any) {
@@ -109,7 +106,7 @@ async function main() {
   }
 
   // 6. Seed conformance resources (CodeSystem, ValueSet, StructureDefinition)
-  if (process.env["SKIP_CONFORMANCE"] !== "1") {
+  if (!seedCfg.skipConformance) {
     console.log("[Conformance] Seeding conformance resources (this may take a minute)...");
     try {
       const confResult = await seedConformanceResources(systemRepo, {
@@ -132,7 +129,7 @@ async function main() {
       console.warn("[Conformance] ⚠️  Seed failed (non-fatal):", err.message);
     }
   } else {
-    console.log("[Conformance] ℹ️  Skipped (SKIP_CONFORMANCE=1)");
+    console.log("[Conformance] ℹ️  Skipped (skipConformance=true)");
   }
 
   // 7. Create and start the server
@@ -141,22 +138,22 @@ async function main() {
     repo: systemRepo,
     systemRepo,
     searchRegistry: spRegistry,
-    logger: false,
+    logger: config.logger,
     baseUrl: BASE_URL,
-    enableAuth: true,
+    enableAuth: config.enableAuth,
   });
 
-  await app.listen({ port: PORT, host: "0.0.0.0" });
+  await app.listen({ port: config.port, host: "0.0.0.0" });
 
   console.log();
   console.log("╔═══════════════════════════════════════════╗");
   console.log(`║  🚀 Server running at ${BASE_URL}         ║`);
   console.log("╠═══════════════════════════════════════════╣");
-  console.log(`║  Admin:  ${ADMIN_EMAIL.padEnd(32)}║`);
-  console.log(`║  Pass:   ${ADMIN_PASSWORD.padEnd(32)}║`);
+  console.log(`║  Admin:  ${seedCfg.adminEmail.padEnd(32)}║`);
+  console.log(`║  Pass:   ${seedCfg.adminPassword.padEnd(32)}║`);
   console.log("╚═══════════════════════════════════════════╝");
   console.log();
-  console.log("Console: http://localhost:3001");
+  console.log(`Console: ${config.consoleUrl}`);
   console.log("Press Ctrl+C to stop.");
 }
 

@@ -80,6 +80,15 @@ export type {
   SeedResult,
 } from "./auth/index.js";
 
+// ─── Config ────────────────────────────────────────────────────────────────
+export { loadConfig } from "./config.js";
+export type {
+  MedXAIServerConfig,
+  DatabaseConfig,
+  RedisConfig,
+  SeedConfig as ServerSeedConfig,
+} from "./config.js";
+
 // ─── Terminology ───────────────────────────────────────────────────────────
 export { seedConformanceResources } from "./terminology/seed-conformance.js";
 export type {
