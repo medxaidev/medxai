@@ -309,3 +309,4 @@ Seed 按以下顺序创建系统初始数据：
 - [WF-CUS-006: MedplumClient 核心能力](WF-CUS-006_medplum-client.md) — CRUD、Batch/Transaction、GraphQL、缓存、自动重试、WebSocket 订阅
 - [WF-CUS-007: Server 路由全表](WF-CUS-007_server-routes.md) — 全部 ~182 个端点、类别、核心实现函数、认证要求
 - [WF-CUS-008: App 平台全面分析](WF-CUS-008_app-platform.md) — 前端管理平台 ~51 页面、路由、组件、API 调用模式
+- [WF-CUS-009: CLI 全面分析](WF-CUS-009_cli.md) — 命令行工具 ~38 命令、认证/Profile/Bot/Bulk/Agent/HL7/AWS
