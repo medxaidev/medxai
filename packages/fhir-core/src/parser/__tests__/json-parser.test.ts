@@ -319,6 +319,44 @@ describe('parseFhirObject', () => {
       expect(result.data.id).toBe('late-type-1');
     }
   });
+
+  // --- Generic resource uses parseComplexObject ---
+
+  it('reports UNEXPECTED_PROPERTY warnings for unknown fields on generic resources', () => {
+    const result = parseFhirObject({
+      resourceType: 'Patient',
+      id: '123',
+      unknownField: 'test',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.issues.some((i) => i.code === 'UNEXPECTED_PROPERTY' && i.message.includes('unknownField'))).toBe(true);
+    expect(result.issues.some((i) => i.severity === 'warning')).toBe(true);
+  });
+
+  it('reports UNEXPECTED_NULL for null fields on generic resources', () => {
+    const result = parseFhirObject({
+      resourceType: 'Patient',
+      id: null,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues.some((i) => i.code === 'UNEXPECTED_NULL' && i.path.includes('id'))).toBe(true);
+    }
+  });
+
+  it('preserves _element companions for primitive fields on generic resources', () => {
+    const result = parseFhirObject({
+      resourceType: 'Patient',
+      id: '123',
+      _id: { extension: [{ url: 'http://example.org', valueString: 'test' }] },
+    });
+
+    expect(result.success).toBe(true);
+    // _id should not trigger UNEXPECTED_PROPERTY
+    expect(result.issues.filter((i) => i.code === 'UNEXPECTED_PROPERTY')).toHaveLength(0);
+  });
 });
 
 // =============================================================================
@@ -508,7 +546,7 @@ describe('parseComplexObject', () => {
 
   // --- _element companion properties ---
 
-  it('preserves _element companion for primitive properties', () => {
+  it('merges primitive value with _element companion via mergePrimitiveElement', () => {
     const schema = makeSchema([
       ['birthDate', { isPrimitive: true }],
     ]);
@@ -519,10 +557,43 @@ describe('parseComplexObject', () => {
     };
     const { result, issues } = parseComplexObject(obj, 'Patient', schema);
 
-    expect(result.birthDate).toBe('1970-03-30');
-    expect(result._birthDate).toBeDefined();
-    expect((result._birthDate as JsonObject).id).toBe('314159');
+    // Value + _element merged into PrimitiveWithMetadata
+    const merged = result.birthDate as { value: string; id: string; extension: unknown[] };
+    expect(merged.value).toBe('1970-03-30');
+    expect(merged.id).toBe('314159');
+    expect(merged.extension).toHaveLength(1);
+    // _birthDate should NOT appear as a separate key
+    expect(result._birthDate).toBeUndefined();
     // _element should not trigger UNEXPECTED_PROPERTY
+    expect(issues.filter((i) => i.code === 'UNEXPECTED_PROPERTY')).toHaveLength(0);
+  });
+
+  it('returns value directly when no _element companion is present', () => {
+    const schema = makeSchema([
+      ['birthDate', { isPrimitive: true }],
+    ]);
+
+    const obj: JsonObject = { birthDate: '1970-03-30' };
+    const { result } = parseComplexObject(obj, 'Patient', schema);
+
+    // No _element → value returned unwrapped
+    expect(result.birthDate).toBe('1970-03-30');
+  });
+
+  it('returns PrimitiveWithMetadata when only _element is present (no value)', () => {
+    const schema = makeSchema([
+      ['birthDate', { isPrimitive: true }],
+    ]);
+
+    const obj: JsonObject = {
+      _birthDate: { id: 'ext-only', extension: [{ url: 'http://example.org' }] },
+    };
+    const { result, issues } = parseComplexObject(obj, 'Patient', schema);
+
+    // _element only → PrimitiveWithMetadata with no value
+    const merged = result.birthDate as { id: string; extension: unknown[] };
+    expect(merged.id).toBe('ext-only');
+    expect(merged.extension).toHaveLength(1);
     expect(issues.filter((i) => i.code === 'UNEXPECTED_PROPERTY')).toHaveLength(0);
   });
 

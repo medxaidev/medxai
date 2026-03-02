@@ -146,6 +146,9 @@ export function parseSuccess<T>(data: T, issues: ParseIssue[] = []): ParseResult
  * @param issues - The error(s) that caused the failure (must contain at least one error)
  */
 export function parseFailure<T>(issues: ParseIssue[]): ParseResult<T> {
+  if (!hasErrors(issues)) {
+    throw new Error('parseFailure requires at least one error in issues array');
+  }
   return { success: false, data: undefined, issues };
 }
 

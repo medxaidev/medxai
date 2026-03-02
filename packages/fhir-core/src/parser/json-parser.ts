@@ -32,6 +32,7 @@ import {
   hasErrors,
 } from './parse-error.js';
 import { parseStructureDefinition } from './structure-definition-parser.js';
+import { mergePrimitiveElement, mergePrimitiveArray } from './primitive-parser.js';
 
 // =============================================================================
 // Section 1: Type Guards & Utilities
@@ -98,6 +99,15 @@ export interface PropertyDescriptor {
   readonly isPrimitive: boolean;
 
   /**
+   * The FHIR primitive type name (e.g., `'string'`, `'boolean'`, `'id'`).
+   *
+   * Required when `isPrimitive` is true. Used by `mergePrimitiveElement`
+   * to validate the JavaScript type of the value (string, number, or boolean).
+   * Defaults to `'string'` when not specified.
+   */
+  readonly fhirType?: string;
+
+  /**
    * Whether this property is an array (max cardinality > 1).
    *
    * FHIR JSON always uses arrays for repeating elements, even when
@@ -139,13 +149,20 @@ export interface ComplexParseResult {
  * Parse a FHIR complex type JSON object using a property schema.
  *
  * This is the workhorse function that all type-specific parsers delegate to.
- * It iterates over the JSON object's keys and:
+ * It uses a 4-pass strategy to process the JSON object's keys:
  *
- * 1. **Known properties** — maps them into the result, recursing for complex types
- * 2. **`_`-prefixed keys** — pairs them with their value property for primitive
- *    element merging (delegated to primitive-parser in Task 2.3; for now, stored
- *    as-is on the result under the `_`-prefixed key)
- * 3. **Unknown keys** — emits `UNEXPECTED_PROPERTY` warnings
+ * 1. **Pass 1: Known properties** — maps non-primitive properties into the result,
+ *    recursing for complex types. Primitive properties are marked as consumed but
+ *    their values are deferred to Pass 2 for `_element` merging.
+ * 2. **Pass 2: Primitive `_element` merging** — for each primitive property in the
+ *    schema, calls `mergePrimitiveElement` (or `mergePrimitiveArray`) from
+ *    primitive-parser to merge the JSON value with its `_name` companion carrying
+ *    id/extension metadata.
+ * 3. **Pass 3: Choice type `[x]`** — identifies choice type properties by matching
+ *    `choiceFieldBases` prefixes with uppercase type suffixes, stores values as-is
+ *    (full extraction delegated to choice-type-parser in Task 2.4)
+ * 4. **Pass 4: Unexpected properties** — emits `UNEXPECTED_PROPERTY` warnings for
+ *    any remaining unconsumed keys
  *
  * @param obj - The raw JSON object to parse
  * @param path - Current JSON path (for error reporting)
@@ -167,12 +184,20 @@ export function parseComplexObject(
   // Collect all keys that are accounted for (known, _, or choice-type)
   const consumedKeys = new Set<string>();
 
-  // --- Pass 1: Process known properties ---
+  // --- Pass 1: Process known NON-primitive properties ---
+  // Primitive properties are deferred to Pass 2 for _element merging.
   for (const [key, descriptor] of schema) {
     const value = obj[key];
-    if (value === undefined) continue;
 
-    consumedKeys.add(key);
+    // Mark key as consumed even if we defer processing
+    if (value !== undefined) {
+      consumedKeys.add(key);
+    }
+
+    // Skip primitives — handled in Pass 2 with _element merging
+    if (descriptor.isPrimitive) continue;
+
+    if (value === undefined) continue;
 
     if (value === null) {
       // FHIR JSON: null is only valid inside arrays for primitive alignment
@@ -187,26 +212,55 @@ export function parseComplexObject(
       result[key] = nested.result;
       issues.push(...nested.issues);
     } else {
-      // Primitive or pass-through value
+      // Pass-through value (complex type without dedicated parser)
       result[key] = value;
     }
   }
 
-  // --- Pass 2: Collect _element companion properties ---
-  for (const key of Object.keys(obj)) {
-    if (!key.startsWith('_')) continue;
-    const baseName = key.slice(1);
+  // --- Pass 2: Merge primitive properties with _element companions ---
+  for (const [key, descriptor] of schema) {
+    if (!descriptor.isPrimitive) continue;
 
-    // Only relevant if the base name is a known property marked as primitive
-    const descriptor = schema.get(baseName);
-    if (descriptor?.isPrimitive) {
-      consumedKeys.add(key);
-      // Store the _element data alongside the value for later merging
-      // Full primitive element merging is implemented in Task 2.3
-      const elementValue = obj[key];
-      if (elementValue !== undefined) {
-        result[key] = elementValue;
+    const value = obj[key];
+    const underscoreKey = `_${key}`;
+    const elementExt = obj[underscoreKey];
+
+    // Consume the _element companion key
+    if (elementExt !== undefined) {
+      consumedKeys.add(underscoreKey);
+    }
+
+    // Skip if neither value nor _element is present
+    if (value === undefined && elementExt === undefined) continue;
+
+    // null top-level primitive value is an error (not inside an array)
+    if (value === null && elementExt === undefined) {
+      issues.push(createIssue('error', 'UNEXPECTED_NULL', `Property "${key}" must not be null`, pathAppend(path, key)));
+      continue;
+    }
+
+    const fhirType = descriptor.fhirType ?? 'string';
+    const propPath = pathAppend(path, key);
+
+    if (descriptor.isArray) {
+      // Array primitive — use mergePrimitiveArray
+      if (value !== undefined && !Array.isArray(value)) {
+        issues.push(createIssue('error', 'INVALID_STRUCTURE', `Property "${key}" must be an array`, propPath));
+        continue;
       }
+      const valArr = (value as unknown[] | undefined) ?? [];
+      const extArr = elementExt as unknown[] | undefined;
+      const { result: merged, issues: mergeIssues } = mergePrimitiveArray(valArr, extArr, fhirType, propPath);
+      result[key] = merged;
+      issues.push(...mergeIssues);
+    } else {
+      // Single primitive — use mergePrimitiveElement
+      const actualValue = value === null ? undefined : value;
+      const { result: merged, issues: mergeIssues } = mergePrimitiveElement(actualValue, elementExt, fhirType, propPath);
+      if (merged !== undefined) {
+        result[key] = merged;
+      }
+      issues.push(...mergeIssues);
     }
   }
 
@@ -312,10 +366,33 @@ function parseArrayProperty(
 // =============================================================================
 
 /**
+ * Property schema for the base FHIR Resource type.
+ *
+ * Covers the 5 fields defined on Resource:
+ * - resourceType (string, required)
+ * - id (primitive, optional)
+ * - meta (complex, optional)
+ * - implicitRules (primitive, optional)
+ * - language (primitive, optional)
+ *
+ * Used by {@link parseGenericResource} to validate and extract base fields
+ * via {@link parseComplexObject}.
+ */
+const RESOURCE_SCHEMA: PropertySchema = new Map<string, PropertyDescriptor>([
+  ['resourceType', { name: 'resourceType', isPrimitive: true, isArray: false, fhirType: 'code' }],
+  ['id', { name: 'id', isPrimitive: true, isArray: false, fhirType: 'id' }],
+  ['meta', { name: 'meta', isPrimitive: false, isArray: false }],
+  ['implicitRules', { name: 'implicitRules', isPrimitive: true, isArray: false, fhirType: 'uri' }],
+  ['language', { name: 'language', isPrimitive: true, isArray: false, fhirType: 'code' }],
+]);
+
+/**
  * Parse a generic FHIR resource from a JSON object.
  *
- * Extracts only the base `Resource` fields (resourceType, id, meta,
- * implicitRules, language) and passes all other properties through as-is.
+ * Uses {@link parseComplexObject} with {@link RESOURCE_SCHEMA} to extract
+ * the base `Resource` fields (resourceType, id, meta, implicitRules, language)
+ * and report unknown properties as warnings.
+ *
  * This is the fallback for resource types that don't have a dedicated parser.
  *
  * @param obj - The raw JSON object (already validated as a plain object with resourceType)
@@ -327,16 +404,14 @@ function parseGenericResource(
   resourceType: string,
   path: string,
 ): { result: Resource; issues: ParseIssue[] } {
-  const issues: ParseIssue[] = [];
+  const { result: parsed, issues } = parseComplexObject(obj, path, RESOURCE_SCHEMA);
 
-  // For generic resources, pass through all properties as-is
-  // Only validate the base Resource structure
   const result: Resource = {
     resourceType,
-    ...(obj.id !== undefined && { id: obj.id as Resource['id'] }),
-    ...(obj.meta !== undefined && { meta: obj.meta as Resource['meta'] }),
-    ...(obj.implicitRules !== undefined && { implicitRules: obj.implicitRules as Resource['implicitRules'] }),
-    ...(obj.language !== undefined && { language: obj.language as Resource['language'] }),
+    ...(parsed.id !== undefined && { id: parsed.id as Resource['id'] }),
+    ...(parsed.meta !== undefined && { meta: parsed.meta as Resource['meta'] }),
+    ...(parsed.implicitRules !== undefined && { implicitRules: parsed.implicitRules as Resource['implicitRules'] }),
+    ...(parsed.language !== undefined && { language: parsed.language as Resource['language'] }),
   };
 
   return { result, issues };

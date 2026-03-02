@@ -10,5 +10,4 @@ __tests__/pgdata/
 # server config (contains passwords — use medxai.config.template.json as reference)
 medxai.config.json
 
-
 devdocs/

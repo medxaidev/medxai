@@ -140,7 +140,7 @@ export function extractChoiceValue(
           'error',
           'INVALID_CHOICE_TYPE',
           `Unknown type suffix "${suffix}" for choice field "${baseName}[x]". ` +
-            `Allowed types: ${allowedTypes.join(', ')}`,
+          `Allowed types: ${allowedTypes.join(', ')}`,
           pathAppend(path, key),
         ),
       );
@@ -381,8 +381,8 @@ export const CHOICE_TYPE_FIELDS: ReadonlyMap<string, readonly ChoiceTypeField[]>
  * `['defaultValue', 'fixed', 'pattern', 'minValue', 'maxValue']` for
  * ElementDefinition).
  *
- * This is used by `parseComplexObject` in `json-parser.ts` to pass
- * `choiceFieldBases` for Pass 3 key matching.
+ * This can be used to pass `choiceFieldBases` to `parseComplexObject`
+ * for Pass 3 key matching, or for other custom parsing logic.
  *
  * @param hostType - The FHIR type name (e.g., "Extension", "ElementDefinition")
  * @returns Array of base names, or empty array if no choice fields

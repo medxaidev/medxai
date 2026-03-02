@@ -124,6 +124,17 @@ describe('parseFailure', () => {
       expect.unreachable('Expected failure');
     }
   });
+
+  it('throws when issues array is empty', () => {
+    expect(() => parseFailure([])).toThrow('parseFailure requires at least one error in issues array');
+  });
+
+  it('throws when issues array contains only warnings', () => {
+    const warnings = [
+      createIssue('warning', 'UNEXPECTED_PROPERTY', 'Unknown prop', 'Patient.x'),
+    ];
+    expect(() => parseFailure(warnings)).toThrow('parseFailure requires at least one error in issues array');
+  });
 });
 
 // =============================================================================
