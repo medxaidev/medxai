@@ -49,6 +49,13 @@ export {
   loadBundlesFromFiles,
 } from './bundle-loader.js';
 
+// ─── InnerType Extractor ────────────────────────────────────────────────────
+export {
+  extractInnerTypes,
+  buildTypeName,
+  isBackboneElementType,
+} from './inner-type-extractor.js';
+
 // ─── Core Definitions ────────────────────────────────────────────────────────
 export {
   BASE_RESOURCES,

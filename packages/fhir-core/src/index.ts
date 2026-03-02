@@ -151,6 +151,9 @@ export {
   loadCoreDefinition,
   loadCoreDefinitionSync,
   getCoreDefinitionsDir,
+  extractInnerTypes,
+  buildTypeName,
+  isBackboneElementType,
 } from './context/index.js';
 
 // ─── Profile module ────────────────────────────────────────────────────────

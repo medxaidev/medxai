@@ -13,7 +13,7 @@
  * @module fhir-context
  */
 
-import type { StructureDefinition } from '../model/index.js';
+import type { StructureDefinition, CanonicalProfile } from '../model/index.js';
 import type {
   FhirContext,
   FhirContextOptions,
@@ -55,6 +55,8 @@ export class FhirContextImpl implements FhirContext {
   private readonly _loader: StructureDefinitionLoader;
   private readonly _options: FhirContextOptions;
   private readonly _stats: ContextStatistics;
+  private readonly _innerTypes = new Map<string, CanonicalProfile>();
+  private readonly _canonicalProfiles = new Map<string, CanonicalProfile>();
   private _disposed = false;
 
   constructor(options: FhirContextOptions) {
@@ -156,9 +158,33 @@ export class FhirContextImpl implements FhirContext {
     return { ...this._stats };
   }
 
+  registerCanonicalProfile(profile: CanonicalProfile): void {
+    this._ensureNotDisposed();
+    this._canonicalProfiles.set(profile.type, profile);
+
+    // Register all inner types from this profile
+    if (profile.innerTypes) {
+      for (const [typeName, innerType] of profile.innerTypes) {
+        this._innerTypes.set(typeName, innerType);
+      }
+    }
+  }
+
+  getInnerType(typeName: string): CanonicalProfile | undefined {
+    this._ensureNotDisposed();
+    return this._innerTypes.get(typeName);
+  }
+
+  hasInnerType(typeName: string): boolean {
+    this._ensureNotDisposed();
+    return this._innerTypes.has(typeName);
+  }
+
   dispose(): void {
     this._registry.clear();
     this._resolver.clearCache();
+    this._innerTypes.clear();
+    this._canonicalProfiles.clear();
     this._stats.totalLoaded = 0;
     this._stats.cacheHits = 0;
     this._stats.cacheMisses = 0;

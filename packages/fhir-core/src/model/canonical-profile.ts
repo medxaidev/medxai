@@ -412,4 +412,31 @@ export interface CanonicalProfile {
    * the correct order during snapshot generation.
    */
   elements: Map<string, CanonicalElement>;
+
+  /**
+   * Inner types extracted from BackboneElement elements.
+   *
+   * Keyed by generated type name (e.g., `'PatientContact'`).
+   * Each inner type is itself a `CanonicalProfile` containing only
+   * the direct child elements of the BackboneElement.
+   *
+   * Populated by {@link extractInnerTypes} after snapshot generation.
+   * Inspired by Medplum's `InternalTypeSchema.innerTypes`.
+   *
+   * @example
+   * ```typescript
+   * const patientProfile = ...;
+   * const contactType = patientProfile.innerTypes?.get('PatientContact');
+   * // contactType.elements has: Patient.contact.relationship, Patient.contact.name, ...
+   * ```
+   */
+  innerTypes?: Map<string, CanonicalProfile>;
+
+  /**
+   * If this profile is an inner type, the generated type name of its parent.
+   *
+   * For example, `PatientContact` has `parentType: 'Patient'`.
+   * Top-level profiles have `parentType` as `undefined`.
+   */
+  parentType?: string;
 }

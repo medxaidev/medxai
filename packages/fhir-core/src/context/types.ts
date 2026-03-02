@@ -14,7 +14,7 @@
  * @module fhir-context
  */
 
-import type { StructureDefinition } from '../model/index.js';
+import type { StructureDefinition, CanonicalProfile } from '../model/index.js';
 
 // =============================================================================
 // Section 1: FhirContext Interface
@@ -131,6 +131,32 @@ export interface FhirContext {
    * Return runtime statistics for monitoring and diagnostics.
    */
   getStatistics(): ContextStatistics;
+
+  /**
+   * Register a CanonicalProfile and its extracted InnerTypes.
+   *
+   * This is the primary method for making InnerTypes available for
+   * downstream consumption (UI forms, recursive validation, etc.).
+   * Typically called after snapshot generation + `extractInnerTypes()`.
+   *
+   * @param profile - The CanonicalProfile (with innerTypes populated)
+   */
+  registerCanonicalProfile(profile: CanonicalProfile): void;
+
+  /**
+   * Retrieve an InnerType schema by its generated type name.
+   *
+   * @param typeName - Generated type name (e.g., `'PatientContact'`)
+   * @returns The InnerType CanonicalProfile, or `undefined` if not registered
+   */
+  getInnerType(typeName: string): CanonicalProfile | undefined;
+
+  /**
+   * Check whether an InnerType is registered.
+   *
+   * @param typeName - Generated type name (e.g., `'PatientContact'`)
+   */
+  hasInnerType(typeName: string): boolean;
 
   /**
    * Release all cached data and reset internal state.

@@ -1,0 +1,25 @@
+{
+  "name": "@medxai/fhirtypes",
+  "version": "0.1.0",
+  "description": "MedXAI FHIR R4 Type Definitions",
+  "keywords": [
+    "medxai",
+    "fhir",
+    "healthcare",
+    "r4",
+    "types",
+    "typescript"
+  ],
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "type": "module",
+  "main": "",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "tsx ../fhir-core/scripts/generate-fhirtypes.ts",
+    "clean": ""
+  }
+}
