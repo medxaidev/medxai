@@ -18,8 +18,12 @@ import { LoaderError } from '../errors.js';
  * A loader that delegates to an ordered list of child loaders.
  *
  * Resolution stops at the first loader that returns a non-null result.
- * If a loader throws a {@link LoaderError}, the error is propagated
- * immediately (no fallback for hard failures).
+ * If a loader throws an error, the error is collected and the next
+ * loader is tried. If all loaders fail or return null, the first
+ * collected error (if any) is thrown.
+ *
+ * This follows the HAPI `ValidationSupportChain` pattern: record
+ * errors from individual loaders but continue trying remaining loaders.
  *
  * @example
  * ```typescript
@@ -43,6 +47,8 @@ export class CompositeLoader implements StructureDefinitionLoader {
   }
 
   async load(url: string): Promise<StructureDefinition | null> {
+    const errors: Error[] = [];
+
     for (const loader of this._loaders) {
       try {
         const result = await loader.load(url);
@@ -50,14 +56,21 @@ export class CompositeLoader implements StructureDefinitionLoader {
           return result;
         }
       } catch (err) {
-        // Re-throw LoaderError directly (hard failure from a specific loader)
+        // Collect error and continue to next loader
         if (err instanceof LoaderError) {
-          throw err;
+          errors.push(err);
+        } else {
+          errors.push(new LoaderError(url, loader.getSourceType(), err as Error));
         }
-        // Wrap unexpected errors
-        throw new LoaderError(url, loader.getSourceType(), err as Error);
       }
     }
+
+    // All loaders returned null or threw — if any errors were collected,
+    // throw the first one (it is the most relevant since loaders are ordered)
+    if (errors.length > 0) {
+      throw errors[0];
+    }
+
     return null;
   }
 

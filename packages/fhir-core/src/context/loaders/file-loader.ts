@@ -56,15 +56,15 @@ export class FileSystemLoader implements StructureDefinitionLoader {
     const name = extractResourceName(url);
     const filePath = join(this._basePath, `${name}.json`);
 
-    // Check file existence before attempting read
-    if (!existsSync(filePath)) {
-      return null;
-    }
-
     let raw: string;
     try {
       raw = await readFile(filePath, 'utf-8');
     } catch (err) {
+      // File not found is a normal "miss" — return null to allow fallback
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      // Other I/O errors (permission denied, etc.) are hard failures
       throw new LoaderError(url, 'filesystem', err as Error);
     }
 

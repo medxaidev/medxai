@@ -174,6 +174,21 @@ export declare function buildSlicingDefinition(slicing: ElementDefinitionSlicing
 export declare function buildTypeConstraints(types: readonly ElementDefinitionType[] | undefined): TypeConstraint[];
 
 /**
+ * Build a PascalCase type name from path segments.
+ *
+ * @param components - Path segments (e.g., `['Patient', 'contact']`)
+ * @returns PascalCase type name (e.g., `'PatientContact'`)
+ *
+ * @example
+ * ```typescript
+ * buildTypeName(['Patient', 'contact'])  // → 'PatientContact'
+ * buildTypeName(['Bundle', 'entry', 'request'])  // → 'BundleEntryRequest'
+ * buildTypeName(['Patient'])  // → 'Patient'
+ * ```
+ */
+export declare function buildTypeName(components: string[]): string;
+
+/**
  * Describes a single error encountered while loading a StructureDefinition.
  */
 export declare interface BundleLoadError {
@@ -440,6 +455,31 @@ export declare interface CanonicalProfile {
      * the correct order during snapshot generation.
      */
     elements: Map<string, CanonicalElement>;
+    /**
+     * Inner types extracted from BackboneElement elements.
+     *
+     * Keyed by generated type name (e.g., `'PatientContact'`).
+     * Each inner type is itself a `CanonicalProfile` containing only
+     * the direct child elements of the BackboneElement.
+     *
+     * Populated by {@link extractInnerTypes} after snapshot generation.
+     * Inspired by Medplum's `InternalTypeSchema.innerTypes`.
+     *
+     * @example
+     * ```typescript
+     * const patientProfile = ...;
+     * const contactType = patientProfile.innerTypes?.get('PatientContact');
+     * // contactType.elements has: Patient.contact.relationship, Patient.contact.name, ...
+     * ```
+     */
+    innerTypes?: Map<string, CanonicalProfile>;
+    /**
+     * If this profile is an inner type, the generated type name of its parent.
+     *
+     * For example, `PatientContact` has `parentType: 'Patient'`.
+     * Top-level profiles have `parentType` as `undefined`.
+     */
+    parentType?: string;
 }
 
 /**
@@ -1112,11 +1152,7 @@ export declare interface ElementDefinition extends BackboneElement {
  * through the derived and related profiles.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.base
  */
-export declare interface ElementDefinitionBase {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
+export declare interface ElementDefinitionBase extends Element {
     /** Path that identifies the base element (1..1) */
     path: FhirString;
     /** Min cardinality of the base element (1..1) */
@@ -1134,11 +1170,7 @@ export declare interface ElementDefinitionBase {
  * conformance expectation.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.binding
  */
-export declare interface ElementDefinitionBinding {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
+export declare interface ElementDefinitionBinding extends Element {
     /**
      * required | extensible | preferred | example (1..1)
      *
@@ -1162,11 +1194,7 @@ export declare interface ElementDefinitionBinding {
  * for the element to be valid.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.constraint
  */
-export declare interface ElementDefinitionConstraint {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
+export declare interface ElementDefinitionConstraint extends Element {
     /**
      * Target of 'condition' reference (1..1)
      *
@@ -1210,11 +1238,7 @@ export declare interface ElementDefinitionConstraint {
  * A sample value for the element, providing an example for implementers.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.example
  */
-export declare interface ElementDefinitionExample {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
+export declare interface ElementDefinitionExample extends Element {
     /** Describes the purpose of this example (1..1) */
     label: FhirString;
     /**
@@ -1235,11 +1259,7 @@ export declare interface ElementDefinitionExample {
  * corresponds to this element.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.mapping
  */
-export declare interface ElementDefinitionMapping {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
+export declare interface ElementDefinitionMapping extends Element {
     /**
      * Reference to mapping declaration (1..1)
      *
@@ -1260,11 +1280,7 @@ export declare interface ElementDefinitionMapping {
  * for matching slices in an instance.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.slicing
  */
-export declare interface ElementDefinitionSlicing {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
+export declare interface ElementDefinitionSlicing extends Element {
     /**
      * Element values that are used to distinguish the slices (0..*)
      *
@@ -1291,11 +1307,7 @@ export declare interface ElementDefinitionSlicing {
  * The data type or resource that is a permitted type for the element.
  * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.type
  */
-export declare interface ElementDefinitionType {
-    /** Unique id for inter-element referencing (0..1) */
-    id?: FhirString;
-    /** Additional content defined by implementations (0..*) */
-    extension?: Extension[];
+export declare interface ElementDefinitionType extends Element {
     /**
      * Data type or Resource (name) (1..1)
      *
@@ -1359,10 +1371,15 @@ export declare interface Extension extends Element {
     /** Identifies the meaning of the extension (1..1) */
     url: FhirUri;
     /**
-     * Value of extension.
-     * This is a choice type [x] — the actual property name in JSON will be
-     * `valueString`, `valueCode`, `valueBoolean`, etc.
-     * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
+     * Value of extension (0..1).
+     *
+     * Choice type [x] — the actual property name in JSON will be
+     * `valueString`, `valueCode`, `valueBoolean`, `valueCoding`, etc.
+     * Allows **all** FHIR data types (~50+ types).
+     *
+     * Stage-1: represented as `unknown`; fhir-parser will handle
+     * concrete dispatch in Phase 2.
+     * @see https://hl7.org/fhir/R4/extensibility-definitions.html#Extension.value_x_
      */
     value?: unknown;
 }
@@ -1382,6 +1399,34 @@ export declare type ExtensionContextType = 'fhirpath' | 'element' | 'extension';
  * extractChoiceTypeName('Observation.value[x]', 'Observation.code')           // undefined
  */
 export declare function extractChoiceTypeName(choicePath: string, concretePath: string): string | undefined;
+
+/**
+ * Extract inner types from a CanonicalProfile.
+ *
+ * Scans the profile's elements for BackboneElement/Element types and creates
+ * independent `CanonicalProfile` instances for each, containing only their
+ * direct child elements.
+ *
+ * The returned Map is keyed by the generated type name (e.g., `'PatientContact'`).
+ * Each inner type has its `parentType` set to the profile's type name.
+ *
+ * **Note:** This function also handles nested BackboneElements. For example,
+ * if `Bundle.entry` is a BackboneElement containing `Bundle.entry.request`
+ * (also a BackboneElement), both `BundleEntry` and `BundleEntryRequest` will
+ * be extracted. `BundleEntryRequest` will have `parentType: 'BundleEntry'`.
+ *
+ * @param profile - The CanonicalProfile to extract inner types from
+ * @returns Map of inner type name → CanonicalProfile
+ *
+ * @example
+ * ```typescript
+ * const innerTypes = extractInnerTypes(patientProfile);
+ * // innerTypes.get('PatientContact')  → CanonicalProfile for Patient.contact
+ * // innerTypes.get('PatientCommunication')  → CanonicalProfile for Patient.communication
+ * // innerTypes.get('PatientLink')  → CanonicalProfile for Patient.link
+ * ```
+ */
+export declare function extractInnerTypes(profile: CanonicalProfile): Map<string, CanonicalProfile>;
 
 /**
  * Extract the first slice name from an element id.
@@ -1448,7 +1493,7 @@ export declare type FhirBase64Binary = Branded<string, 'FhirBase64Binary'>;
  * FHIR boolean: true | false
  * @see https://hl7.org/fhir/R4/datatypes.html#boolean
  */
-export declare type FhirBoolean = boolean;
+export declare type FhirBoolean = Branded<boolean, 'FhirBoolean'>;
 
 /**
  * FHIR canonical: a URI that refers to a resource by its canonical URL,
@@ -1571,6 +1616,29 @@ export declare interface FhirContext {
                     */
                    getStatistics(): ContextStatistics;
                    /**
+                    * Register a CanonicalProfile and its extracted InnerTypes.
+                    *
+                    * This is the primary method for making InnerTypes available for
+                    * downstream consumption (UI forms, recursive validation, etc.).
+                    * Typically called after snapshot generation + `extractInnerTypes()`.
+                    *
+                    * @param profile - The CanonicalProfile (with innerTypes populated)
+                    */
+                   registerCanonicalProfile(profile: CanonicalProfile): void;
+                   /**
+                    * Retrieve an InnerType schema by its generated type name.
+                    *
+                    * @param typeName - Generated type name (e.g., `'PatientContact'`)
+                    * @returns The InnerType CanonicalProfile, or `undefined` if not registered
+                    */
+                   getInnerType(typeName: string): CanonicalProfile | undefined;
+                   /**
+                    * Check whether an InnerType is registered.
+                    *
+                    * @param typeName - Generated type name (e.g., `'PatientContact'`)
+                    */
+                   hasInnerType(typeName: string): boolean;
+                   /**
                     * Release all cached data and reset internal state.
                     *
                     * After calling `dispose()`, the context must be re-initialized
@@ -1600,6 +1668,8 @@ export declare interface FhirContext {
                       private readonly _loader;
                       private readonly _options;
                       private readonly _stats;
+                      private readonly _innerTypes;
+                      private readonly _canonicalProfiles;
                       private _disposed;
                       constructor(options: FhirContextOptions);
                       loadStructureDefinition(url: string): Promise<StructureDefinition>;
@@ -1609,6 +1679,9 @@ export declare interface FhirContext {
                       registerStructureDefinition(sd: StructureDefinition): void;
                       preloadCoreDefinitions(): Promise<void>;
                       getStatistics(): ContextStatistics;
+                      registerCanonicalProfile(profile: CanonicalProfile): void;
+                      getInnerType(typeName: string): CanonicalProfile | undefined;
+                      hasInnerType(typeName: string): boolean;
                       dispose(): void;
                       /**
                        * Validate that a StructureDefinition has the minimum required fields.
@@ -2059,6 +2132,18 @@ export declare interface FhirContext {
                             */
                            source?: string;
                        }
+
+                       /**
+                        * Check if an element defines a BackboneElement or Element inner type.
+                        *
+                        * An element is an inner type root if:
+                        * - Its `types` array contains a type with `code === 'BackboneElement'` or `code === 'Element'`
+                        * - It is not the root element of the profile (path has at least one dot)
+                        *
+                        * @param element - The canonical element to check
+                        * @returns `true` if this element defines an inner type
+                        */
+                       export declare function isBackboneElementType(element: CanonicalElement): boolean;
 
                        /**
                         * Check whether a path ends with `[x]` (choice type wildcard).
@@ -2909,11 +2994,7 @@ export declare interface FhirContext {
                           * Designates a discriminator to differentiate between slices.
                           * @see https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.slicing.discriminator
                           */
-                         export declare interface SlicingDiscriminator {
-                             /** Unique id for inter-element referencing (0..1) */
-                             id?: FhirString;
-                             /** Additional content defined by implementations (0..*) */
-                             extension?: Extension[];
+                         export declare interface SlicingDiscriminator extends Element {
                              /**
                               * value | exists | pattern | type | profile (1..1)
                               * @see https://hl7.org/fhir/R4/valueset-discriminator-type.html
@@ -3389,13 +3470,7 @@ export declare interface FhirContext {
                           * type = 'Extension'.
                           * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.context
                           */
-                         export declare interface StructureDefinitionContext {
-                             /** Unique id for inter-element referencing (0..1) */
-                             id?: FhirString;
-                             /** Additional content defined by implementations (0..*) */
-                             extension?: Extension[];
-                             /** Extensions that cannot be ignored even if unrecognized (0..*) */
-                             modifierExtension?: Extension[];
+                         export declare interface StructureDefinitionContext extends BackboneElement {
                              /** fhirpath | element | extension (1..1) */
                              type: ExtensionContextType;
                              /** Where the extension can be used in instances (1..1) */
@@ -3408,13 +3483,7 @@ export declare interface FhirContext {
                           * format used when creating profiles.
                           * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.differential
                           */
-                         export declare interface StructureDefinitionDifferential {
-                             /** Unique id for inter-element referencing (0..1) */
-                             id?: FhirString;
-                             /** Additional content defined by implementations (0..*) */
-                             extension?: Extension[];
-                             /** Extensions that cannot be ignored even if unrecognized (0..*) */
-                             modifierExtension?: Extension[];
+                         export declare interface StructureDefinitionDifferential extends BackboneElement {
                              /**
                               * Definition of elements in the resource (if no StructureDefinition) (1..*)
                               *
@@ -3476,13 +3545,7 @@ export declare interface FhirContext {
                               * A mapping to an external specification that the structure conforms to.
                               * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.mapping
                               */
-                             export declare interface StructureDefinitionMapping {
-                                 /** Unique id for inter-element referencing (0..1) */
-                                 id?: FhirString;
-                                 /** Additional content defined by implementations (0..*) */
-                                 extension?: Extension[];
-                                 /** Extensions that cannot be ignored even if unrecognized (0..*) */
-                                 modifierExtension?: Extension[];
+                             export declare interface StructureDefinitionMapping extends BackboneElement {
                                  /** Internal id when this mapping is used (1..1) */
                                  identity: FhirId;
                                  /** Identifies what this mapping refers to (0..1) */
@@ -3585,13 +3648,7 @@ export declare interface FhirContext {
                                   * inheritance chain.
                                   * @see https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.snapshot
                                   */
-                                 export declare interface StructureDefinitionSnapshot {
-                                     /** Unique id for inter-element referencing (0..1) */
-                                     id?: FhirString;
-                                     /** Additional content defined by implementations (0..*) */
-                                     extension?: Extension[];
-                                     /** Extensions that cannot be ignored even if unrecognized (0..*) */
-                                     modifierExtension?: Extension[];
+                                 export declare interface StructureDefinitionSnapshot extends BackboneElement {
                                      /**
                                       * Definition of elements in the resource (if no StructureDefinition) (1..*)
                                       *
@@ -3770,9 +3827,15 @@ export declare interface FhirContext {
                                           /** Type of context being specified (1..1) */
                                           code: Coding;
                                           /**
-                                           * Value that defines the context.
-                                           * Choice type [x]: valueCodeableConcept | valueQuantity | valueRange | valueReference
-                                           * Stage-1: represented as unknown; fhir-parser will handle concrete dispatch.
+                                           * Value that defines the context (1..1).
+                                           *
+                                           * Choice type [x] — the actual property name in JSON will be
+                                           * `valueCodeableConcept`, `valueQuantity`, `valueRange`, or `valueReference`.
+                                           * Allows: CodeableConcept | Quantity | Range | Reference.
+                                           *
+                                           * Stage-1: represented as `unknown`; fhir-parser will handle
+                                           * concrete dispatch in Phase 2.
+                                           * @see https://hl7.org/fhir/R4/metadatatypes-definitions.html#UsageContext.value_x_
                                            */
                                           value?: unknown;
                                       }
