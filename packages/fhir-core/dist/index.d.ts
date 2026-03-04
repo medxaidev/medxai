@@ -1,9 +1,13 @@
 /**
- * `@medxai/fhir-core` — Public API
+ * `@medxai/fhir-core` — Public API (Frozen at v0.1.0)
  *
- * Re-exports all public types from the model, parser, and context layers.
- * Additional modules (profile, validator) will be added here as they
- * are implemented in later phases.
+ * Re-exports all public types and functions from the six core modules:
+ *   model → parser → context → profile → validator (+ fhirpath internal)
+ *
+ * This file defines the frozen public API surface for @medxai/fhir-core v0.1.
+ * Any symbol exported here is subject to the v0.1 compatibility contract.
+ * See: docs/specs/engine-capability-contract-v0.1.md
+ *      docs/api/fhir-core-api-v0.1.md
  *
  * @packageDocumentation
  */
@@ -578,8 +582,12 @@ export declare const COMPLEX_TYPES: readonly ["Address", "Age", "Annotation", "A
  * A loader that delegates to an ordered list of child loaders.
  *
  * Resolution stops at the first loader that returns a non-null result.
- * If a loader throws a {@link LoaderError}, the error is propagated
- * immediately (no fallback for hard failures).
+ * If a loader throws an error, the error is collected and the next
+ * loader is tried. If all loaders fail or return null, the first
+ * collected error (if any) is thrown.
+ *
+ * This follows the HAPI `ValidationSupportChain` pattern: record
+ * errors from individual loaders but continue trying remaining loaders.
  *
  * @example
  * ```typescript
