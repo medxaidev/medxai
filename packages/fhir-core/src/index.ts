@@ -1,9 +1,13 @@
 /**
- * `@medxai/fhir-core` — Public API
+ * `@medxai/fhir-core` — Public API (Frozen at v0.1.0)
  *
- * Re-exports all public types from the model, parser, and context layers.
- * Additional modules (profile, validator) will be added here as they
- * are implemented in later phases.
+ * Re-exports all public types and functions from the six core modules:
+ *   model → parser → context → profile → validator (+ fhirpath internal)
+ *
+ * This file defines the frozen public API surface for @medxai/fhir-core v0.1.
+ * Any symbol exported here is subject to the v0.1 compatibility contract.
+ * See: docs/specs/engine-capability-contract-v0.1.md
+ *      docs/api/fhir-core-api-v0.1.md
  *
  * @packageDocumentation
  */
