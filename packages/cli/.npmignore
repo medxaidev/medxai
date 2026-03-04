@@ -1,0 +1,41 @@
+# Source files
+src/
+tsconfig.json
+scripts/
+
+# Tests
+**/__tests__/
+**/*.test.ts
+**/*.spec.ts
+**/fixtures/
+
+# Development files
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts (keep dist/)
+node_modules/
+
+# Documentation (keep README.md, LICENSE, CHANGELOG.md via package.json files field)
+docs/
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Misc
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+.env.local

@@ -253,3 +253,11 @@ export {
   ProfileNotFoundError,
   ValidationFailedError,
 } from './validator/index.js';
+
+// ─── FHIRPath module (public evaluation API) ─────────────────────────────
+export {
+  evalFhirPath,
+  evalFhirPathBoolean,
+  evalFhirPathTyped,
+  evalFhirPathString,
+} from './fhirpath/index.js';

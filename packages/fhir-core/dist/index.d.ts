@@ -33,6 +33,32 @@ export declare type AggregationMode = 'contained' | 'referenced' | 'bundled';
 export declare const ALL_CORE_DEFINITIONS: readonly string[];
 
 /**
+ * Interface for all AST nodes in the FHIRPath expression tree.
+ * Each node can evaluate itself given a context and input collection.
+ */
+declare interface Atom {
+    /**
+     * Evaluate this atom against the given input collection.
+     * @param context - The evaluation context (variables, parent scope).
+     * @param input - The input collection of typed values.
+     * @returns The result collection.
+     */
+    eval(context: AtomContext, input: TypedValue[]): TypedValue[];
+    /** Returns a string representation of this atom (for debugging). */
+    toString(): string;
+}
+
+/**
+ * Evaluation context for FHIRPath expressions.
+ * Supports nested scoping via the `parent` chain, used by functions
+ * like `where()` and `select()` that introduce `$this`.
+ */
+declare interface AtomContext {
+    readonly parent?: AtomContext;
+    readonly variables: Record<string, TypedValue>;
+}
+
+/**
  * Base definition for all elements that are defined inside a resource,
  * but not those in a data type.
  * @see https://hl7.org/fhir/R4/backboneelement.html
@@ -1371,6 +1397,51 @@ export declare interface ElementDefinitionType extends Element {
 export declare function ensureElementIds(elements: ElementDefinition[], resourceType?: string): void;
 
 /**
+ * Evaluate a FHIRPath expression against a resource or other object.
+ * Accepts raw values (auto-wrapped in TypedValue) or pre-wrapped TypedValue arrays.
+ *
+ * @param expression - The FHIRPath expression string or pre-parsed AST.
+ * @param input - The resource or object to evaluate against.
+ * @returns Array of result values (unwrapped from TypedValue).
+ */
+export declare function evalFhirPath(expression: string | FhirPathAtom, input: unknown): unknown[];
+
+/**
+ * Evaluate a FHIRPath expression and return a boolean result.
+ *
+ * Useful for invariant validation where the expression must evaluate to `true`.
+ * Uses FHIRPath boolean semantics: empty → false, single truthy → true.
+ *
+ * @param expression - FHIRPath expression string or pre-parsed AST.
+ * @param input - The resource or typed values to evaluate against.
+ * @param variables - Optional variable bindings.
+ * @returns Boolean result of the expression.
+ */
+export declare function evalFhirPathBoolean(expression: string | FhirPathAtom, input: unknown, variables?: Record<string, TypedValue>): boolean;
+
+/**
+ * Evaluate a FHIRPath expression and return the first result as a string.
+ *
+ * Useful for extracting display values, identifiers, etc.
+ *
+ * @param expression - FHIRPath expression string or pre-parsed AST.
+ * @param input - The resource or typed values to evaluate against.
+ * @param variables - Optional variable bindings.
+ * @returns The first result value as a string, or `undefined` if empty.
+ */
+export declare function evalFhirPathString(expression: string | FhirPathAtom, input: unknown, variables?: Record<string, TypedValue>): string | undefined;
+
+/**
+ * Evaluate a FHIRPath expression against typed input values.
+ *
+ * @param expression - The FHIRPath expression string or pre-parsed AST.
+ * @param input - Array of TypedValue inputs.
+ * @param variables - Optional variable bindings.
+ * @returns Array of TypedValue results.
+ */
+export declare function evalFhirPathTyped(expression: string | FhirPathAtom, input: TypedValue[], variables?: Record<string, TypedValue>): TypedValue[];
+
+/**
  * An Extension: additional information that is not part of the basic
  * definition of the resource.
  * @see https://hl7.org/fhir/R4/extensibility.html#Extension
@@ -1800,6 +1871,18 @@ export declare interface FhirContext {
                    * @see https://hl7.org/fhir/R4/datatypes.html#oid
                    */
                   export declare type FhirOid = Branded<string, 'FhirOid'>;
+
+                  /**
+                   * Root wrapper atom for a parsed FHIRPath expression.
+                   * Iterates over each input element, setting `$this` for each evaluation.
+                   */
+                  declare class FhirPathAtom implements Atom {
+                      readonly original: string;
+                      readonly child: Atom;
+                      constructor(original: string, child: Atom);
+                      eval(context: AtomContext, input: TypedValue[]): TypedValue[];
+                      toString(): string;
+                  }
 
                   /**
                    * FHIR positiveInt: positive integer in the range 1..2,147,483,647.
@@ -3795,6 +3878,20 @@ export declare interface FhirContext {
                                        * @see https://hl7.org/fhir/R4/valueset-type-derivation-rule.html
                                        */
                                       export declare type TypeDerivationRule = 'specialization' | 'constraint';
+
+                                      /**
+                                       * A value paired with its FHIR type identifier.
+                                       * This is the fundamental unit of data flowing through the FHIRPath engine.
+                                       *
+                                       * @example
+                                       * ```ts
+                                       * const tv: TypedValue = { type: PropertyType.string, value: 'hello' };
+                                       * ```
+                                       */
+                                      declare interface TypedValue {
+                                          readonly type: string;
+                                          readonly value: unknown;
+                                      }
 
                                       /**
                                        * Thrown when differential elements remain unconsumed after snapshot

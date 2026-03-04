@@ -1,7 +1,7 @@
 {
   "name": "@medxai/cli",
-  "version": "0.0.1",
-  "description": "FHIR CLI",
+  "version": "0.1.0",
+  "description": "MedXAI FHIR Engine CLI — Operational Console for FHIR R4 structure analysis and validation",
   "homepage": "https://medxai.com.cn",
   "license": "Apache-2.0",
   "author": "Fangjun <fangjun20208@gmail.com>",
@@ -11,15 +11,16 @@
     "healthcare",
     "hl7",
     "typescript",
-    "parser",
+    "cli",
     "validator",
+    "fhirpath",
     "medical",
     "interoperability"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/medxaidev/medxai.git",
-    "directory": "packages/fhir-core"
+    "directory": "packages/cli"
   },
   "bugs": {
     "url": "https://github.com/medxaidev/medxai/issues"
@@ -28,20 +29,17 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "sideEffects": false,
   "type": "module",
-  "main": "./dist/cjs/index.cjs",
-  "module": "./dist/esm/index.mjs",
-  "types": "./dist/index.d.ts",
+  "bin": {
+    "medxai": "./dist/bin/medxai.mjs"
+  },
+  "main": "./dist/esm/index.mjs",
+  "types": "./dist/lib/index.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/esm/index.d.ts",
+        "types": "./dist/lib/index.d.ts",
         "default": "./dist/esm/index.mjs"
-      },
-      "require": {
-        "types": "./dist/cjs/index.d.ts",
-        "default": "./dist/cjs/index.cjs"
       }
     },
     "./package.json": "./package.json"
@@ -55,6 +53,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "build": "npm run clean && tsc && node ./scripts/esbuild.mjs",
+    "dev": "node --import tsx ./src/bin/medxai.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -64,10 +63,8 @@
     "typescript": "5.9.3",
     "@types/node": "25.2.0",
     "rimraf": "6.1.2",
-    "esbuild": "0.27.2",
-    "@microsoft/api-extractor": "7.56.1"
+    "esbuild": "0.27.2"
   },
-  "peerDependencies": {},
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"

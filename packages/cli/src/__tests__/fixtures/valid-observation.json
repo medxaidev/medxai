@@ -1,0 +1,20 @@
+{
+  "resourceType": "Observation",
+  "id": "test-obs",
+  "status": "final",
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "29463-7",
+        "display": "Body weight"
+      }
+    ]
+  },
+  "valueQuantity": {
+    "value": 75,
+    "unit": "kg",
+    "system": "http://unitsofmeasure.org",
+    "code": "kg"
+  }
+}

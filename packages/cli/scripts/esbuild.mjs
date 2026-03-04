@@ -1,29 +1,20 @@
 import { build } from 'esbuild';
-import { writeFileSync, copyFileSync, readFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 
 // 读取 package.json
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
-// 设置外部依赖
+// 设置外部依赖 — fhir-core 打包进 CLI
 const external = [
-  ...Object.keys(pkg.dependencies || {}),
-  ...Object.keys(pkg.peerDependencies || {}),
-  'node:*'
+  'node:*',
+  'node:fs',
+  'node:path',
+  'node:process',
+  'node:url',
 ];
-
-// 类型声明文件路径
-const dtsSource = './dist/index.d.ts';
-const dtsEsmDest = './dist/esm/index.d.ts';
-const dtsCjsDest = './dist/cjs/index.d.ts';
-
-// 运行 api-extractor 生成单一类型声明
-console.log('Running api-extractor...');
-execSync('api-extractor run --local', { stdio: 'inherit' });
 
 // 构建通用配置
 const baseOptions = {
-  entryPoints: ['./src/index.ts'],
   bundle: true,
   sourcemap: true,
   platform: 'node',
@@ -31,72 +22,51 @@ const baseOptions = {
   tsconfig: 'tsconfig.json',
   loader: { '.ts': 'ts' },
   resolveExtensions: ['.ts', '.js'],
-  external
+  external,
+  define: {
+    'CLI_VERSION': JSON.stringify(pkg.version),
+  },
 };
 
-// 顺序构建 ESM
-async function buildESM() {
-  console.log('Building ESM...');
+// 构建 CLI bin 入口
+async function buildBin() {
+  console.log('Building CLI binary...');
+  mkdirSync('./dist/bin', { recursive: true });
   await build({
     ...baseOptions,
+    entryPoints: ['./src/bin/medxai.ts'],
     format: 'esm',
-    outfile: './dist/esm/index.mjs'
+    outfile: './dist/bin/medxai.mjs',
+    banner: {
+      js: '#!/usr/bin/env node\n',
+    },
+  });
+  console.log('CLI binary built.');
+}
+
+// 构建 ESM library (programmatic API)
+async function buildESM() {
+  console.log('Building ESM library...');
+  mkdirSync('./dist/esm', { recursive: true });
+  await build({
+    ...baseOptions,
+    entryPoints: ['./src/index.ts'],
+    format: 'esm',
+    outfile: './dist/esm/index.mjs',
   });
 
-  // 复制类型声明
-  copyFileSync(dtsSource, dtsEsmDest);
-
-  // 写子 package.json
   writeFileSync(
     './dist/esm/package.json',
-    JSON.stringify(
-      {
-        type: 'module',
-        main: 'index.mjs',
-        types: 'index.d.ts'
-      },
-      null,
-      2
-    )
+    JSON.stringify({ type: 'module', main: 'index.mjs' }, null, 2),
   );
-
-  console.log('ESM build finished.');
+  console.log('ESM library built.');
 }
 
-// 顺序构建 CJS
-async function buildCJS() {
-  console.log('Building CJS...');
-  await build({
-    ...baseOptions,
-    format: 'cjs',
-    outfile: './dist/cjs/index.cjs'
-  });
-
-  // 复制类型声明
-  copyFileSync(dtsSource, dtsCjsDest);
-
-  // 写子 package.json
-  writeFileSync(
-    './dist/cjs/package.json',
-    JSON.stringify(
-      {
-        type: 'commonjs',
-        main: 'index.cjs',
-        types: 'index.d.ts'
-      },
-      null,
-      2
-    )
-  );
-
-  console.log('CJS build finished.');
-}
-
-// 主函数顺序执行
+// 主函数
 async function main() {
   try {
+    await buildBin();
     await buildESM();
-    await buildCJS();
     console.log('Build all done.');
   } catch (err) {
     console.error(err);
